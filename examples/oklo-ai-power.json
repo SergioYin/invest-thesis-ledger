@@ -1,0 +1,98 @@
+{
+  "ledger_version": "0.1.0",
+  "thesis_id": "oklo-ai-power",
+  "title": "Oklo AI Power Demand Thesis",
+  "asset": {
+    "name": "Oklo Inc.",
+    "type": "equity",
+    "ticker": "OKLO"
+  },
+  "created": "2026-05-12",
+  "updated": "2026-05-12",
+  "thesis": "Advanced nuclear developers may benefit if AI data center demand increases the value of firm, clean power, but commercialization timing and regulatory execution remain the core constraints.",
+  "sources": [
+    {
+      "id": "S1",
+      "title": "Company investor presentation",
+      "publisher": "Oklo",
+      "date": "2026-05-01",
+      "url": "https://example.com/oklo-investor-presentation"
+    },
+    {
+      "id": "S2",
+      "title": "Electricity demand outlook",
+      "publisher": "Grid Research Desk",
+      "date": "2026-04-20",
+      "url": "https://example.com/electricity-demand-outlook"
+    },
+    {
+      "id": "S3",
+      "title": "Nuclear licensing status note",
+      "publisher": "Regulatory Monitor",
+      "date": "2026-04-28",
+      "url": "https://example.com/nuclear-licensing-status"
+    }
+  ],
+  "positions": [
+    "Watchlist only until milestone evidence improves.",
+    "No thesis action without updated cash runway and licensing review."
+  ],
+  "assumptions": [
+    {
+      "id": "A1",
+      "statement": "AI data center operators continue seeking long-duration clean power contracts.",
+      "confidence": "medium",
+      "source_ids": ["S2"]
+    },
+    {
+      "id": "A2",
+      "statement": "Oklo can preserve financing flexibility through the next licensing milestones.",
+      "confidence": "low",
+      "source_ids": ["S1", "S3"]
+    }
+  ],
+  "catalysts": [
+    "Signed commercial power purchase agreement with credible counterparty.",
+    "Material licensing update with a clear review timeline.",
+    "Capital raise or partnership that reduces funding risk."
+  ],
+  "risks": [
+    {
+      "id": "R1",
+      "name": "Licensing delay",
+      "severity": "high",
+      "probability": "medium",
+      "mitigation": "Require dated regulatory milestones before increasing conviction.",
+      "source_ids": ["S3"]
+    },
+    {
+      "id": "R2",
+      "name": "Narrative valuation",
+      "severity": "medium",
+      "probability": "high",
+      "mitigation": "Separate power-demand narrative from contracted revenue evidence.",
+      "source_ids": ["S1", "S2"]
+    }
+  ],
+  "checklist": [
+    {
+      "id": "C1",
+      "item": "Confirm latest cash balance and expected burn.",
+      "status": "open"
+    },
+    {
+      "id": "C2",
+      "item": "Map each announced customer to binding contract evidence.",
+      "status": "open"
+    }
+  ],
+  "reviews": [
+    {
+      "date": "2026-05-12",
+      "decision": "watch",
+      "summary": "Initial ledger created. Demand backdrop is attractive, but investability depends on licensing and financing evidence.",
+      "drift": "none recorded",
+      "source_ids": ["S1", "S2", "S3"]
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "checklist": [
+    {
+      "id": "C1",
+      "item": "Confirm latest cash balance and expected burn.",
+      "status": "open"
+    },
+    {
+      "id": "C2",
+      "item": "Map each announced customer to binding contract evidence.",
+      "status": "open"
+    }
+  ],
+  "risks": [
+    {
+      "id": "R1",
+      "mitigation": "Require dated regulatory milestones before increasing conviction.",
+      "name": "Licensing delay",
+      "probability": "medium",
+      "severity": "high",
+      "source_ids": [
+        "S3"
+      ]
+    },
+    {
+      "id": "R2",
+      "mitigation": "Separate power-demand narrative from contracted revenue evidence.",
+      "name": "Narrative valuation",
+      "probability": "high",
+      "severity": "medium",
+      "source_ids": [
+        "S1",
+        "S2"
+      ]
+    }
+  ],
+  "thesis_id": "oklo-ai-power",
+  "title": "Oklo AI Power Demand Thesis",
+  "updated": "2026-05-12"
+}

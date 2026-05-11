@@ -1,0 +1,19 @@
+{
+  "created": "2026-05-12",
+  "reviews": [
+    {
+      "date": "2026-05-12",
+      "decision": "watch",
+      "drift": "none recorded",
+      "source_ids": [
+        "S1",
+        "S2",
+        "S3"
+      ],
+      "summary": "Initial ledger created. Demand backdrop is attractive, but investability depends on licensing and financing evidence."
+    }
+  ],
+  "thesis_id": "oklo-ai-power",
+  "title": "Oklo AI Power Demand Thesis",
+  "updated": "2026-05-12"
+}

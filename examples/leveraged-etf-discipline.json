@@ -1,0 +1,95 @@
+{
+  "ledger_version": "0.1.0",
+  "thesis_id": "leveraged-etf-discipline",
+  "title": "Leveraged ETF Discipline Ledger",
+  "asset": {
+    "name": "Generic 2x Equity Index ETF",
+    "type": "fund",
+    "ticker": "LEV2X"
+  },
+  "created": "2026-05-12",
+  "updated": "2026-05-12",
+  "thesis": "Leveraged ETFs can express short-term tactical views, but path dependency, volatility drag, and position sizing rules must dominate the decision process.",
+  "sources": [
+    {
+      "id": "S1",
+      "title": "Leveraged and inverse ETF risk bulletin",
+      "publisher": "Investor Education Desk",
+      "date": "2026-03-15",
+      "url": "https://example.com/leveraged-etf-risk-bulletin"
+    },
+    {
+      "id": "S2",
+      "title": "Volatility drag illustration",
+      "publisher": "Portfolio Research Notes",
+      "date": "2026-04-05",
+      "url": "https://example.com/volatility-drag"
+    }
+  ],
+  "positions": [
+    "Maximum planned holding period is five trading days.",
+    "Position size must be smaller than the equivalent unlevered exposure."
+  ],
+  "assumptions": [
+    {
+      "id": "A1",
+      "statement": "The instrument is used for a defined short-term thesis rather than a long-term allocation.",
+      "confidence": "high",
+      "source_ids": ["S1"]
+    },
+    {
+      "id": "A2",
+      "statement": "Volatility conditions are reviewed before entry and daily while open.",
+      "confidence": "medium",
+      "source_ids": ["S2"]
+    }
+  ],
+  "catalysts": [
+    "Index breaks above predefined technical level.",
+    "Macro event calendar supports a time-boxed tactical setup."
+  ],
+  "risks": [
+    {
+      "id": "R1",
+      "name": "Volatility drag",
+      "severity": "high",
+      "probability": "high",
+      "mitigation": "Use only with explicit holding-period limit and daily review.",
+      "source_ids": ["S1", "S2"]
+    },
+    {
+      "id": "R2",
+      "name": "Oversized exposure",
+      "severity": "high",
+      "probability": "medium",
+      "mitigation": "Cap notional exposure before order entry.",
+      "source_ids": ["S1"]
+    }
+  ],
+  "checklist": [
+    {
+      "id": "C1",
+      "item": "Record entry price, stop, target, and expiry date before trade.",
+      "status": "open"
+    },
+    {
+      "id": "C2",
+      "item": "Confirm no earnings, CPI, FOMC, or other event invalidates sizing.",
+      "status": "open"
+    },
+    {
+      "id": "C3",
+      "item": "Review realized leverage and tracking after each close.",
+      "status": "open"
+    }
+  ],
+  "reviews": [
+    {
+      "date": "2026-05-12",
+      "decision": "policy",
+      "summary": "Created a discipline ledger for tactical leveraged ETF use.",
+      "drift": "none recorded",
+      "source_ids": ["S1", "S2"]
+    }
+  ]
+}
