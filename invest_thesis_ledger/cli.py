@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import argparse
+import shutil
 import sys
+import tempfile
 from pathlib import Path
 from typing import Callable, Optional, Sequence
 
@@ -140,6 +142,15 @@ def build_parser() -> argparse.ArgumentParser:
     watchlist.add_argument("ledgers", metavar="LEDGER", nargs="+", help="ledger JSON file")
     _add_output_args(watchlist)
     watchlist.set_defaults(func=_cmd_watchlist)
+
+    demo_bundle = subparsers.add_parser(
+        "demo-bundle",
+        help="write a static Markdown demo bundle from two or more ledgers",
+        description="write a static Markdown demo bundle from two or more ledgers.",
+    )
+    demo_bundle.add_argument("ledgers", metavar="LEDGER", nargs="+", help="ledger JSON file")
+    demo_bundle.add_argument("--output-dir", required=True, metavar="DIR", help="write static demo bundle to DIR")
+    demo_bundle.set_defaults(func=_cmd_demo_bundle)
 
     init_template = subparsers.add_parser("init-template", help="create a deterministic starter ledger")
     init_template.add_argument("--asset", required=True, metavar="TICKER", help="asset ticker or symbol")
@@ -333,29 +344,39 @@ def _cmd_review_queue(args: argparse.Namespace) -> int:
 
 
 def _cmd_watchlist(args: argparse.Namespace) -> int:
-    if len(args.ledgers) < 2:
-        sys.stderr.write("error: watchlist requires at least two ledger JSON files\n")
-        return 2
-    ledgers = []
-    for path in args.ledgers:
-        ledger = _load_or_report(path)
-        if ledger is None:
-            return 2
-        ledgers.append(ledger)
-
-    validation_results = [(ledger, *validate_ledger(ledger)) for ledger in ledgers]
-    if any(errors for _, errors, _ in validation_results):
-        for ledger, errors, warnings in validation_results:
-            if errors:
-                sys.stderr.write(validation_summary(ledger, errors, warnings))
-        return 1
-    for ledger, errors, warnings in validation_results:
-        if warnings:
-            sys.stderr.write(validation_summary(ledger, errors, warnings))
+    ledgers, status = _load_validated_ledgers(args.ledgers, "watchlist")
+    if ledgers is None:
+        return status
 
     _write_text(args.output, render_watchlist(ledgers))
     _write_text(args.json_output, to_json(watchlist_payload(ledgers)))
     sys.stdout.write(f"wrote: {args.output}, {args.json_output}\n")
+    return 0
+
+
+def _cmd_demo_bundle(args: argparse.Namespace) -> int:
+    ledgers, status = _load_validated_ledgers(args.ledgers, "demo-bundle")
+    if ledgers is None:
+        return status
+
+    output_dir = Path(args.output_dir)
+    files = _demo_bundle_files(ledgers)
+    if output_dir.exists() and (not output_dir.is_dir() or output_dir.is_symlink()):
+        sys.stderr.write(f"error: output dir is not a directory: {output_dir}\n")
+        return 2
+    if output_dir.resolve() == Path.cwd().resolve():
+        sys.stderr.write(f"error: refusing to replace current working directory: {output_dir}\n")
+        return 2
+
+    try:
+        _write_demo_bundle_dir(output_dir, files)
+    except OSError as exc:
+        sys.stderr.write(f"error: cannot write demo bundle {output_dir}: {exc}\n")
+        return 2
+    except ValueError as exc:
+        sys.stderr.write(f"error: cannot write demo bundle {output_dir}: {exc}\n")
+        return 2
+    sys.stdout.write(f"wrote: {output_dir}\n")
     return 0
 
 
@@ -395,10 +416,156 @@ def _load_or_report(path: str) -> Optional[dict]:
     return None
 
 
+def _load_validated_ledgers(paths: Sequence[str], command: str) -> tuple[Optional[list[dict]], int]:
+    if len(paths) < 2:
+        sys.stderr.write(f"error: {command} requires at least two ledger JSON files\n")
+        return None, 2
+    ledgers = []
+    for path in paths:
+        ledger = _load_or_report(path)
+        if ledger is None:
+            return None, 2
+        ledgers.append(ledger)
+
+    validation_results = [(ledger, *validate_ledger(ledger)) for ledger in ledgers]
+    if any(errors for _, errors, _ in validation_results):
+        for ledger, errors, warnings in validation_results:
+            if errors:
+                sys.stderr.write(validation_summary(ledger, errors, warnings))
+        return None, 1
+    for ledger, errors, warnings in validation_results:
+        if warnings:
+            sys.stderr.write(validation_summary(ledger, errors, warnings))
+    return ledgers, 0
+
+
 def _write_text(path: str, text: str) -> None:
     output_path = Path(path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(text, encoding="utf-8")
+
+
+def _write_demo_bundle_dir(output_dir: Path, files: Sequence[tuple[str, str]]) -> None:
+    parent = output_dir.parent
+    parent.mkdir(parents=True, exist_ok=True)
+    stage = Path(tempfile.mkdtemp(prefix=f".{output_dir.name}.", suffix=".tmp", dir=parent))
+    backup: Optional[Path] = None
+    try:
+        for filename, text in files:
+            path = Path(filename)
+            if path.is_absolute() or path.name != filename:
+                raise ValueError(f"generated filename must stay inside output dir: {filename}")
+            (stage / filename).write_text(text, encoding="utf-8")
+
+        if output_dir.exists():
+            backup = Path(tempfile.mkdtemp(prefix=f".{output_dir.name}.", suffix=".backup", dir=parent))
+            backup.rmdir()
+            output_dir.replace(backup)
+        stage.replace(output_dir)
+        if backup is not None:
+            shutil.rmtree(backup)
+    except Exception:
+        if stage.exists():
+            shutil.rmtree(stage)
+        if backup is not None and backup.exists() and not output_dir.exists():
+            backup.replace(output_dir)
+        raise
+
+
+def _demo_bundle_files(ledgers: Sequence[dict]) -> list[tuple[str, str]]:
+    body_files: list[tuple[str, str]] = []
+    ledger_prefixes = _bundle_prefixes(ledgers)
+    ledger_artifacts = (
+        ("brief", render_brief),
+        ("risk", render_risk),
+        ("history", render_history),
+        ("decision-memo", render_decision_memo),
+        ("scenario-plan", render_scenario_plan),
+    )
+    for ledger, ledger_id in zip(ledgers, ledger_prefixes):
+        for suffix, renderer in ledger_artifacts:
+            body_files.append((f"{ledger_id}-{suffix}.md", renderer(ledger)))
+    body_files.extend(
+        [
+            ("portfolio-summary.md", render_portfolio(ledgers)),
+            ("watchlist.md", render_watchlist(ledgers)),
+        ]
+    )
+    filenames = ["index.md"] + [filename for filename, _ in body_files] + ["manifest.json"]
+    index_text = _render_demo_bundle_index(ledgers, filenames)
+    manifest = {
+        "generated_files": filenames,
+        "ledger_ids": [str(ledger["thesis_id"]) for ledger in ledgers],
+        "tool_version": __version__,
+    }
+    files = [("index.md", index_text)]
+    files.extend(body_files)
+    files.append(("manifest.json", to_json(manifest)))
+    return files
+
+
+def _render_demo_bundle_index(ledgers: Sequence[dict], generated_files: Sequence[str]) -> str:
+    lines = [
+        "# Invest Thesis Ledger Demo Bundle",
+        "",
+        "> This is a research organization tool, not investment advice.",
+        "",
+        f"- Tool Version: {__version__}",
+        f"- Ledgers: {len(ledgers)}",
+        "",
+        "## Input Ledgers",
+        "",
+        "| Ticker | Title | Ledger ID | Updated |",
+        "| --- | --- | --- | --- |",
+    ]
+    for ledger in ledgers:
+        asset = ledger["asset"]
+        lines.append(
+            "| "
+            + " | ".join(
+                [
+                    _bundle_cell(str(asset["ticker"])),
+                    _bundle_cell(str(ledger["title"])),
+                    _bundle_cell(str(ledger["thesis_id"])),
+                    _bundle_cell(str(ledger["updated"])),
+                ]
+            )
+            + " |"
+        )
+    lines.extend(["", "## Bundle Files", ""])
+    for filename in generated_files:
+        lines.append(f"- [{_bundle_link_label(filename)}]({filename})")
+    return "\n".join(lines) + "\n"
+
+
+def _bundle_slug(value: str) -> str:
+    slug = "".join(char.lower() if char.isalnum() else "-" for char in value).strip("-")
+    while "--" in slug:
+        slug = slug.replace("--", "-")
+    return slug or "ledger"
+
+
+def _bundle_prefixes(ledgers: Sequence[dict]) -> list[str]:
+    used: set[str] = set()
+    prefixes = []
+    for ledger in ledgers:
+        base = _bundle_slug(str(ledger["thesis_id"]))
+        candidate = base
+        index = 2
+        while candidate in used:
+            candidate = f"{base}-{index}"
+            index += 1
+        used.add(candidate)
+        prefixes.append(candidate)
+    return prefixes
+
+
+def _bundle_cell(value: str) -> str:
+    return value.replace("\r", " ").replace("\n", " ").replace("|", "\\|")
+
+
+def _bundle_link_label(value: str) -> str:
+    return value.replace("[", "\\[").replace("]", "\\]")
 
 
 def _starter_ledger(asset: str, name: str, asset_type: str) -> dict:
@@ -407,7 +574,7 @@ def _starter_ledger(asset: str, name: str, asset_type: str) -> dict:
     clean_name = name.strip()
     clean_type = asset_type.strip()
     return {
-        "ledger_version": "0.8.0",
+        "ledger_version": "0.9.0",
         "thesis_id": f"{slug}-thesis",
         "title": f"{clean_name} Thesis Ledger",
         "asset": {

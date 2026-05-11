@@ -5,8 +5,9 @@ ledgers as JSON, then rendering deterministic briefs, risk reports, review
 timelines, thesis drift comparisons, catalyst calendars, evidence coverage
 reports, broker/institution matrices, exposure checklists, deterministic
 starter ledger generation, decision memos, scenario plans, portfolio-level
-summaries, review queues, and weekly watchlists. v0.8.0 adds the watchlist
-workflow while preserving compatibility with v0.1.0 through v0.7.0 ledgers.
+summaries, review queues, weekly watchlists, and static demo bundles. v0.9.0
+adds the `demo-bundle` workflow while preserving compatibility with v0.1.0
+through v0.8.0 ledgers.
 
 This project is for research organization only. It is not investment advice.
 
@@ -125,6 +126,12 @@ Render a weekly watchlist ranked by review queue score:
 python -m invest_thesis_ledger watchlist examples/oklo-ai-power.json examples/leveraged-etf-discipline.json --output watchlist.md --json-output watchlist.json
 ```
 
+Write a static deterministic Markdown demo bundle:
+
+```bash
+python -m invest_thesis_ledger demo-bundle examples/oklo-ai-power.json examples/leveraged-etf-discipline.json --output-dir demo-bundle
+```
+
 Create a deterministic starter ledger:
 
 ```bash
@@ -139,7 +146,7 @@ input file list.
 
 ## Ledger Format
 
-Ledgers are JSON objects. The v0.8.0 required fields are:
+Ledgers are JSON objects. The v0.9.0 required fields are:
 
 - `ledger_version`
 - `thesis_id`
@@ -176,7 +183,7 @@ ID.
 optional string `tags`; `exposure` combines these risk tags with position rules
 into a checklist.
 
-The formal v0.8.0 schema reference is in `docs/ledger-schema.md`.
+The formal v0.9.0 schema reference is in `docs/ledger-schema.md`.
 
 See:
 
@@ -214,6 +221,12 @@ Checked-in deterministic CLI output fixtures are available under
 - `examples/output/review-queue.json`
 - `examples/output/watchlist.md`
 - `examples/output/watchlist.json`
+- `examples/output/demo-bundle/index.md`
+- `examples/output/demo-bundle/manifest.json`
+- `examples/output/demo-bundle/portfolio-summary.md`
+- `examples/output/demo-bundle/watchlist.md`
+- per-ledger demo bundle artifacts for brief, risk, history, decision memo, and
+  scenario plan reports
 
 ## Development
 
@@ -258,6 +271,13 @@ high-risk count, and open position-rule count. Ranking remains deterministic
 when ledgers have duplicate `thesis_id` values or tied scores; watchlist rows
 are derived from each ledger directly and ties include latest-review and nearest
 open-catalyst details.
+
+`demo-bundle` validates all input ledgers before writing anything, then cleanly
+overwrites the target output directory with static Markdown files: `index.md`,
+per-ledger brief/risk/history/decision memo/scenario plan reports,
+`portfolio-summary.md`, `watchlist.md`, and `manifest.json`. The manifest lists
+generated files, tool version, and input ledger IDs only; it intentionally
+contains no timestamps.
 
 `decision-memo` uses the same normalized broker, catalyst, exposure, and
 evidence payloads to produce a deterministic pre-trade/review memo with the

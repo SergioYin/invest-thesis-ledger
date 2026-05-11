@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.0 - 2026-05-12
+
+- Added `demo-bundle` command for static deterministic Markdown bundles across two or more ledgers.
+- Added bundle output with `index.md`, per-ledger brief/risk/history/decision memo/scenario plan reports, portfolio summary, watchlist, and timestamp-free `manifest.json`.
+- Added clean output-directory overwrite behavior after successful validation of all input ledgers.
+- Added checked-in demo bundle example outputs generated from the Oklo and leveraged ETF examples.
+- Updated README, schema docs, tests, and selfcheck for demo bundle coverage.
+
 ## 0.8.0 - 2026-05-12
 
 - Added `watchlist` command for weekly human review lists across two or more ledgers.

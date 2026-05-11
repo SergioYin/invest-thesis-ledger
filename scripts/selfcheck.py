@@ -43,6 +43,20 @@ FIXTURE_OUTPUTS = [
     "review-queue.json",
     "watchlist.md",
     "watchlist.json",
+    "demo-bundle/index.md",
+    "demo-bundle/oklo-ai-power-brief.md",
+    "demo-bundle/oklo-ai-power-risk.md",
+    "demo-bundle/oklo-ai-power-history.md",
+    "demo-bundle/oklo-ai-power-decision-memo.md",
+    "demo-bundle/oklo-ai-power-scenario-plan.md",
+    "demo-bundle/leveraged-etf-discipline-brief.md",
+    "demo-bundle/leveraged-etf-discipline-risk.md",
+    "demo-bundle/leveraged-etf-discipline-history.md",
+    "demo-bundle/leveraged-etf-discipline-decision-memo.md",
+    "demo-bundle/leveraged-etf-discipline-scenario-plan.md",
+    "demo-bundle/portfolio-summary.md",
+    "demo-bundle/watchlist.md",
+    "demo-bundle/manifest.json",
 ]
 
 
@@ -248,6 +262,18 @@ def main() -> int:
                 str(temp_dir / "watchlist.md"),
                 "--json-output",
                 str(temp_dir / "watchlist.json"),
+            ]
+        )
+        _run(
+            [
+                sys.executable,
+                "-m",
+                "invest_thesis_ledger",
+                "demo-bundle",
+                str(EXAMPLES[0]),
+                str(EXAMPLES[1]),
+                "--output-dir",
+                str(temp_dir / "demo-bundle"),
             ]
         )
         _check_fixtures(temp_dir)

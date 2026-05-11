@@ -92,9 +92,10 @@ def validate_ledger(ledger: Mapping[str, Any]) -> Tuple[List[str], List[str]]:
         "0.6.0",
         "0.7.0",
         "0.8.0",
+        "0.9.0",
     }:
         warnings.append(
-            "ledger.ledger_version is not 0.1.0, 0.2.0, 0.3.0, 0.4.0, 0.5.0, 0.6.0, 0.7.0, or 0.8.0"
+            "ledger.ledger_version is not 0.1.0, 0.2.0, 0.3.0, 0.4.0, 0.5.0, 0.6.0, 0.7.0, 0.8.0, or 0.9.0"
         )
 
     asset = ledger["asset"]

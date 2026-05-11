@@ -1,0 +1,23 @@
+{
+  "generated_files": [
+    "index.md",
+    "oklo-ai-power-brief.md",
+    "oklo-ai-power-risk.md",
+    "oklo-ai-power-history.md",
+    "oklo-ai-power-decision-memo.md",
+    "oklo-ai-power-scenario-plan.md",
+    "leveraged-etf-discipline-brief.md",
+    "leveraged-etf-discipline-risk.md",
+    "leveraged-etf-discipline-history.md",
+    "leveraged-etf-discipline-decision-memo.md",
+    "leveraged-etf-discipline-scenario-plan.md",
+    "portfolio-summary.md",
+    "watchlist.md",
+    "manifest.json"
+  ],
+  "ledger_ids": [
+    "oklo-ai-power",
+    "leveraged-etf-discipline"
+  ],
+  "tool_version": "0.9.0"
+}

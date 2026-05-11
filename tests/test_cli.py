@@ -7,6 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from invest_thesis_ledger.cli import _write_demo_bundle_dir
 from invest_thesis_ledger.render import decision_memo_payload, review_queue_payload, scenario_plan_payload, watchlist_payload
 
 
@@ -69,6 +70,12 @@ class CliTests(unittest.TestCase):
         self.assertIn("LEDGER", watchlist.stdout)
         self.assertIn("weekly watchlist", watchlist.stdout)
         self.assertIn("write JSON output to PATH", watchlist.stdout)
+
+        demo_bundle = self.run_cli("demo-bundle", "--help")
+        self.assertEqual(demo_bundle.returncode, 0, demo_bundle.stderr)
+        self.assertIn("LEDGER", demo_bundle.stdout)
+        self.assertIn("static Markdown demo bundle", demo_bundle.stdout)
+        self.assertIn("write static demo bundle to DIR", demo_bundle.stdout)
 
         decision_memo = self.run_cli("decision-memo", "--help")
         self.assertEqual(decision_memo.returncode, 0, decision_memo.stderr)
@@ -1073,6 +1080,151 @@ class CliTests(unittest.TestCase):
             self.assertIn("Title \\| with break", text)
             self.assertIn("Catalyst \\| with break", text)
 
+    def test_demo_bundle_writes_static_markdown_bundle_and_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            output_dir = Path(temp) / "bundle"
+            result = self.run_cli(
+                "demo-bundle",
+                str(EXAMPLE),
+                str(ETF_EXAMPLE),
+                "--output-dir",
+                str(output_dir),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            expected_files = [
+                "index.md",
+                "oklo-ai-power-brief.md",
+                "oklo-ai-power-risk.md",
+                "oklo-ai-power-history.md",
+                "oklo-ai-power-decision-memo.md",
+                "oklo-ai-power-scenario-plan.md",
+                "leveraged-etf-discipline-brief.md",
+                "leveraged-etf-discipline-risk.md",
+                "leveraged-etf-discipline-history.md",
+                "leveraged-etf-discipline-decision-memo.md",
+                "leveraged-etf-discipline-scenario-plan.md",
+                "portfolio-summary.md",
+                "watchlist.md",
+                "manifest.json",
+            ]
+            self.assertEqual(sorted(path.name for path in output_dir.iterdir()), sorted(expected_files))
+            self.assertIn("# Invest Thesis Ledger Demo Bundle", (output_dir / "index.md").read_text())
+            self.assertIn("# Portfolio Summary", (output_dir / "portfolio-summary.md").read_text())
+            self.assertIn("# Watchlist", (output_dir / "watchlist.md").read_text())
+            manifest = json.loads((output_dir / "manifest.json").read_text())
+            self.assertEqual(manifest["tool_version"], "0.9.0")
+            self.assertEqual(manifest["ledger_ids"], ["oklo-ai-power", "leveraged-etf-discipline"])
+            self.assertEqual(manifest["generated_files"], expected_files)
+            index_links = [
+                line.removeprefix("- [").split("](", 1)[1].removesuffix(")")
+                for line in (output_dir / "index.md").read_text().splitlines()
+                if line.startswith("- [")
+            ]
+            self.assertEqual(index_links, manifest["generated_files"])
+            self.assertNotIn("timestamp", manifest)
+            self.assertNotIn("generated_at", manifest)
+
+    def test_demo_bundle_manifest_is_deterministic(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            first_dir = Path(temp) / "first"
+            second_dir = Path(temp) / "second"
+            first = self.run_cli("demo-bundle", str(EXAMPLE), str(ETF_EXAMPLE), "--output-dir", str(first_dir))
+            second = self.run_cli("demo-bundle", str(EXAMPLE), str(ETF_EXAMPLE), "--output-dir", str(second_dir))
+            self.assertEqual(first.returncode, 0, first.stderr)
+            self.assertEqual(second.returncode, 0, second.stderr)
+            self.assertEqual((first_dir / "manifest.json").read_text(), (second_dir / "manifest.json").read_text())
+            self.assertEqual((first_dir / "index.md").read_text(), (second_dir / "index.md").read_text())
+
+    def test_demo_bundle_cleanly_overwrites_output_dir(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            output_dir = Path(temp) / "bundle"
+            output_dir.mkdir()
+            stale_file = output_dir / "stale.md"
+            stale_dir = output_dir / "nested"
+            stale_dir.mkdir()
+            (stale_dir / "stale.md").write_text("stale", encoding="utf-8")
+            stale_file.write_text("stale", encoding="utf-8")
+            result = self.run_cli("demo-bundle", str(EXAMPLE), str(ETF_EXAMPLE), "--output-dir", str(output_dir))
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertFalse(stale_file.exists())
+            self.assertFalse(stale_dir.exists())
+            self.assertTrue((output_dir / "manifest.json").exists())
+
+    def test_demo_bundle_validates_all_ledgers_before_writing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_dir = Path(temp)
+            bad_path = temp_dir / "bad.json"
+            output_dir = temp_dir / "bundle"
+            output_dir.mkdir()
+            sentinel = output_dir / "sentinel.md"
+            sentinel.write_text("keep", encoding="utf-8")
+            data = json.loads(ETF_EXAMPLE.read_text())
+            data["risks"][0]["source_ids"] = ["missing"]
+            bad_path.write_text(json.dumps(data), encoding="utf-8")
+            result = self.run_cli("demo-bundle", str(EXAMPLE), str(bad_path), "--output-dir", str(output_dir))
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("ledger: leveraged-etf-discipline", result.stderr)
+            self.assertIn("unknown source missing", result.stderr)
+            self.assertEqual(sentinel.read_text(), "keep")
+            self.assertFalse((output_dir / "manifest.json").exists())
+
+    def test_demo_bundle_requires_two_ledgers(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            result = self.run_cli("demo-bundle", str(EXAMPLE), "--output-dir", str(Path(temp) / "bundle"))
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("requires at least two", result.stderr)
+
+    def test_demo_bundle_disambiguates_duplicate_ledger_ids(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_dir = Path(temp)
+            first_path = temp_dir / "first.json"
+            second_path = temp_dir / "second.json"
+            first_data = json.loads(EXAMPLE.read_text())
+            second_data = json.loads(ETF_EXAMPLE.read_text())
+            second_data["thesis_id"] = first_data["thesis_id"]
+            first_path.write_text(json.dumps(first_data), encoding="utf-8")
+            second_path.write_text(json.dumps(second_data), encoding="utf-8")
+            output_dir = temp_dir / "bundle"
+            result = self.run_cli("demo-bundle", str(first_path), str(second_path), "--output-dir", str(output_dir))
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue((output_dir / "oklo-ai-power-brief.md").exists())
+            self.assertTrue((output_dir / "oklo-ai-power-2-brief.md").exists())
+            manifest = json.loads((output_dir / "manifest.json").read_text())
+            self.assertEqual(manifest["ledger_ids"], ["oklo-ai-power", "oklo-ai-power"])
+            self.assertIn("oklo-ai-power-2-brief.md", manifest["generated_files"])
+
+    def test_demo_bundle_refuses_symlinked_output_dir(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_dir = Path(temp)
+            real_dir = temp_dir / "real"
+            real_dir.mkdir()
+            sentinel = real_dir / "sentinel.md"
+            sentinel.write_text("keep", encoding="utf-8")
+            output_dir = temp_dir / "bundle-link"
+            try:
+                output_dir.symlink_to(real_dir, target_is_directory=True)
+            except OSError as exc:
+                self.skipTest(f"symlink unavailable: {exc}")
+
+            result = self.run_cli("demo-bundle", str(EXAMPLE), str(ETF_EXAMPLE), "--output-dir", str(output_dir))
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("output dir is not a directory", result.stderr)
+            self.assertEqual(sentinel.read_text(), "keep")
+            self.assertFalse((real_dir / "manifest.json").exists())
+
+    def test_demo_bundle_staged_write_preserves_existing_dir_on_write_error(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            output_dir = Path(temp) / "bundle"
+            output_dir.mkdir()
+            sentinel = output_dir / "sentinel.md"
+            sentinel.write_text("keep", encoding="utf-8")
+
+            with self.assertRaises(ValueError):
+                _write_demo_bundle_dir(output_dir, [("index.md", "new"), ("nested/file.md", "bad")])
+
+            self.assertEqual(sentinel.read_text(), "keep")
+            self.assertFalse((output_dir / "index.md").exists())
+
     def test_portfolio_reports_validation_warnings_without_blocking_output(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             temp_dir = Path(temp)
@@ -1126,7 +1278,7 @@ class CliTests(unittest.TestCase):
             self.assertEqual(second.returncode, 0, second.stderr)
             self.assertEqual(output_a.read_text(), output_b.read_text())
             payload = json.loads(output_a.read_text())
-            self.assertEqual(payload["ledger_version"], "0.8.0")
+            self.assertEqual(payload["ledger_version"], "0.9.0")
             self.assertEqual(payload["thesis_id"], "msft-thesis")
             self.assertEqual(payload["sources"][0]["id"], "S1")
             self.assertEqual(payload["assumptions"][0]["source_ids"], ["S1"])
