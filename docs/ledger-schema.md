@@ -1,7 +1,7 @@
-# Ledger Schema v0.5.0
+# Ledger Schema v0.6.0
 
 This document defines the JSON ledger format accepted by `invest-thesis-ledger`
-v0.5.0. Ledgers are research organization records only and are not investment
+v0.6.0. Ledgers are research organization records only and are not investment
 advice.
 
 ## Document Shape
@@ -15,7 +15,7 @@ without breaking the renderer.
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `ledger_version` | string | Schema version. v0.5.0 ledgers should use `"0.5.0"`. v0.1.0, v0.2.0, v0.3.0, and v0.4.0 remain accepted for compatibility; other values validate with a warning. |
+| `ledger_version` | string | Schema version. v0.6.0 ledgers should use `"0.6.0"`. v0.1.0, v0.2.0, v0.3.0, v0.4.0, and v0.5.0 remain accepted for compatibility; other values validate with a warning. |
 | `thesis_id` | string | Stable machine-readable ledger identifier. |
 | `title` | string | Human-readable thesis title. |
 | `asset` | object | Asset metadata. |
@@ -114,11 +114,11 @@ The CLI renders these optional top-level fields when present:
 
 | Field | Type | Rendered By | Description |
 | --- | --- | --- | --- |
-| `positions` | array | `brief` | Position notes or sizing discipline. |
-| `catalysts` | array | `brief`, `calendar`, `evidence` | Catalysts or evidence that could change conviction. |
-| `broker_views` | array | `broker-matrix`, `evidence` | Broker, desk, or institution rating/target/thesis views. |
-| `position_rules` | array | `exposure`, `evidence` | Position sizing, exposure, and trade discipline rules. |
-| `checklist` | array | `risk` | Risk checklist items. |
+| `positions` | array | `brief`, `decision-memo` | Position notes or sizing discipline. |
+| `catalysts` | array | `brief`, `calendar`, `decision-memo`, `evidence` | Catalysts or evidence that could change conviction. |
+| `broker_views` | array | `broker-matrix`, `decision-memo`, `evidence` | Broker, desk, or institution rating/target/thesis views. |
+| `position_rules` | array | `decision-memo`, `exposure`, `evidence` | Position sizing, exposure, and trade discipline rules. |
+| `checklist` | array | `decision-memo`, `risk` | Risk checklist items. |
 
 `catalysts` entries may be strings or objects. String entries are accepted for
 v0.1.0 compatibility and render as undated watch items. Object entries can
@@ -179,7 +179,7 @@ existing source, and duplicate source references within one rule are invalid.
 
 ## Determinism
 
-For the same input file or ordered input file list, v0.5.0 CLI outputs are
+For the same input file or ordered input file list, v0.6.0 CLI outputs are
 deterministic:
 
 - JSON outputs are serialized with sorted keys and two-space indentation.
@@ -195,6 +195,8 @@ deterministic:
 - Review queue reasons are sorted by the scoring categories documented below;
   reason item IDs use the stable order for their source report, risk,
   checklist, or position-rule type.
+- Decision memos reuse the deterministic broker, catalyst, exposure, evidence,
+  and history payload ordering.
 - Evidence stale-source warnings are measured against ledger `updated`, not the
   current wall-clock date.
 - Source reference lists preserve the ledger order inside each item.
@@ -202,7 +204,7 @@ deterministic:
 - `init-template` uses fixed placeholder dates so repeated runs with the same
   arguments produce byte-identical JSON.
 
-## v0.5.0 Reports
+## v0.6.0 Reports
 
 `compare <old.json> <new.json> --output drift.md --json-output drift.json`
 loads and validates both ledgers, then compares:
@@ -235,8 +237,21 @@ maps optional risk `tags` and `position_rules` into an exposure checklist. The
 JSON output includes tag counts, normalized risks, normalized position rules,
 and combined checklist entries.
 
+`decision-memo <ledger.json> --output decision-memo.md --json-output decision-memo.json`
+loads and validates one ledger, then renders a deterministic pre-trade/review
+memo containing:
+
+- asset and thesis snapshot
+- assumptions and latest dated review
+- broker view summary and normalized broker views
+- high/critical/severe risks
+- catalyst checklist
+- position notes, open position rules, and open checklist items
+- evidence coverage, stale sources, unused sources, and unsupported items
+- final questions before action
+
 `init-template --asset TICKER --name NAME --type TYPE --output ledger.json`
-writes a deterministic starter ledger with v0.5.0 fields, fixed placeholder
+writes a deterministic starter ledger with v0.6.0 fields, fixed placeholder
 dates, one source-backed assumption, one risk, one review, and a thesis ID
 derived from the ticker.
 

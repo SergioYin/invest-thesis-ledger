@@ -155,7 +155,7 @@ def history_payload(ledger: Mapping[str, Any]) -> Dict[str, Any]:
                 "drift": item.get("drift", "none recorded"),
                 "source_ids": list(item["source_ids"]),
             }
-            for item in sorted(ledger["reviews"], key=lambda review: review["date"])
+            for item in sorted(ledger["reviews"], key=_review_sort_key)
         ],
     }
 
@@ -727,6 +727,221 @@ def render_review_queue(ledgers: Sequence[Mapping[str, Any]]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def decision_memo_payload(ledger: Mapping[str, Any]) -> Dict[str, Any]:
+    """Build structured pre-trade/review decision memo output."""
+
+    reviews = history_payload(ledger)["reviews"]
+    latest_review = reviews[-1] if reviews else {}
+    broker = broker_matrix_payload(ledger)
+    exposure = exposure_payload(ledger)
+    evidence = evidence_payload(ledger)
+    high_risks = [
+        {
+            "id": risk["id"],
+            "name": risk["name"],
+            "severity": risk["severity"],
+            "probability": risk["probability"],
+            "mitigation": risk["mitigation"],
+            "tags": list(risk.get("tags", [])) if isinstance(risk.get("tags", []), list) else [],
+            "source_ids": list(risk["source_ids"]),
+        }
+        for risk in ledger.get("risks", [])
+        if isinstance(risk, dict) and str(risk.get("severity", "")).lower() in {"high", "critical", "severe"}
+    ]
+    high_risks.sort(key=lambda item: item["id"])
+    open_position_rules = [
+        item for item in exposure["position_rules"] if not _is_closed_status(str(item.get("status", "")))
+    ]
+    open_checklist = [
+        item for item in risk_payload(ledger)["checklist"] if not _is_closed_status(str(item.get("status", "")))
+    ]
+    catalysts = calendar_payload(ledger)["catalysts"]
+    open_catalysts = [item for item in catalysts if not _is_closed_status(str(item.get("status", "")))]
+    questions = _decision_questions(
+        latest_review, high_risks, open_catalysts, open_position_rules, open_checklist, evidence
+    )
+    return {
+        "thesis_id": ledger["thesis_id"],
+        "title": ledger["title"],
+        "updated": ledger["updated"],
+        "asset": dict(ledger["asset"]),
+        "thesis": ledger["thesis"],
+        "assumptions": [
+            {
+                "id": item["id"],
+                "statement": item["statement"],
+                "confidence": item["confidence"],
+                "source_ids": list(item["source_ids"]),
+            }
+            for item in sorted(
+                [item for item in ledger.get("assumptions", []) if isinstance(item, dict)],
+                key=lambda item: str(item.get("id", "")),
+            )
+        ],
+        "latest_review": {
+            "date": latest_review.get("date", ""),
+            "decision": latest_review.get("decision", ""),
+            "summary": latest_review.get("summary", ""),
+            "drift": latest_review.get("drift", "none recorded"),
+            "source_ids": list(latest_review.get("source_ids", [])),
+        },
+        "broker_view_summary": {
+            "view_count": len(broker["broker_views"]),
+            "rating_counts": broker["rating_counts"],
+            "views": broker["broker_views"],
+        },
+        "high_risks": high_risks,
+        "catalyst_checklist": catalysts,
+        "exposure": {
+            "positions": [str(item) for item in ledger.get("positions", [])],
+            "tag_counts": exposure["tag_counts"],
+            "open_position_rules": open_position_rules,
+            "open_checklist": open_checklist,
+        },
+        "evidence_summary": {
+            "coverage": evidence["coverage"],
+            "stale_sources": evidence["stale_sources"],
+            "unused_sources": evidence["unused_sources"],
+            "unsupported_items": [item for item in evidence["items"] if not item["source_ids"]],
+        },
+        "questions_before_action": questions,
+    }
+
+
+def render_decision_memo(ledger: Mapping[str, Any]) -> str:
+    """Render a deterministic pre-trade/review decision memo."""
+
+    payload = decision_memo_payload(ledger)
+    lines = [
+        f"# Decision Memo: {_inline(payload['title'])}",
+        "",
+        "> This is a research organization tool, not investment advice.",
+        "",
+        "## Asset / Thesis Snapshot",
+        "",
+        f"- Ledger ID: {_inline(payload['thesis_id'])}",
+        f"- Updated: {_inline(payload['updated'])}",
+        f"- Asset: {_inline(payload['asset']['ticker'])} ({_inline(payload['asset']['name'])})",
+        f"- Type: {_inline(payload['asset']['type'])}",
+        f"- Thesis: {_inline(payload['thesis'])}",
+        "",
+        "### Assumptions",
+        "",
+    ]
+    if payload["assumptions"]:
+        for item in payload["assumptions"]:
+            lines.append(
+                f"- {_inline(item['id'])}: {_inline(item['statement'])} "
+                f"(confidence: {_inline(item['confidence'])}; sources: {_refs(item['source_ids'])})"
+            )
+    else:
+        lines.append("- No assumptions recorded.")
+    latest = payload["latest_review"]
+    lines.extend(["", "## Latest Review", ""])
+    if latest["date"]:
+        lines.extend(
+            [
+                f"- Date: {_inline(latest['date'])}",
+                f"- Decision: {_inline(latest['decision'])}",
+                f"- Summary: {_inline(latest['summary'])}",
+                f"- Drift: {_inline(latest['drift'])}",
+                f"- Sources: {_refs(latest['source_ids'])}",
+            ]
+        )
+    else:
+        lines.append("- No review recorded.")
+    lines.extend(["", "## Broker View Summary", ""])
+    broker = payload["broker_view_summary"]
+    lines.append(f"- Views: {broker['view_count']}")
+    if broker["rating_counts"]:
+        for rating, count in broker["rating_counts"].items():
+            lines.append(f"- Rating {_inline(rating)}: {count}")
+    else:
+        lines.append("- No broker ratings recorded.")
+    if broker["views"]:
+        lines.extend(["", "| Institution | Rating | Target | As Of | Thesis | Sources |", "| --- | --- | --- | --- | --- | --- |"])
+        for item in broker["views"]:
+            lines.append(
+                "| "
+                + " | ".join(
+                    [
+                        _cell(item["institution"]),
+                        _cell(item["rating"]),
+                        _cell(item["target"]),
+                        _cell(item["as_of"]),
+                        _cell(item["thesis"]),
+                        _cell(_refs(item["source_ids"])),
+                    ]
+                )
+                + " |"
+            )
+    lines.extend(["", "## High Risks", ""])
+    if payload["high_risks"]:
+        for item in payload["high_risks"]:
+            lines.append(
+                f"- {_inline(item['id'])}: {_inline(item['name'])} "
+                f"(severity: {_inline(item['severity'])}; probability: {_inline(item['probability'])}; "
+                f"tags: {_inline_join(item['tags'])}; mitigation: {_inline(item['mitigation'])}; "
+                f"sources: {_refs(item['source_ids'])})"
+            )
+    else:
+        lines.append("- No high-severity risks recorded.")
+    lines.extend(["", "## Catalyst Checklist", ""])
+    if payload["catalyst_checklist"]:
+        for item in payload["catalyst_checklist"]:
+            timing = _catalyst_timing(item)
+            lines.append(
+                f"- [{_checkbox(item['status'])}] {_inline(item['id'])}: {_inline(item['title'])}"
+                f"{_inline(timing)} (status: {_inline(item['status'])}; sources: {_refs(item['source_ids'])})"
+            )
+    else:
+        lines.append("- No catalysts recorded.")
+    lines.extend(["", "## Exposure / Open Position Rules", ""])
+    if payload["exposure"]["positions"]:
+        for item in payload["exposure"]["positions"]:
+            lines.append(f"- Position note: {_inline(item)}")
+    else:
+        lines.append("- No position notes recorded.")
+    if payload["exposure"]["open_position_rules"]:
+        for item in payload["exposure"]["open_position_rules"]:
+            lines.append(
+                f"- [ ] {_inline(item['id'])}: {_inline(item['rule'])} "
+                f"(exposure: {_inline(item['exposure']) if item['exposure'] else 'not specified'}; "
+                f"tags: {_inline_join(item['tags'])}; sources: {_refs(item['source_ids'])})"
+            )
+    else:
+        lines.append("- No open position rules recorded.")
+    if payload["exposure"]["open_checklist"]:
+        for item in payload["exposure"]["open_checklist"]:
+            lines.append(f"- [ ] {_inline(item['id'])}: {_inline(item['item'])} ({_inline(item['status'])})")
+    lines.extend(["", "## Evidence / Stale-Source Summary", ""])
+    coverage = payload["evidence_summary"]["coverage"]
+    lines.extend(
+        [
+            f"- Tracked Items: {coverage['tracked_items']}",
+            f"- Supported Items: {coverage['supported_items']}",
+            f"- Unsupported Items: {coverage['unsupported_items']}",
+            f"- Sources: {coverage['source_count']}",
+            f"- Unused Sources: {coverage['unused_source_count']}",
+            f"- Stale Sources: {coverage['stale_source_count']}",
+        ]
+    )
+    if payload["evidence_summary"]["stale_sources"]:
+        for item in payload["evidence_summary"]["stale_sources"]:
+            lines.append(f"- Stale [{_inline(item['id'])}] {_inline(item['title'])} ({_inline(item['date'])}): {item['age_days']} days old")
+    else:
+        lines.append("- No stale sources detected.")
+    if payload["evidence_summary"]["unsupported_items"]:
+        for item in payload["evidence_summary"]["unsupported_items"]:
+            lines.append(f"- Unsupported {_inline(item['type'])} {_inline(item['id'])}")
+    lines.extend(["", "## Questions before action", ""])
+    for item in payload["questions_before_action"]:
+        lines.append(f"- [ ] {_inline(item['id'])}: {_inline(item['question'])}")
+    lines.extend(["", "## Sources", ""])
+    lines.extend(_source_lines(ledger))
+    return "\n".join(lines) + "\n"
+
+
 def evidence_payload(ledger: Mapping[str, Any]) -> Dict[str, Any]:
     """Build structured source coverage and stale-source output."""
 
@@ -1000,13 +1215,7 @@ def _project(item: Mapping[str, Any], fields: Sequence[str]) -> Dict[str, Any]:
 def _reviews_with_ids(reviews: Sequence[Any]) -> List[Dict[str, Any]]:
     items = []
     review_items = [review for review in reviews if isinstance(review, dict)]
-    review_items.sort(
-        key=lambda review: (
-            str(review.get("date", "")),
-            str(review.get("decision", "")),
-            str(review.get("summary", "")),
-        )
-    )
+    review_items.sort(key=_review_sort_key)
     for index, review in enumerate(review_items, start=1):
         item = dict(review)
         item["id"] = item.get("id", f"REV{index}:{item.get('date', '')}")
@@ -1194,6 +1403,57 @@ def _review_next_action(reasons: Sequence[Mapping[str, Any]]) -> str:
     if "open_checklist" in reason_types:
         return "Close or update open checklist items."
     return "No immediate human review trigger detected."
+
+
+def _decision_questions(
+    latest_review: Mapping[str, Any],
+    high_risks: Sequence[Mapping[str, Any]],
+    catalysts: Sequence[Mapping[str, Any]],
+    open_position_rules: Sequence[Mapping[str, Any]],
+    open_checklist: Sequence[Mapping[str, Any]],
+    evidence: Mapping[str, Any],
+) -> List[Dict[str, str]]:
+    questions = [
+        {
+            "id": "Q1",
+            "question": "Does the latest review decision still support the contemplated action?",
+        },
+        {
+            "id": "Q2",
+            "question": "Are all high-severity risks understood with current mitigation evidence?",
+        },
+        {
+            "id": "Q3",
+            "question": "Have open catalysts been checked for new source-backed status changes?",
+        },
+        {
+            "id": "Q4",
+            "question": "Do open position rules permit the proposed exposure?",
+        },
+        {
+            "id": "Q5",
+            "question": "Are stale, unused, or unsupported evidence gaps acceptable before action?",
+        },
+    ]
+    if not latest_review.get("date"):
+        questions.append({"id": "Q6", "question": "Should a dated review be recorded before any action?"})
+    elif evidence.get("coverage", {}).get("stale_source_count", 0):
+        questions.append({"id": "Q6", "question": "Which stale sources must be refreshed before relying on this memo?"})
+    elif not high_risks and not catalysts and not open_position_rules and not open_checklist:
+        questions.append({"id": "Q6", "question": "Is there any off-ledger constraint that should be added before action?"})
+    else:
+        questions.append({"id": "Q6", "question": "What evidence would falsify the action after execution?"})
+    return questions
+
+
+def _review_sort_key(review: Mapping[str, Any]) -> tuple[str, str, str, tuple[str, ...]]:
+    source_ids = review.get("source_ids", [])
+    return (
+        str(review.get("date", "")),
+        str(review.get("decision", "")),
+        str(review.get("summary", "")),
+        tuple(str(source_id) for source_id in source_ids) if isinstance(source_ids, list) else (),
+    )
 
 
 def _is_closed_status(status: str) -> bool:

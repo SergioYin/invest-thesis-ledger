@@ -12,6 +12,7 @@ from .render import (
     broker_matrix_payload,
     calendar_payload,
     compare_payload,
+    decision_memo_payload,
     evidence_payload,
     exposure_payload,
     history_payload,
@@ -20,6 +21,7 @@ from .render import (
     render_brief,
     render_calendar,
     render_compare,
+    render_decision_memo,
     render_evidence,
     render_exposure,
     render_history,
@@ -93,6 +95,15 @@ def build_parser() -> argparse.ArgumentParser:
     _add_ledger_arg(exposure)
     _add_output_args(exposure)
     exposure.set_defaults(func=_cmd_exposure)
+
+    decision_memo = subparsers.add_parser(
+        "decision-memo",
+        help="render a pre-trade/review decision memo",
+        description="render a pre-trade/review decision memo.",
+    )
+    _add_ledger_arg(decision_memo)
+    _add_output_args(decision_memo)
+    decision_memo.set_defaults(func=_cmd_decision_memo)
 
     portfolio = subparsers.add_parser("portfolio", help="aggregate two or more ledgers into a portfolio summary")
     portfolio.add_argument("ledgers", metavar="LEDGER", nargs="+", help="ledger JSON file")
@@ -225,6 +236,16 @@ def _cmd_exposure(args: argparse.Namespace) -> int:
     )
 
 
+def _cmd_decision_memo(args: argparse.Namespace) -> int:
+    return _render_validated(
+        args.ledger,
+        (
+            (args.output, render_decision_memo),
+            (args.json_output, lambda ledger: to_json(decision_memo_payload(ledger))),
+        ),
+    )
+
+
 def _cmd_portfolio(args: argparse.Namespace) -> int:
     if len(args.ledgers) < 2:
         sys.stderr.write("error: portfolio requires at least two ledger JSON files\n")
@@ -297,6 +318,8 @@ def _render_validated(
     if errors:
         sys.stderr.write(validation_summary(ledger, errors, warnings))
         return 1
+    if warnings:
+        sys.stderr.write(validation_summary(ledger, errors, warnings))
     for output_path, renderer in outputs:
         _write_text(output_path, renderer(ledger))
     sys.stdout.write(f"wrote: {', '.join(path for path, _ in outputs)}\n")
@@ -325,7 +348,7 @@ def _starter_ledger(asset: str, name: str, asset_type: str) -> dict:
     clean_name = name.strip()
     clean_type = asset_type.strip()
     return {
-        "ledger_version": "0.5.0",
+        "ledger_version": "0.6.0",
         "thesis_id": f"{slug}-thesis",
         "title": f"{clean_name} Thesis Ledger",
         "asset": {

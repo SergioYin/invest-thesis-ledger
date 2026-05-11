@@ -1,0 +1,213 @@
+{
+  "asset": {
+    "name": "Oklo Inc.",
+    "ticker": "OKLO",
+    "type": "equity"
+  },
+  "assumptions": [
+    {
+      "confidence": "medium",
+      "id": "A1",
+      "source_ids": [
+        "S2"
+      ],
+      "statement": "AI data center operators continue seeking long-duration clean power contracts."
+    },
+    {
+      "confidence": "low",
+      "id": "A2",
+      "source_ids": [
+        "S1",
+        "S3"
+      ],
+      "statement": "Oklo can preserve financing flexibility through the next licensing milestones."
+    }
+  ],
+  "broker_view_summary": {
+    "rating_counts": {
+      "cautious": 1,
+      "constructive": 1
+    },
+    "view_count": 2,
+    "views": [
+      {
+        "as_of": "2026-05-10",
+        "id": "B1",
+        "institution": "Grid Infrastructure Desk",
+        "rating": "constructive",
+        "source_ids": [
+          "S1",
+          "S2"
+        ],
+        "target": "watch for contracted megawatts",
+        "thesis": "Firm clean power scarcity could support premium economics if Oklo converts interest into binding contracts."
+      },
+      {
+        "as_of": "2026-05-11",
+        "id": "B2",
+        "institution": "Regulatory Risk Desk",
+        "rating": "cautious",
+        "source_ids": [
+          "S3"
+        ],
+        "target": "no target until licensing timeline is dated",
+        "thesis": "Commercial upside remains hard to underwrite before licensing cadence and financing runway are clearer."
+      }
+    ]
+  },
+  "catalyst_checklist": [
+    {
+      "date": "2026-08-15",
+      "id": "CAT2",
+      "source_ids": [
+        "S3"
+      ],
+      "status": "watch",
+      "title": "Material licensing update with a clear review timeline.",
+      "window": ""
+    },
+    {
+      "date": "",
+      "id": "CAT1",
+      "source_ids": [
+        "S1",
+        "S2"
+      ],
+      "status": "watch",
+      "title": "Signed commercial power purchase agreement with credible counterparty.",
+      "window": "2026-H2"
+    },
+    {
+      "date": "",
+      "id": "CAT3",
+      "source_ids": [
+        "S1"
+      ],
+      "status": "watch",
+      "title": "Capital raise or partnership that reduces funding risk.",
+      "window": "next financing update"
+    }
+  ],
+  "evidence_summary": {
+    "coverage": {
+      "source_count": 3,
+      "stale_source_count": 0,
+      "supported_items": 13,
+      "tracked_items": 13,
+      "unsupported_items": 0,
+      "unused_source_count": 0
+    },
+    "stale_sources": [],
+    "unsupported_items": [],
+    "unused_sources": []
+  },
+  "exposure": {
+    "open_checklist": [
+      {
+        "id": "C1",
+        "item": "Confirm latest cash balance and expected burn.",
+        "status": "open"
+      },
+      {
+        "id": "C2",
+        "item": "Map each announced customer to binding contract evidence.",
+        "status": "open"
+      }
+    ],
+    "open_position_rules": [
+      {
+        "exposure": "watchlist",
+        "id": "P1",
+        "rule": "Keep status at watchlist until a dated licensing update is source-backed.",
+        "source_ids": [
+          "S3"
+        ],
+        "status": "open",
+        "tags": [
+          "regulatory",
+          "timeline"
+        ]
+      },
+      {
+        "exposure": "no position",
+        "id": "P2",
+        "rule": "Do not size from AI power narrative without named contract evidence.",
+        "source_ids": [
+          "S1",
+          "S2"
+        ],
+        "status": "open",
+        "tags": [
+          "valuation",
+          "narrative"
+        ]
+      }
+    ],
+    "positions": [
+      "Watchlist only until milestone evidence improves.",
+      "No thesis action without updated cash runway and licensing review."
+    ],
+    "tag_counts": {
+      "narrative": 1,
+      "regulatory": 1,
+      "timeline": 1,
+      "valuation": 1
+    }
+  },
+  "high_risks": [
+    {
+      "id": "R1",
+      "mitigation": "Require dated regulatory milestones before increasing conviction.",
+      "name": "Licensing delay",
+      "probability": "medium",
+      "severity": "high",
+      "source_ids": [
+        "S3"
+      ],
+      "tags": [
+        "regulatory",
+        "timeline"
+      ]
+    }
+  ],
+  "latest_review": {
+    "date": "2026-06-30",
+    "decision": "watch",
+    "drift": "Catalyst tracking added so future reviews separate power-demand validation from Oklo-specific execution evidence.",
+    "source_ids": [
+      "S1",
+      "S3"
+    ],
+    "summary": "Maintain watchlist status until catalysts move from narrative support to dated, source-backed milestones."
+  },
+  "questions_before_action": [
+    {
+      "id": "Q1",
+      "question": "Does the latest review decision still support the contemplated action?"
+    },
+    {
+      "id": "Q2",
+      "question": "Are all high-severity risks understood with current mitigation evidence?"
+    },
+    {
+      "id": "Q3",
+      "question": "Have open catalysts been checked for new source-backed status changes?"
+    },
+    {
+      "id": "Q4",
+      "question": "Do open position rules permit the proposed exposure?"
+    },
+    {
+      "id": "Q5",
+      "question": "Are stale, unused, or unsupported evidence gaps acceptable before action?"
+    },
+    {
+      "id": "Q6",
+      "question": "What evidence would falsify the action after execution?"
+    }
+  ],
+  "thesis": "Advanced nuclear developers may benefit if AI data center demand increases the value of firm, clean power, but commercialization timing and regulatory execution remain the core constraints.",
+  "thesis_id": "oklo-ai-power",
+  "title": "Oklo AI Power Demand Thesis",
+  "updated": "2026-05-12"
+}

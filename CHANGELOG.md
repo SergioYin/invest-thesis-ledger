@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.0 - 2026-05-12
+
+- Added `decision-memo` command for deterministic pre-trade/review memos from one ledger.
+- Added structured decision memo JSON and Markdown output covering asset/thesis snapshot, latest review, broker view summary, high risks, catalyst checklist, exposure/open position rules, evidence/stale-source summary, and questions before action.
+- Added checked-in Oklo decision memo example outputs.
+- Updated README, schema docs, tests, and selfcheck for decision memo coverage.
+
 ## 0.5.0 - 2026-05-12
 
 - Added `review-queue` command for prioritizing two or more ledgers for human review.

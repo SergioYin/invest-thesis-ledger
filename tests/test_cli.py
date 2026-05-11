@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from invest_thesis_ledger.render import review_queue_payload
+from invest_thesis_ledger.render import decision_memo_payload, review_queue_payload
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -63,6 +63,12 @@ class CliTests(unittest.TestCase):
         self.assertIn("LEDGER", review_queue.stdout)
         self.assertIn("prioritize two or more ledgers", review_queue.stdout)
         self.assertIn("write JSON output to PATH", review_queue.stdout)
+
+        decision_memo = self.run_cli("decision-memo", "--help")
+        self.assertEqual(decision_memo.returncode, 0, decision_memo.stderr)
+        self.assertIn("LEDGER", decision_memo.stdout)
+        self.assertIn("pre-trade/review decision memo", decision_memo.stdout)
+        self.assertIn("write JSON output to PATH", decision_memo.stdout)
 
     def test_brief_is_deterministic(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -210,6 +216,122 @@ class CliTests(unittest.TestCase):
             self.assertEqual(payload["tag_counts"]["regulatory"], 1)
             self.assertEqual(payload["position_rules"][0]["id"], "P1")
             self.assertIn("RISK-R1", [item["id"] for item in payload["checklist"]])
+
+    def test_decision_memo_writes_pre_trade_review_payload(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            md_path = Path(temp) / "decision-memo.md"
+            json_path = Path(temp) / "decision-memo.json"
+            result = self.run_cli(
+                "decision-memo",
+                str(EXAMPLE),
+                "--output",
+                str(md_path),
+                "--json-output",
+                str(json_path),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            text = md_path.read_text()
+            self.assertIn("# Decision Memo", text)
+            self.assertIn("## Questions before action", text)
+            payload = json.loads(json_path.read_text())
+            self.assertEqual(payload["thesis_id"], "oklo-ai-power")
+            self.assertEqual(payload["latest_review"]["date"], "2026-06-30")
+            self.assertEqual(payload["broker_view_summary"]["rating_counts"]["cautious"], 1)
+            self.assertEqual(payload["high_risks"][0]["id"], "R1")
+            self.assertEqual(payload["catalyst_checklist"][0]["id"], "CAT2")
+            self.assertEqual(payload["exposure"]["open_position_rules"][0]["id"], "P1")
+            self.assertEqual(payload["evidence_summary"]["coverage"]["stale_source_count"], 0)
+            self.assertEqual(payload["questions_before_action"][0]["id"], "Q1")
+
+    def test_decision_memo_latest_review_tie_breaker_is_input_order_independent(self) -> None:
+        data = json.loads(EXAMPLE.read_text())
+        same_day_reviews = [
+            {
+                "date": "2026-07-01",
+                "decision": "watch",
+                "summary": "A same-day lower tie breaker.",
+                "source_ids": ["S1"],
+            },
+            {
+                "date": "2026-07-01",
+                "decision": "watch",
+                "summary": "Z same-day upper tie breaker.",
+                "source_ids": ["S1"],
+            },
+        ]
+        data["reviews"] = same_day_reviews
+        forward = decision_memo_payload(data)
+        data["reviews"] = list(reversed(same_day_reviews))
+        reverse = decision_memo_payload(data)
+        self.assertEqual(forward["latest_review"], reverse["latest_review"])
+        self.assertEqual(forward["latest_review"]["summary"], "Z same-day upper tie breaker.")
+
+    def test_decision_memo_escapes_markdown_title_and_reports_warnings(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_dir = Path(temp)
+            warning_path = temp_dir / "warning.json"
+            data = json.loads(EXAMPLE.read_text())
+            data["title"] = "Title | with\nbreak"
+            data["reviews"] = list(reversed(data["reviews"]))
+            warning_path.write_text(json.dumps(data), encoding="utf-8")
+            md_path = temp_dir / "decision-memo.md"
+            json_path = temp_dir / "decision-memo.json"
+            result = self.run_cli(
+                "decision-memo",
+                str(warning_path),
+                "--output",
+                str(md_path),
+                "--json-output",
+                str(json_path),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("warning: ledger.reviews are not sorted by date", result.stderr)
+            self.assertIn("# Decision Memo: Title \\| with break", md_path.read_text())
+
+    def test_decision_memo_questions_prioritize_stale_evidence_over_closed_catalysts(self) -> None:
+        data = json.loads(EXAMPLE.read_text())
+        data["updated"] = "2026-12-31"
+        data["risks"][0]["severity"] = "medium"
+        data["risks"][1]["severity"] = "medium"
+        data["catalysts"] = [
+            {
+                "id": "CAT-CLOSED",
+                "title": "Closed item",
+                "date": "2026-08-15",
+                "window": "",
+                "status": "closed",
+                "source_ids": ["S1"],
+            }
+        ]
+        data["position_rules"] = []
+        data["checklist"] = []
+        payload = decision_memo_payload(data)
+        self.assertEqual(
+            payload["questions_before_action"][-1]["question"],
+            "Which stale sources must be refreshed before relying on this memo?",
+        )
+
+    def test_decision_memo_validates_before_writing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_dir = Path(temp)
+            bad_path = temp_dir / "bad.json"
+            data = json.loads(EXAMPLE.read_text())
+            data["risks"][0]["source_ids"] = ["missing"]
+            bad_path.write_text(json.dumps(data), encoding="utf-8")
+            md_path = temp_dir / "decision-memo.md"
+            json_path = temp_dir / "decision-memo.json"
+            result = self.run_cli(
+                "decision-memo",
+                str(bad_path),
+                "--output",
+                str(md_path),
+                "--json-output",
+                str(json_path),
+            )
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("unknown source missing", result.stderr)
+            self.assertFalse(md_path.exists())
+            self.assertFalse(json_path.exists())
 
     def test_portfolio_aggregates_multiple_ledgers(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -651,7 +773,7 @@ class CliTests(unittest.TestCase):
             self.assertEqual(second.returncode, 0, second.stderr)
             self.assertEqual(output_a.read_text(), output_b.read_text())
             payload = json.loads(output_a.read_text())
-            self.assertEqual(payload["ledger_version"], "0.5.0")
+            self.assertEqual(payload["ledger_version"], "0.6.0")
             self.assertEqual(payload["thesis_id"], "msft-thesis")
             self.assertEqual(payload["sources"][0]["id"], "S1")
             self.assertEqual(payload["assumptions"][0]["source_ids"], ["S1"])
@@ -802,6 +924,18 @@ class CliTests(unittest.TestCase):
                         str(temp_dir / "oklo-ai-power-exposure.json"),
                     ],
                     ["oklo-ai-power-exposure.md", "oklo-ai-power-exposure.json"],
+                ),
+                (
+                    "decision-memo",
+                    [
+                        "decision-memo",
+                        str(EXAMPLE),
+                        "--output",
+                        str(temp_dir / "oklo-ai-power-decision-memo.md"),
+                        "--json-output",
+                        str(temp_dir / "oklo-ai-power-decision-memo.json"),
+                    ],
+                    ["oklo-ai-power-decision-memo.md", "oklo-ai-power-decision-memo.json"],
                 ),
                 (
                     "compare",
