@@ -180,6 +180,43 @@ class CliTests(unittest.TestCase):
             self.assertEqual(stdout, "")
             self.assertEqual(stderr, f"error: cannot write output {json_path}: disk full\n")
             self.assertNotIn("Traceback", stderr)
+            self.assertFalse(md_path.exists())
+
+    def test_paired_outputs_do_not_leave_first_output_when_second_write_fails(self) -> None:
+        commands = (
+            ("risk", [str(EXAMPLE)]),
+            ("history", [str(EXAMPLE)]),
+            ("compare", [str(PRIOR_EXAMPLE), str(EXAMPLE)]),
+            ("portfolio", [str(EXAMPLE), str(ETF_EXAMPLE)]),
+            ("evidence-audit", [str(EXAMPLE), str(ETF_EXAMPLE)]),
+            ("review-queue", [str(EXAMPLE), str(ETF_EXAMPLE)]),
+            ("watchlist", [str(EXAMPLE), str(ETF_EXAMPLE)]),
+            ("action-plan", [str(EXAMPLE), str(ETF_EXAMPLE)]),
+            ("diff-archive", [str(ARCHIVE_FIXTURE), str(ARCHIVE_FIXTURE)]),
+        )
+        for command, positional_args in commands:
+            with self.subTest(command=command), tempfile.TemporaryDirectory() as temp:
+                temp_dir = Path(temp)
+                md_path = temp_dir / f"{command}.md"
+                blocked_parent = temp_dir / "blocked"
+                blocked_parent.write_text("not a directory", encoding="utf-8")
+                json_path = blocked_parent / f"{command}.json"
+
+                status, stdout, stderr = self.run_cli_in_process(
+                    command,
+                    *positional_args,
+                    "--output",
+                    str(md_path),
+                    "--json-output",
+                    str(json_path),
+                )
+
+                self.assertEqual(status, 2)
+                self.assertEqual(stdout, "")
+                self.assertIn(f"error: cannot write output {json_path}:", stderr)
+                self.assertNotIn("Traceback", stderr)
+                self.assertFalse(md_path.exists())
+                self.assertFalse(json_path.exists())
 
     def test_init_template_output_write_error_returns_concise_exit_2(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -1819,7 +1856,7 @@ class CliTests(unittest.TestCase):
             self.assertIn("# Watchlist", (output_dir / "watchlist.md").read_text())
             self.assertIn("# Weekly Action Plan", (output_dir / "action-plan.md").read_text())
             manifest = json.loads((output_dir / "manifest.json").read_text())
-            self.assertEqual(manifest["tool_version"], "1.7.0")
+            self.assertEqual(manifest["tool_version"], "1.7.1")
             self.assertEqual(manifest["ledger_ids"], ["oklo-ai-power", "leveraged-etf-discipline"])
             self.assertEqual(manifest["generated_files"], expected_files)
             index_links = [
@@ -1967,11 +2004,11 @@ class CliTests(unittest.TestCase):
             self.assertEqual(sorted(path.name for path in output_dir.iterdir()), sorted(expected_files))
             manifest = json.loads((output_dir / "manifest.json").read_text())
             self.assertEqual(manifest["archive_format"], "portable-research-archive")
-            self.assertEqual(manifest["tool_version"], "1.7.0")
+            self.assertEqual(manifest["tool_version"], "1.7.1")
             self.assertEqual(manifest["ledger_ids"], ["oklo-ai-power", "leveraged-etf-discipline"])
             self.assertEqual(manifest["generated_files"], expected_files)
             summary = json.loads((output_dir / "archive-summary.json").read_text())
-            self.assertEqual(summary["tool_version"], "1.7.0")
+            self.assertEqual(summary["tool_version"], "1.7.1")
             self.assertEqual(summary["ledger_ids"], manifest["ledger_ids"])
             self.assertEqual(summary["archive"]["ledger_count"], 2)
             self.assertEqual(summary["archive"]["file_count"], len(expected_files))
@@ -2455,7 +2492,7 @@ class CliTests(unittest.TestCase):
             self.assertNotIn("<script", (output_dir / "index.html").read_text().lower())
             self.assertNotIn("@import", (output_dir / "style.css").read_text().lower())
             manifest = json.loads((output_dir / "manifest.json").read_text())
-            self.assertEqual(manifest["tool_version"], "1.7.0")
+            self.assertEqual(manifest["tool_version"], "1.7.1")
             self.assertEqual(manifest["ledger_ids"], ["oklo-ai-power", "leveraged-etf-discipline"])
             self.assertEqual(manifest["generated_files"], expected_files)
             self.assertNotIn("timestamp", manifest)
@@ -2651,7 +2688,7 @@ class CliTests(unittest.TestCase):
             self.assertEqual(second.returncode, 0, second.stderr)
             self.assertEqual(output_a.read_text(), output_b.read_text())
             payload = json.loads(output_a.read_text())
-            self.assertEqual(payload["ledger_version"], "1.7.0")
+            self.assertEqual(payload["ledger_version"], "1.7.1")
             self.assertEqual(payload["thesis_id"], "msft-thesis")
             self.assertEqual(payload["sources"][0]["id"], "S1")
             self.assertEqual(payload["assumptions"][0]["source_ids"], ["S1"])

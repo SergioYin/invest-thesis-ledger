@@ -1,8 +1,8 @@
 # Archive Diff
 
 - Status: unchanged
-- Old Tool Version: 1.7.0
-- New Tool Version: 1.7.0
+- Old Tool Version: 1.7.1
+- New Tool Version: 1.7.1
 - Old File Count: 19
 - New File Count: 19
 - Unchanged Files: 19

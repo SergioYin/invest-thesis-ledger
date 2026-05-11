@@ -1,7 +1,7 @@
-# Ledger Schema v1.7.0
+# Ledger Schema v1.7.1
 
 This document defines the JSON ledger format accepted by `invest-thesis-ledger`
-v1.7.0. Ledgers are research organization records only and are not investment
+v1.7.1. Ledgers are research organization records only and are not investment
 advice.
 
 ## Document Shape
@@ -15,7 +15,7 @@ without breaking the renderer.
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `ledger_version` | string | Schema version. v1.7.0 ledgers should use `"1.7.0"`. v0.1.0 through v1.6.2 remain accepted for compatibility; other values validate with a warning. |
+| `ledger_version` | string | Schema version. v1.7.1 ledgers should use `"1.7.1"`. v0.1.0 through v1.7.0 remain accepted for compatibility; other values validate with a warning. |
 | `thesis_id` | string | Stable machine-readable ledger identifier. |
 | `title` | string | Human-readable thesis title. |
 | `asset` | object | Asset metadata. |
@@ -183,7 +183,7 @@ source, and duplicate source references within one item are invalid.
 
 ## Determinism
 
-For the same input file or ordered input file list, v1.7.0 CLI outputs are
+For the same input file or ordered input file list, v1.7.1 CLI outputs are
 deterministic:
 
 - JSON outputs are serialized with sorted keys and two-space indentation.
@@ -223,8 +223,10 @@ deterministic:
 - Rendered source sections are sorted by source ID.
 - `init-template` uses fixed placeholder dates so repeated runs with the same
   arguments produce byte-identical JSON.
+- Paired Markdown/JSON report commands stage both output files before final
+  commit and clean up or restore companions on write failure.
 
-## v1.7.0 Reports
+## v1.7.1 Reports
 
 `compare <old.json> <new.json> --output drift.md --json-output drift.json`
 loads and validates both ledgers, then compares:
@@ -295,7 +297,7 @@ Evidence gaps are ordered by review priority: low-confidence assumptions, stale
 sources, unused sources, then unsupported evidence items.
 
 `init-template --asset TICKER --name NAME --type TYPE --output ledger.json`
-writes a deterministic starter ledger with v1.7.0 fields, fixed placeholder
+writes a deterministic starter ledger with v1.7.1 fields, fixed placeholder
 dates, one source-backed assumption, one risk, one review, and a thesis ID
 derived from the ticker.
 

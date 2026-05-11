@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import argparse
+import errno
 import hashlib
 import html
 import json
+import os
 import shutil
 import sys
 import tempfile
@@ -657,19 +659,103 @@ def _write_text(path: str, text: str) -> None:
 
 
 def _write_rendered_outputs(ledger: dict, outputs: Sequence[tuple[str, Callable[[dict], str]]]) -> int:
-    for output_path, renderer in outputs:
-        status = _write_text_outputs(((output_path, renderer(ledger)),))
-        if status:
-            return status
-    return 0
+    rendered = tuple((output_path, renderer(ledger)) for output_path, renderer in outputs)
+    return _write_text_outputs(rendered)
 
 
 def _write_text_outputs(outputs: Sequence[tuple[str, str]]) -> int:
+    if len(outputs) > 1:
+        return _write_paired_text_outputs(outputs)
     for output_path, text in outputs:
         status = _write_output(output_path, lambda output_path=output_path, text=text: _write_text(output_path, text))
         if status:
             return status
     return 0
+
+
+def _write_paired_text_outputs(outputs: Sequence[tuple[str, str]]) -> int:
+    staged: list[tuple[str, Path, Path]] = []
+    backups: list[tuple[Path, Optional[Path]]] = []
+    committed: list[Path] = []
+    failing_path: object = outputs[0][0]
+    try:
+        for output_path, text in outputs:
+            failing_path = output_path
+            target = Path(output_path)
+            stage = _stage_text_output(target, text)
+            staged.append((output_path, target, stage))
+
+        for output_path, target, stage in staged:
+            failing_path = output_path
+            backup: Optional[Path] = None
+            if target.exists() and target.is_dir() and not target.is_symlink():
+                raise IsADirectoryError(errno.EISDIR, "Is a directory", str(target))
+            if target.exists() or target.is_symlink():
+                backup = _temp_sibling_path(target, "backup")
+                target.replace(backup)
+            backups.append((target, backup))
+            stage.replace(target)
+            committed.append(target)
+    except OSError as exc:
+        _cleanup_failed_paired_outputs(staged, backups, committed)
+        _report_output_write_error(failing_path, exc)
+        return 2
+
+    for _, _, stage in staged:
+        _unlink_if_exists(stage)
+    for _, backup in backups:
+        if backup is not None:
+            _unlink_if_exists(backup)
+    return 0
+
+
+def _stage_text_output(target: Path, text: str) -> Path:
+    target.parent.mkdir(parents=True, exist_ok=True)
+    stage = _temp_sibling_path(target, "tmp")
+    try:
+        _write_text(str(stage), text)
+    except OSError:
+        _unlink_if_exists(stage)
+        raise
+    return stage
+
+
+def _temp_sibling_path(target: Path, suffix: str) -> Path:
+    handle, name = tempfile.mkstemp(prefix=f".{target.name}.", suffix=f".{suffix}", dir=target.parent)
+    try:
+        os.close(handle)
+    except OSError:
+        pass
+    Path(name).unlink()
+    return Path(name)
+
+
+def _cleanup_failed_paired_outputs(
+    staged: Sequence[tuple[str, Path, Path]],
+    backups: Sequence[tuple[Path, Optional[Path]]],
+    committed: Sequence[Path],
+) -> None:
+    for _, _, stage in staged:
+        _unlink_if_exists(stage)
+    for target in reversed(committed):
+        _unlink_if_exists(target)
+    for target, backup in reversed(backups):
+        if backup is not None and backup.exists():
+            if target.exists() or target.is_symlink():
+                _unlink_if_exists(target)
+            try:
+                backup.replace(target)
+            except OSError:
+                pass
+
+
+def _unlink_if_exists(path: Path) -> None:
+    try:
+        path.unlink()
+    except FileNotFoundError:
+        pass
+    except OSError:
+        pass
 
 
 def _write_output(path: object, write: Callable[[], None]) -> int:

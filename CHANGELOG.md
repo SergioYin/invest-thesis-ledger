@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.7.1 - 2026-05-12
+
+- Made paired Markdown/JSON outputs stage all files before commit and clean up or restore companions when a paired write fails.
+- Added regression coverage for second-output failures across risk, history, compare, portfolio, evidence-audit, review-queue, watchlist, action-plan, and diff-archive.
+- Preserved concise exit-code-2 output write errors without tracebacks.
+- Updated package/schema version, README, schema docs, tests, selfcheck, and checked-in fixtures for v1.7.1.
+
 ## 1.7.0 - 2026-05-12
 
 - Added consistent output-write error handling for file, paired Markdown/JSON, archive diff, template, demo bundle, archive, and HTML dashboard outputs.
