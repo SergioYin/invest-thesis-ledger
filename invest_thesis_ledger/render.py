@@ -53,40 +53,43 @@ def render_brief(ledger: Mapping[str, Any]) -> str:
 
     asset = ledger["asset"]
     lines = [
-        f"# {ledger['title']}",
+        f"# {_markdown_inline(ledger['title'])}",
         "",
         "> This is a research organization tool, not investment advice.",
         "",
         "## Asset",
         "",
-        f"- Name: {asset['name']}",
-        f"- Type: {asset['type']}",
-        f"- Ticker: {asset['ticker']}",
-        f"- Ledger ID: {ledger['thesis_id']}",
-        f"- Updated: {ledger['updated']}",
+        f"- Name: {_markdown_inline(asset['name'])}",
+        f"- Type: {_markdown_inline(asset['type'])}",
+        f"- Ticker: {_markdown_inline(asset['ticker'])}",
+        f"- Ledger ID: {_markdown_inline(ledger['thesis_id'])}",
+        f"- Updated: {_markdown_inline(ledger['updated'])}",
         "",
         "## Thesis",
         "",
-        ledger["thesis"],
+        _markdown_inline(ledger["thesis"]),
         "",
         "## Assumptions",
         "",
     ]
     for item in ledger["assumptions"]:
         lines.append(
-            f"- {item['id']}: {item['statement']} "
-            f"(confidence: {item['confidence']}; sources: {_refs(item['source_ids'])})"
+            f"- {_markdown_inline(item['id'])}: {_markdown_inline(item['statement'])} "
+            f"(confidence: {_markdown_inline(item['confidence'])}; sources: {_refs(item['source_ids'])})"
         )
     lines.extend(["", "## Catalysts", ""])
     for item in calendar_payload(ledger)["catalysts"]:
         timing = _catalyst_timing(item)
         source_text = f"; sources: {_refs(item['source_ids'])}" if item["source_ids"] else ""
-        lines.append(f"- {item['id']}: {item['title']}{timing}{source_text}")
+        lines.append(
+            f"- {_markdown_inline(item['id'])}: {_markdown_inline(item['title'])}"
+            f"{_markdown_inline(timing)}{source_text}"
+        )
     if not ledger.get("catalysts"):
         lines.append("- None recorded.")
     lines.extend(["", "## Current Position Notes", ""])
     for item in ledger.get("positions", []):
-        lines.append(f"- {item}")
+        lines.append(f"- {_markdown_inline(item)}")
     if not ledger.get("positions"):
         lines.append("- None recorded.")
     lines.extend(["", "## Sources", ""])
@@ -134,12 +137,12 @@ def render_risk(ledger: Mapping[str, Any]) -> str:
 
     payload = risk_payload(ledger)
     lines = [
-        f"# Risk Report: {payload['title']}",
+        f"# Risk Report: {_markdown_inline(payload['title'])}",
         "",
         "> This is a research organization tool, not investment advice.",
         "",
-        f"- Ledger ID: {payload['thesis_id']}",
-        f"- Updated: {payload['updated']}",
+        f"- Ledger ID: {_markdown_inline(payload['thesis_id'])}",
+        f"- Updated: {_markdown_inline(payload['updated'])}",
         "",
         "## Risks",
         "",
@@ -147,19 +150,22 @@ def render_risk(ledger: Mapping[str, Any]) -> str:
     for item in payload["risks"]:
         lines.extend(
             [
-                f"### {item['id']}: {item['name']}",
+                f"### {_markdown_inline(item['id'])}: {_markdown_inline(item['name'])}",
                 "",
-                f"- Severity: {item['severity']}",
-                f"- Probability: {item['probability']}",
-                f"- Tags: {', '.join(item['tags']) if item['tags'] else 'none'}",
-                f"- Mitigation: {item['mitigation']}",
+                f"- Severity: {_markdown_inline(item['severity'])}",
+                f"- Probability: {_markdown_inline(item['probability'])}",
+                f"- Tags: {_markdown_join(item['tags'])}",
+                f"- Mitigation: {_markdown_inline(item['mitigation'])}",
                 f"- Sources: {_refs(item['source_ids'])}",
                 "",
             ]
         )
     lines.extend(["## Checklist", ""])
     for item in payload["checklist"]:
-        lines.append(f"- [{_checkbox(item['status'])}] {item['id']}: {item['item']} ({item['status']})")
+        lines.append(
+            f"- [{_checkbox(item['status'])}] {_markdown_inline(item['id'])}: {_markdown_inline(item['item'])} "
+            f"({_markdown_inline(item['status'])})"
+        )
     if not payload["checklist"]:
         lines.append("- No checklist items recorded.")
     lines.extend(["", "## Sources", ""])
@@ -2101,12 +2107,12 @@ def render_evidence(ledger: Mapping[str, Any]) -> str:
 
     payload = evidence_payload(ledger)
     lines = [
-        f"# Evidence Report: {payload['title']}",
+        f"# Evidence Report: {_markdown_inline(payload['title'])}",
         "",
         "> This is a research organization tool, not investment advice.",
         "",
-        f"- Ledger ID: {payload['thesis_id']}",
-        f"- Updated: {payload['updated']}",
+        f"- Ledger ID: {_markdown_inline(payload['thesis_id'])}",
+        f"- Updated: {_markdown_inline(payload['updated'])}",
         "",
         "## Coverage",
         "",
@@ -2116,17 +2122,23 @@ def render_evidence(ledger: Mapping[str, Any]) -> str:
     lines.extend(["", "## Items", ""])
     for item in payload["items"]:
         status = "supported" if item["source_ids"] else "unsupported"
-        lines.append(f"- {item['type']} {item['id']}: {status}; sources: {_refs(item['source_ids'])}")
+        lines.append(
+            f"- {_markdown_inline(item['type'])} {_markdown_inline(item['id'])}: "
+            f"{status}; sources: {_refs(item['source_ids'])}"
+        )
     lines.extend(["", "## Stale Sources", ""])
     if payload["stale_sources"]:
         for item in payload["stale_sources"]:
-            lines.append(f"- [{item['id']}] {item['title']} ({item['date']}): {item['age_days']} days old")
+            lines.append(
+                f"- [{_markdown_inline(item['id'])}] {_markdown_inline(item['title'])} "
+                f"({_markdown_inline(item['date'])}): {item['age_days']} days old"
+            )
     else:
         lines.append("- No stale sources detected.")
     lines.extend(["", "## Unused Sources", ""])
     if payload["unused_sources"]:
         for source_id in payload["unused_sources"]:
-            lines.append(f"- [{source_id}]")
+            lines.append(f"- [{_markdown_inline(source_id)}]")
     else:
         lines.append("- No unused sources detected.")
     return "\n".join(lines) + "\n"
@@ -2137,13 +2149,13 @@ def render_history(ledger: Mapping[str, Any]) -> str:
 
     payload = history_payload(ledger)
     lines = [
-        f"# History: {payload['title']}",
+        f"# History: {_markdown_inline(payload['title'])}",
         "",
         "> This is a research organization tool, not investment advice.",
         "",
-        f"- Ledger ID: {payload['thesis_id']}",
-        f"- Created: {payload['created']}",
-        f"- Updated: {payload['updated']}",
+        f"- Ledger ID: {_markdown_inline(payload['thesis_id'])}",
+        f"- Created: {_markdown_inline(payload['created'])}",
+        f"- Updated: {_markdown_inline(payload['updated'])}",
         "",
         "## Timeline",
         "",
@@ -2151,10 +2163,10 @@ def render_history(ledger: Mapping[str, Any]) -> str:
     for item in payload["reviews"]:
         lines.extend(
             [
-                f"### {item['date']} - {item['decision']}",
+                f"### {_markdown_inline(item['date'])} - {_markdown_inline(item['decision'])}",
                 "",
-                f"- Summary: {item['summary']}",
-                f"- Drift: {item['drift']}",
+                f"- Summary: {_markdown_inline(item['summary'])}",
+                f"- Drift: {_markdown_inline(item['drift'])}",
                 f"- Sources: {_refs(item['source_ids'])}",
                 "",
             ]
@@ -2171,7 +2183,7 @@ def to_json(data: Mapping[str, Any]) -> str:
 
 
 def _refs(source_ids: Sequence[str]) -> str:
-    return ", ".join(f"[{_inline(source_id)}]" for source_id in source_ids) if source_ids else "none"
+    return ", ".join(f"[{_markdown_inline(source_id)}]" for source_id in source_ids) if source_ids else "none"
 
 
 def _source_lines(ledger: Mapping[str, Any]) -> List[str]:
@@ -2180,8 +2192,9 @@ def _source_lines(ledger: Mapping[str, Any]) -> List[str]:
     for source_id in sorted(sources):
         source = sources[source_id]
         lines.append(
-            f"- [{_inline(source_id)}] {_inline(source['title'])}. {_inline(source['publisher'])}, "
-            f"{_inline(source['date'])}. {_inline(source['url'])}"
+            f"- [{_markdown_inline(source_id)}] {_markdown_inline(source['title'])}. "
+            f"{_markdown_inline(source['publisher'])}, {_markdown_inline(source['date'])}. "
+            f"{_markdown_inline(source['url'])}"
         )
     return lines
 
@@ -2654,6 +2667,14 @@ def _inline(value: Any) -> str:
 
 def _inline_join(values: Sequence[Any]) -> str:
     return ", ".join(_inline(value) for value in values) if values else "none"
+
+
+def _markdown_inline(value: Any) -> str:
+    return _inline(value).replace("[", "\\[").replace("]", "\\]")
+
+
+def _markdown_join(values: Sequence[Any]) -> str:
+    return ", ".join(_markdown_inline(value) for value in values) if values else "none"
 
 
 def _plain_join(values: Iterable[Any]) -> str:

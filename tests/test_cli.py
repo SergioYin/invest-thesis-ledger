@@ -388,6 +388,79 @@ class CliTests(unittest.TestCase):
             self.assertEqual(output_a.read_text(), output_b.read_text())
             self.assertIn("## Sources", output_a.read_text())
 
+    def test_markdown_reports_escape_ledger_controlled_strings(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_dir = Path(temp)
+            ledger_path = temp_dir / "ledger.json"
+            data = json.loads(EXAMPLE.read_text(encoding="utf-8"))
+            source_id = "S[1]|A\nB"
+            unused_source_id = "S[2]|unused\nid"
+            data["ledger_version"] = "1.7.3"
+            data["thesis_id"] = "ledger[pipe]|id\nbreak"
+            data["title"] = "Title [x] | y\nbreak"
+            data["asset"]["name"] = "Asset [name] | line\nbreak"
+            data["thesis"] = "Thesis [case] | line\nbreak"
+            data["sources"][0]["id"] = source_id
+            data["sources"][0]["title"] = "Source [title] | line\nbreak"
+            data["sources"][0]["date"] = "2025-01-01"
+            data["sources"].append(
+                {
+                    "id": unused_source_id,
+                    "title": "Unused [source] | line\nbreak",
+                    "publisher": "Desk",
+                    "date": "2025-01-01",
+                    "url": "https://example.com/unused",
+                }
+            )
+            for key in ("assumptions", "risks", "reviews", "catalysts", "broker_views", "position_rules"):
+                for item in data.get(key, []):
+                    if isinstance(item, dict) and item.get("source_ids"):
+                        item["source_ids"] = [source_id]
+            data["assumptions"][0]["id"] = "A[1]|id\nbreak"
+            data["assumptions"][0]["statement"] = "Assumption [text] | line\nbreak"
+            data["risks"][0]["id"] = "R[1]|id\nbreak"
+            data["risks"][0]["name"] = "Risk [name] | line\nbreak"
+            data["risks"][0]["mitigation"] = "Mitigation [text] | line\nbreak"
+            data["reviews"][0]["decision"] = "Hold [watch] | line\nbreak"
+            data["reviews"][0]["summary"] = "Review [summary] | line\nbreak"
+            data["reviews"][0]["drift"] = "Drift [note] | line\nbreak"
+            data["checklist"][0]["id"] = "C[1]|id\nbreak"
+            data["checklist"][0]["item"] = "Checklist [item] | line\nbreak"
+            ledger_path.write_text(json.dumps(data), encoding="utf-8")
+
+            outputs = {}
+            for command in ("brief", "risk", "evidence", "history"):
+                md_path = temp_dir / f"{command}.md"
+                args = [command, str(ledger_path), "--output", str(md_path)]
+                if command != "brief":
+                    args.extend(["--json-output", str(temp_dir / f"{command}.json")])
+                result = self.run_cli(*args)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                outputs[command] = md_path.read_text(encoding="utf-8")
+
+            expected_title = "Title \\[x\\] \\| y break"
+            expected_source_id = "S\\[1\\]\\|A B"
+            expected_unused_source_id = "S\\[2\\]\\|unused id"
+            expected_source_title = "Source \\[title\\] \\| line break"
+            self.assertIn(f"# {expected_title}", outputs["brief"])
+            self.assertIn("Thesis \\[case\\] \\| line break", outputs["brief"])
+            self.assertIn("A\\[1\\]\\|id break: Assumption \\[text\\] \\| line break", outputs["brief"])
+            self.assertIn(f"sources: [{expected_source_id}]", outputs["brief"])
+            self.assertIn(f"[{expected_source_id}] {expected_source_title}.", outputs["brief"])
+            self.assertIn("### R\\[1\\]\\|id break: Risk \\[name\\] \\| line break", outputs["risk"])
+            self.assertIn("Mitigation \\[text\\] \\| line break", outputs["risk"])
+            self.assertIn("C\\[1\\]\\|id break: Checklist \\[item\\] \\| line break", outputs["risk"])
+            self.assertIn(f"[{expected_source_id}] {expected_source_title}.", outputs["risk"])
+            self.assertIn("assumption A\\[1\\]\\|id break: supported", outputs["evidence"])
+            self.assertIn(f"[{expected_unused_source_id}]", outputs["evidence"])
+            self.assertIn("Source \\[title\\] \\| line break (2025-01-01):", outputs["evidence"])
+            self.assertIn("### 2026-05-12 - Hold \\[watch\\] \\| line break", outputs["history"])
+            self.assertIn("Review \\[summary\\] \\| line break", outputs["history"])
+            self.assertIn("Drift \\[note\\] \\| line break", outputs["history"])
+            self.assertIn(f"[{expected_source_id}] {expected_source_title}.", outputs["history"])
+            for text in outputs.values():
+                self.assertNotIn("| line\n", text)
+
     def test_risk_writes_markdown_and_json(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             md_path = Path(temp) / "risk.md"
@@ -1947,7 +2020,7 @@ class CliTests(unittest.TestCase):
             self.assertIn("# Watchlist", (output_dir / "watchlist.md").read_text())
             self.assertIn("# Weekly Action Plan", (output_dir / "action-plan.md").read_text())
             manifest = json.loads((output_dir / "manifest.json").read_text())
-            self.assertEqual(manifest["tool_version"], "1.7.2")
+            self.assertEqual(manifest["tool_version"], "1.7.3")
             self.assertEqual(manifest["ledger_ids"], ["oklo-ai-power", "leveraged-etf-discipline"])
             self.assertEqual(manifest["generated_files"], expected_files)
             index_links = [
@@ -2095,11 +2168,11 @@ class CliTests(unittest.TestCase):
             self.assertEqual(sorted(path.name for path in output_dir.iterdir()), sorted(expected_files))
             manifest = json.loads((output_dir / "manifest.json").read_text())
             self.assertEqual(manifest["archive_format"], "portable-research-archive")
-            self.assertEqual(manifest["tool_version"], "1.7.2")
+            self.assertEqual(manifest["tool_version"], "1.7.3")
             self.assertEqual(manifest["ledger_ids"], ["oklo-ai-power", "leveraged-etf-discipline"])
             self.assertEqual(manifest["generated_files"], expected_files)
             summary = json.loads((output_dir / "archive-summary.json").read_text())
-            self.assertEqual(summary["tool_version"], "1.7.2")
+            self.assertEqual(summary["tool_version"], "1.7.3")
             self.assertEqual(summary["ledger_ids"], manifest["ledger_ids"])
             self.assertEqual(summary["archive"]["ledger_count"], 2)
             self.assertEqual(summary["archive"]["file_count"], len(expected_files))
@@ -2583,7 +2656,7 @@ class CliTests(unittest.TestCase):
             self.assertNotIn("<script", (output_dir / "index.html").read_text().lower())
             self.assertNotIn("@import", (output_dir / "style.css").read_text().lower())
             manifest = json.loads((output_dir / "manifest.json").read_text())
-            self.assertEqual(manifest["tool_version"], "1.7.2")
+            self.assertEqual(manifest["tool_version"], "1.7.3")
             self.assertEqual(manifest["ledger_ids"], ["oklo-ai-power", "leveraged-etf-discipline"])
             self.assertEqual(manifest["generated_files"], expected_files)
             self.assertNotIn("timestamp", manifest)
@@ -2779,7 +2852,7 @@ class CliTests(unittest.TestCase):
             self.assertEqual(second.returncode, 0, second.stderr)
             self.assertEqual(output_a.read_text(), output_b.read_text())
             payload = json.loads(output_a.read_text())
-            self.assertEqual(payload["ledger_version"], "1.7.2")
+            self.assertEqual(payload["ledger_version"], "1.7.3")
             self.assertEqual(payload["thesis_id"], "msft-thesis")
             self.assertEqual(payload["sources"][0]["id"], "S1")
             self.assertEqual(payload["assumptions"][0]["source_ids"], ["S1"])

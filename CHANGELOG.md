@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.7.3 - 2026-05-12
+
+- Escaped ledger-controlled Markdown in brief, risk, evidence, history, source references, and source sections so pipes, brackets, and line breaks do not corrupt report structure.
+- Added regression coverage for valid ledgers containing brackets, pipes, and newlines in core report fields and source metadata.
+- Updated package/schema version, README, schema docs, tests, and checked-in fixtures for v1.7.3.
+
 ## 1.7.2 - 2026-05-12
 
 - Added fixture freshness tests for demo bundles, portable archives, archive diffs, and HTML dashboards against current generators.
