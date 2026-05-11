@@ -50,6 +50,22 @@ class CliTests(unittest.TestCase):
             status = cli_module.main(args)
         return status, stdout.getvalue(), stderr.getvalue()
 
+    def write_invalid_ledger(self, path: Path) -> None:
+        data = json.loads(EXAMPLE.read_text(encoding="utf-8"))
+        data["risks"][0]["source_ids"] = ["missing"]
+        path.write_text(json.dumps(data), encoding="utf-8")
+
+    def assert_output_tree_matches(self, generated: Path, checked_in: Path) -> None:
+        generated_files = sorted(path.relative_to(generated) for path in generated.rglob("*") if path.is_file())
+        checked_in_files = sorted(path.relative_to(checked_in) for path in checked_in.rglob("*") if path.is_file())
+        self.assertEqual(generated_files, checked_in_files)
+        for filename in generated_files:
+            self.assertEqual(
+                (generated / filename).read_text(encoding="utf-8"),
+                (checked_in / filename).read_text(encoding="utf-8"),
+                str(filename),
+            )
+
     def test_validate_example(self) -> None:
         result = self.run_cli("validate", str(EXAMPLE))
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -186,6 +202,12 @@ class CliTests(unittest.TestCase):
         commands = (
             ("risk", [str(EXAMPLE)]),
             ("history", [str(EXAMPLE)]),
+            ("calendar", [str(EXAMPLE)]),
+            ("evidence", [str(EXAMPLE)]),
+            ("broker-matrix", [str(EXAMPLE)]),
+            ("exposure", [str(EXAMPLE)]),
+            ("decision-memo", [str(EXAMPLE)]),
+            ("scenario-plan", [str(EXAMPLE)]),
             ("compare", [str(PRIOR_EXAMPLE), str(EXAMPLE)]),
             ("portfolio", [str(EXAMPLE), str(ETF_EXAMPLE)]),
             ("evidence-audit", [str(EXAMPLE), str(ETF_EXAMPLE)]),
@@ -215,6 +237,75 @@ class CliTests(unittest.TestCase):
                 self.assertEqual(stdout, "")
                 self.assertIn(f"error: cannot write output {json_path}:", stderr)
                 self.assertNotIn("Traceback", stderr)
+                self.assertFalse(md_path.exists())
+                self.assertFalse(json_path.exists())
+
+    def test_command_level_invalid_ledgers_do_not_write_outputs(self) -> None:
+        commands = (
+            ("brief", [str(EXAMPLE)], False),
+            ("risk", [str(EXAMPLE)], True),
+            ("history", [str(EXAMPLE)], True),
+            ("calendar", [str(EXAMPLE)], True),
+            ("evidence", [str(EXAMPLE)], True),
+            ("broker-matrix", [str(EXAMPLE)], True),
+            ("exposure", [str(EXAMPLE)], True),
+        )
+        for command, positional_args, has_json in commands:
+            with self.subTest(command=command), tempfile.TemporaryDirectory() as temp:
+                temp_dir = Path(temp)
+                bad_path = temp_dir / "bad.json"
+                self.write_invalid_ledger(bad_path)
+                md_path = temp_dir / f"{command}.md"
+                json_path = temp_dir / f"{command}.json"
+                args = [
+                    command,
+                    *(str(bad_path) if arg == str(EXAMPLE) else arg for arg in positional_args),
+                    "--output",
+                    str(md_path),
+                ]
+                if has_json:
+                    args.extend(["--json-output", str(json_path)])
+
+                result = self.run_cli(*args)
+
+                self.assertEqual(result.returncode, 1)
+                self.assertIn("unknown source missing", result.stderr)
+                self.assertFalse(md_path.exists())
+                self.assertFalse(json_path.exists())
+
+    def test_compare_invalid_ledgers_do_not_write_outputs(self) -> None:
+        cases = (
+            ("old", True, False),
+            ("new", False, True),
+        )
+        for label, old_invalid, new_invalid in cases:
+            with self.subTest(label=label), tempfile.TemporaryDirectory() as temp:
+                temp_dir = Path(temp)
+                old_path = temp_dir / "old.json"
+                new_path = temp_dir / "new.json"
+                if old_invalid:
+                    self.write_invalid_ledger(old_path)
+                else:
+                    shutil.copyfile(PRIOR_EXAMPLE, old_path)
+                if new_invalid:
+                    self.write_invalid_ledger(new_path)
+                else:
+                    shutil.copyfile(EXAMPLE, new_path)
+                md_path = temp_dir / "compare.md"
+                json_path = temp_dir / "compare.json"
+
+                result = self.run_cli(
+                    "compare",
+                    str(old_path),
+                    str(new_path),
+                    "--output",
+                    str(md_path),
+                    "--json-output",
+                    str(json_path),
+                )
+
+                self.assertEqual(result.returncode, 1)
+                self.assertIn("unknown source missing", result.stderr)
                 self.assertFalse(md_path.exists())
                 self.assertFalse(json_path.exists())
 
@@ -1856,7 +1947,7 @@ class CliTests(unittest.TestCase):
             self.assertIn("# Watchlist", (output_dir / "watchlist.md").read_text())
             self.assertIn("# Weekly Action Plan", (output_dir / "action-plan.md").read_text())
             manifest = json.loads((output_dir / "manifest.json").read_text())
-            self.assertEqual(manifest["tool_version"], "1.7.1")
+            self.assertEqual(manifest["tool_version"], "1.7.2")
             self.assertEqual(manifest["ledger_ids"], ["oklo-ai-power", "leveraged-etf-discipline"])
             self.assertEqual(manifest["generated_files"], expected_files)
             index_links = [
@@ -2004,11 +2095,11 @@ class CliTests(unittest.TestCase):
             self.assertEqual(sorted(path.name for path in output_dir.iterdir()), sorted(expected_files))
             manifest = json.loads((output_dir / "manifest.json").read_text())
             self.assertEqual(manifest["archive_format"], "portable-research-archive")
-            self.assertEqual(manifest["tool_version"], "1.7.1")
+            self.assertEqual(manifest["tool_version"], "1.7.2")
             self.assertEqual(manifest["ledger_ids"], ["oklo-ai-power", "leveraged-etf-discipline"])
             self.assertEqual(manifest["generated_files"], expected_files)
             summary = json.loads((output_dir / "archive-summary.json").read_text())
-            self.assertEqual(summary["tool_version"], "1.7.1")
+            self.assertEqual(summary["tool_version"], "1.7.2")
             self.assertEqual(summary["ledger_ids"], manifest["ledger_ids"])
             self.assertEqual(summary["archive"]["ledger_count"], 2)
             self.assertEqual(summary["archive"]["file_count"], len(expected_files))
@@ -2492,7 +2583,7 @@ class CliTests(unittest.TestCase):
             self.assertNotIn("<script", (output_dir / "index.html").read_text().lower())
             self.assertNotIn("@import", (output_dir / "style.css").read_text().lower())
             manifest = json.loads((output_dir / "manifest.json").read_text())
-            self.assertEqual(manifest["tool_version"], "1.7.1")
+            self.assertEqual(manifest["tool_version"], "1.7.2")
             self.assertEqual(manifest["ledger_ids"], ["oklo-ai-power", "leveraged-etf-discipline"])
             self.assertEqual(manifest["generated_files"], expected_files)
             self.assertNotIn("timestamp", manifest)
@@ -2688,7 +2779,7 @@ class CliTests(unittest.TestCase):
             self.assertEqual(second.returncode, 0, second.stderr)
             self.assertEqual(output_a.read_text(), output_b.read_text())
             payload = json.loads(output_a.read_text())
-            self.assertEqual(payload["ledger_version"], "1.7.1")
+            self.assertEqual(payload["ledger_version"], "1.7.2")
             self.assertEqual(payload["thesis_id"], "msft-thesis")
             self.assertEqual(payload["sources"][0]["id"], "S1")
             self.assertEqual(payload["assumptions"][0]["source_ids"], ["S1"])
@@ -2952,6 +3043,68 @@ class CliTests(unittest.TestCase):
                         (OUTPUT / filename).read_text(),
                         filename,
                     )
+
+    def test_demo_directory_and_archive_diff_fixtures_match_cli(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_dir = Path(temp)
+            generated_demo = temp_dir / "demo-bundle"
+            generated_archive = temp_dir / "archive"
+            generated_dashboard = temp_dir / "html-dashboard"
+            generated_diff_md = temp_dir / "archive-diff.md"
+            generated_diff_json = temp_dir / "archive-diff.json"
+
+            commands = (
+                (
+                    "demo-bundle",
+                    [
+                        "demo-bundle",
+                        str(EXAMPLE),
+                        str(ETF_EXAMPLE),
+                        "--output-dir",
+                        str(generated_demo),
+                    ],
+                ),
+                (
+                    "archive",
+                    [
+                        "archive",
+                        str(EXAMPLE),
+                        str(ETF_EXAMPLE),
+                        "--output-dir",
+                        str(generated_archive),
+                    ],
+                ),
+                (
+                    "html-dashboard",
+                    [
+                        "html-dashboard",
+                        str(EXAMPLE),
+                        str(ETF_EXAMPLE),
+                        "--output-dir",
+                        str(generated_dashboard),
+                    ],
+                ),
+            )
+            for label, args in commands:
+                result = self.run_cli(*args)
+                self.assertEqual(result.returncode, 0, f"{label}: {result.stderr}")
+
+            result = self.run_cli(
+                "diff-archive",
+                str(generated_archive),
+                str(generated_archive),
+                "--output",
+                str(generated_diff_md),
+                "--json-output",
+                str(generated_diff_json),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+
+            self.assert_output_tree_matches(generated_demo, OUTPUT / "demo-bundle")
+            self.assert_output_tree_matches(generated_archive, OUTPUT / "archive")
+            self.assert_output_tree_matches(generated_dashboard, OUTPUT / "html-dashboard")
+            self.assertEqual(generated_diff_md.read_text(), (OUTPUT / "archive-diff.md").read_text())
+            self.assertEqual(generated_diff_json.read_text(), (OUTPUT / "archive-diff.json").read_text())
 
     def test_invalid_unknown_source_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

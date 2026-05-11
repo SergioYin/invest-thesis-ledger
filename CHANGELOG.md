@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.7.2 - 2026-05-12
+
+- Added fixture freshness tests for demo bundles, portable archives, archive diffs, and HTML dashboards against current generators.
+- Expanded paired Markdown/JSON write-failure regression coverage to calendar, evidence, broker-matrix, exposure, decision-memo, and scenario-plan.
+- Added command-level invalid-ledger/no-output coverage for brief, risk, history, compare, calendar, evidence, broker-matrix, and exposure.
+- Updated package/schema version, README, schema docs, tests, and checked-in fixtures for v1.7.2.
+
 ## 1.7.1 - 2026-05-12
 
 - Made paired Markdown/JSON outputs stage all files before commit and clean up or restore companions when a paired write fails.
