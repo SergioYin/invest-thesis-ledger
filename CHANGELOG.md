@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.4.0 - 2026-05-12
+
+- Added `archive` command for deterministic portable research archives across two or more ledgers.
+- Added archive output with `README.md`, normalized per-ledger JSON copies, per-ledger brief/risk/history/decision/scenario Markdown, aggregate portfolio/evidence-audit/watchlist/action-plan Markdown, `manifest.json`, and `archive-summary.json`.
+- Added SHA-256 file hashes in the archive summary using the Python standard library, with no timestamps, absolute paths, workflow files, dependency files, or external data.
+- Kept archive writes validation-first and cleanly staged so existing output directories are replaced only after all ledgers validate and archive files are generated.
+- Updated package/schema version, README, schema docs, tests, selfcheck, and checked-in fixtures for v1.4.0.
+
 ## 1.3.0 - 2026-05-12
 
 - Expanded `demo-bundle` output with `evidence-audit.md` and `action-plan.md`.

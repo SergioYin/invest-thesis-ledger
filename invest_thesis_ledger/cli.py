@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import html
 import shutil
 import sys
@@ -174,6 +175,15 @@ def build_parser() -> argparse.ArgumentParser:
     demo_bundle.add_argument("ledgers", metavar="LEDGER", nargs="+", help="ledger JSON file")
     demo_bundle.add_argument("--output-dir", required=True, metavar="DIR", help="write static demo bundle to DIR")
     demo_bundle.set_defaults(func=_cmd_demo_bundle)
+
+    archive = subparsers.add_parser(
+        "archive",
+        help="write a deterministic portable research archive from two or more ledgers",
+        description="write a deterministic portable research archive from two or more ledgers.",
+    )
+    archive.add_argument("ledgers", metavar="LEDGER", nargs="+", help="ledger JSON file")
+    archive.add_argument("--output-dir", required=True, metavar="DIR", help="write portable archive to DIR")
+    archive.set_defaults(func=_cmd_archive)
 
     html_dashboard = subparsers.add_parser(
         "html-dashboard",
@@ -418,8 +428,8 @@ def _cmd_demo_bundle(args: argparse.Namespace) -> int:
     if output_dir.exists() and (not output_dir.is_dir() or output_dir.is_symlink()):
         sys.stderr.write(f"error: output dir is not a directory: {output_dir}\n")
         return 2
-    if output_dir.resolve() == Path.cwd().resolve():
-        sys.stderr.write(f"error: refusing to replace current working directory: {output_dir}\n")
+    if _is_unsafe_output_dir(output_dir):
+        sys.stderr.write(f"error: refusing to replace current working directory or ancestor: {output_dir}\n")
         return 2
 
     try:
@@ -429,6 +439,32 @@ def _cmd_demo_bundle(args: argparse.Namespace) -> int:
         return 2
     except ValueError as exc:
         sys.stderr.write(f"error: cannot write demo bundle {output_dir}: {exc}\n")
+        return 2
+    sys.stdout.write(f"wrote: {output_dir}\n")
+    return 0
+
+
+def _cmd_archive(args: argparse.Namespace) -> int:
+    ledgers, status = _load_validated_ledgers(args.ledgers, "archive")
+    if ledgers is None:
+        return status
+
+    output_dir = Path(args.output_dir)
+    files = _archive_files(ledgers)
+    if output_dir.exists() and (not output_dir.is_dir() or output_dir.is_symlink()):
+        sys.stderr.write(f"error: output dir is not a directory: {output_dir}\n")
+        return 2
+    if _is_unsafe_output_dir(output_dir):
+        sys.stderr.write(f"error: refusing to replace current working directory or ancestor: {output_dir}\n")
+        return 2
+
+    try:
+        _write_demo_bundle_dir(output_dir, files)
+    except OSError as exc:
+        sys.stderr.write(f"error: cannot write archive {output_dir}: {exc}\n")
+        return 2
+    except ValueError as exc:
+        sys.stderr.write(f"error: cannot write archive {output_dir}: {exc}\n")
         return 2
     sys.stdout.write(f"wrote: {output_dir}\n")
     return 0
@@ -444,8 +480,8 @@ def _cmd_html_dashboard(args: argparse.Namespace) -> int:
     if output_dir.exists() and (not output_dir.is_dir() or output_dir.is_symlink()):
         sys.stderr.write(f"error: output dir is not a directory: {output_dir}\n")
         return 2
-    if output_dir.resolve() == Path.cwd().resolve():
-        sys.stderr.write(f"error: refusing to replace current working directory: {output_dir}\n")
+    if _is_unsafe_output_dir(output_dir):
+        sys.stderr.write(f"error: refusing to replace current working directory or ancestor: {output_dir}\n")
         return 2
 
     try:
@@ -525,6 +561,12 @@ def _write_text(path: str, text: str) -> None:
     output_path.write_text(text, encoding="utf-8")
 
 
+def _is_unsafe_output_dir(output_dir: Path) -> bool:
+    resolved = output_dir.resolve()
+    cwd = Path.cwd().resolve()
+    return resolved == cwd or resolved in cwd.parents
+
+
 def _write_demo_bundle_dir(output_dir: Path, files: Sequence[tuple[str, str]]) -> None:
     parent = output_dir.parent
     parent.mkdir(parents=True, exist_ok=True)
@@ -586,6 +628,111 @@ def _demo_bundle_files(ledgers: Sequence[dict]) -> list[tuple[str, str]]:
     return files
 
 
+def _archive_files(ledgers: Sequence[dict]) -> list[tuple[str, str]]:
+    body_files: list[tuple[str, str]] = []
+    ledger_artifacts = (
+        ("brief", render_brief),
+        ("risk", render_risk),
+        ("history", render_history),
+        ("decision", render_decision_memo),
+        ("scenario", render_scenario_plan),
+    )
+    aggregate_files = [
+        "portfolio.md",
+        "evidence-audit.md",
+        "watchlist.md",
+        "action-plan.md",
+    ]
+    metadata_files = ["README.md", "manifest.json", "archive-summary.json"]
+    ledger_prefixes = _bundle_prefixes(
+        ledgers,
+        reserved_filenames=metadata_files + aggregate_files,
+        primary_extension=".json",
+        artifact_suffixes=[suffix for suffix, _renderer in ledger_artifacts],
+    )
+    for ledger, ledger_id in zip(ledgers, ledger_prefixes):
+        body_files.append((f"{ledger_id}.json", to_json(ledger)))
+        for suffix, renderer in ledger_artifacts:
+            body_files.append((f"{ledger_id}-{suffix}.md", renderer(ledger)))
+    body_files.extend(
+        [
+            (aggregate_files[0], render_portfolio(ledgers)),
+            (aggregate_files[1], render_evidence_audit(ledgers)),
+            (aggregate_files[2], render_watchlist(ledgers)),
+            (aggregate_files[3], render_action_plan(ledgers)),
+        ]
+    )
+    filenames = [metadata_files[0]] + [filename for filename, _ in body_files] + metadata_files[1:]
+    manifest = {
+        "archive_format": "portable-research-archive",
+        "generated_files": filenames,
+        "ledger_ids": [str(ledger["thesis_id"]) for ledger in ledgers],
+        "tool_version": __version__,
+    }
+    files = [("README.md", _render_archive_readme(ledgers, filenames))]
+    files.extend(body_files)
+    files.append(("manifest.json", to_json(manifest)))
+    summary = _archive_summary(ledgers, files, filenames)
+    files.append(("archive-summary.json", to_json(summary)))
+    return files
+
+
+def _archive_summary(
+    ledgers: Sequence[dict],
+    hashed_files: Sequence[tuple[str, str]],
+    generated_files: Sequence[str],
+) -> dict:
+    file_hashes = {
+        filename: hashlib.sha256(text.encode("utf-8")).hexdigest()
+        for filename, text in sorted(hashed_files, key=lambda item: item[0])
+    }
+    return {
+        "archive": {
+            "file_count": len(generated_files),
+            "hashed_file_count": len(file_hashes),
+            "ledger_count": len(ledgers),
+        },
+        "file_hashes": file_hashes,
+        "generated_files": list(generated_files),
+        "ledger_ids": [str(ledger["thesis_id"]) for ledger in ledgers],
+        "tool_version": __version__,
+    }
+
+
+def _render_archive_readme(ledgers: Sequence[dict], generated_files: Sequence[str]) -> str:
+    lines = [
+        "# Invest Thesis Ledger Portable Archive",
+        "",
+        "> This is a research organization tool, not investment advice.",
+        "",
+        f"- Tool Version: {__version__}",
+        f"- Ledgers: {len(ledgers)}",
+        "",
+        "## Input Ledgers",
+        "",
+        "| Ticker | Title | Ledger ID | Updated |",
+        "| --- | --- | --- | --- |",
+    ]
+    for ledger in ledgers:
+        asset = ledger["asset"]
+        lines.append(
+            "| "
+            + " | ".join(
+                [
+                    _bundle_cell(str(asset["ticker"])),
+                    _bundle_cell(str(ledger["title"])),
+                    _bundle_cell(str(ledger["thesis_id"])),
+                    _bundle_cell(str(ledger["updated"])),
+                ]
+            )
+            + " |"
+        )
+    lines.extend(["", "## Archive Files", ""])
+    for filename in generated_files:
+        lines.append(f"- [{_bundle_link_label(filename)}]({filename})")
+    return "\n".join(lines) + "\n"
+
+
 def _render_demo_bundle_index(ledgers: Sequence[dict], generated_files: Sequence[str]) -> str:
     lines = [
         "# Invest Thesis Ledger Demo Bundle",
@@ -621,7 +768,19 @@ def _render_demo_bundle_index(ledgers: Sequence[dict], generated_files: Sequence
 
 
 def _html_dashboard_files(ledgers: Sequence[dict]) -> list[tuple[str, str]]:
-    ledger_prefixes = _bundle_prefixes(ledgers)
+    ledger_prefixes = _bundle_prefixes(
+        ledgers,
+        reserved_filenames=[
+            "index.html",
+            "style.css",
+            "portfolio.html",
+            "evidence-audit.html",
+            "watchlist.html",
+            "action-plan.html",
+            "manifest.json",
+        ],
+        primary_extension=".html",
+    )
     ledger_pages = [
         (f"{ledger_id}.html", _render_html_ledger_page(ledger, ledger_id))
         for ledger, ledger_id in zip(ledgers, ledger_prefixes)
@@ -1204,19 +1363,40 @@ def _bundle_slug(value: str) -> str:
     return slug or "ledger"
 
 
-def _bundle_prefixes(ledgers: Sequence[dict]) -> list[str]:
-    used: set[str] = set()
+def _bundle_prefixes(
+    ledgers: Sequence[dict],
+    reserved_filenames: Sequence[str] = (),
+    primary_extension: Optional[str] = None,
+    artifact_suffixes: Sequence[str] = (),
+) -> list[str]:
+    used_prefixes: set[str] = set()
+    used_filenames = set(reserved_filenames)
     prefixes = []
     for ledger in ledgers:
         base = _bundle_slug(str(ledger["thesis_id"]))
         candidate = base
         index = 2
-        while candidate in used:
+        while (
+            candidate in used_prefixes
+            or _bundle_generated_names(candidate, primary_extension, artifact_suffixes) & used_filenames
+        ):
             candidate = f"{base}-{index}"
             index += 1
-        used.add(candidate)
+        used_prefixes.add(candidate)
+        used_filenames.update(_bundle_generated_names(candidate, primary_extension, artifact_suffixes))
         prefixes.append(candidate)
     return prefixes
+
+
+def _bundle_generated_names(
+    prefix: str,
+    primary_extension: Optional[str],
+    artifact_suffixes: Sequence[str],
+) -> set[str]:
+    names = {f"{prefix}-{suffix}.md" for suffix in artifact_suffixes}
+    if primary_extension is not None:
+        names.add(f"{prefix}{primary_extension}")
+    return names
 
 
 def _bundle_cell(value: str) -> str:
@@ -1233,7 +1413,7 @@ def _starter_ledger(asset: str, name: str, asset_type: str) -> dict:
     clean_name = name.strip()
     clean_type = asset_type.strip()
     return {
-        "ledger_version": "1.3.0",
+        "ledger_version": __version__,
         "thesis_id": f"{slug}-thesis",
         "title": f"{clean_name} Thesis Ledger",
         "asset": {

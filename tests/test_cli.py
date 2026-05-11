@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import re
 import subprocess
 import sys
@@ -101,6 +102,12 @@ class CliTests(unittest.TestCase):
         self.assertIn("LEDGER", html_dashboard.stdout)
         self.assertIn("static no-JS HTML dashboard", html_dashboard.stdout)
         self.assertIn("write static HTML dashboard to DIR", html_dashboard.stdout)
+
+        archive = self.run_cli("archive", "--help")
+        self.assertEqual(archive.returncode, 0, archive.stderr)
+        self.assertIn("LEDGER", archive.stdout)
+        self.assertIn("portable research archive", archive.stdout)
+        self.assertIn("write portable archive to DIR", archive.stdout)
 
         decision_memo = self.run_cli("decision-memo", "--help")
         self.assertEqual(decision_memo.returncode, 0, decision_memo.stderr)
@@ -1684,7 +1691,7 @@ class CliTests(unittest.TestCase):
             self.assertIn("# Watchlist", (output_dir / "watchlist.md").read_text())
             self.assertIn("# Weekly Action Plan", (output_dir / "action-plan.md").read_text())
             manifest = json.loads((output_dir / "manifest.json").read_text())
-            self.assertEqual(manifest["tool_version"], "1.3.0")
+            self.assertEqual(manifest["tool_version"], "1.4.0")
             self.assertEqual(manifest["ledger_ids"], ["oklo-ai-power", "leveraged-etf-discipline"])
             self.assertEqual(manifest["generated_files"], expected_files)
             index_links = [
@@ -1797,6 +1804,180 @@ class CliTests(unittest.TestCase):
             self.assertEqual(sentinel.read_text(), "keep")
             self.assertFalse((output_dir / "index.md").exists())
 
+    def test_archive_writes_portable_archive_manifest_and_summary(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            output_dir = Path(temp) / "archive"
+            result = self.run_cli(
+                "archive",
+                str(EXAMPLE),
+                str(ETF_EXAMPLE),
+                "--output-dir",
+                str(output_dir),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            expected_files = [
+                "README.md",
+                "oklo-ai-power.json",
+                "oklo-ai-power-brief.md",
+                "oklo-ai-power-risk.md",
+                "oklo-ai-power-history.md",
+                "oklo-ai-power-decision.md",
+                "oklo-ai-power-scenario.md",
+                "leveraged-etf-discipline.json",
+                "leveraged-etf-discipline-brief.md",
+                "leveraged-etf-discipline-risk.md",
+                "leveraged-etf-discipline-history.md",
+                "leveraged-etf-discipline-decision.md",
+                "leveraged-etf-discipline-scenario.md",
+                "portfolio.md",
+                "evidence-audit.md",
+                "watchlist.md",
+                "action-plan.md",
+                "manifest.json",
+                "archive-summary.json",
+            ]
+            self.assertEqual(sorted(path.name for path in output_dir.iterdir()), sorted(expected_files))
+            manifest = json.loads((output_dir / "manifest.json").read_text())
+            self.assertEqual(manifest["archive_format"], "portable-research-archive")
+            self.assertEqual(manifest["tool_version"], "1.4.0")
+            self.assertEqual(manifest["ledger_ids"], ["oklo-ai-power", "leveraged-etf-discipline"])
+            self.assertEqual(manifest["generated_files"], expected_files)
+            summary = json.loads((output_dir / "archive-summary.json").read_text())
+            self.assertEqual(summary["tool_version"], "1.4.0")
+            self.assertEqual(summary["ledger_ids"], manifest["ledger_ids"])
+            self.assertEqual(summary["archive"]["ledger_count"], 2)
+            self.assertEqual(summary["archive"]["file_count"], len(expected_files))
+            self.assertEqual(summary["archive"]["hashed_file_count"], len(expected_files) - 1)
+            self.assertEqual(set(summary["file_hashes"]), set(expected_files) - {"archive-summary.json"})
+            self.assertNotIn("archive-summary.json", summary["file_hashes"])
+            self.assertEqual(
+                summary["file_hashes"]["manifest.json"],
+                hashlib.sha256((output_dir / "manifest.json").read_bytes()).hexdigest(),
+            )
+
+    def test_archive_hashes_are_deterministic_and_no_absolute_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            first_dir = Path(temp) / "first"
+            second_dir = Path(temp) / "second"
+            first = self.run_cli("archive", str(EXAMPLE), str(ETF_EXAMPLE), "--output-dir", str(first_dir))
+            second = self.run_cli("archive", str(EXAMPLE), str(ETF_EXAMPLE), "--output-dir", str(second_dir))
+            self.assertEqual(first.returncode, 0, first.stderr)
+            self.assertEqual(second.returncode, 0, second.stderr)
+            self.assertEqual((first_dir / "manifest.json").read_text(), (second_dir / "manifest.json").read_text())
+            self.assertEqual(
+                (first_dir / "archive-summary.json").read_text(),
+                (second_dir / "archive-summary.json").read_text(),
+            )
+            summary = json.loads((first_dir / "archive-summary.json").read_text())
+            for filename, digest in summary["file_hashes"].items():
+                self.assertFalse(Path(filename).is_absolute())
+                self.assertEqual(digest, hashlib.sha256((first_dir / filename).read_bytes()).hexdigest())
+            all_text = "\n".join(path.read_text() for path in first_dir.iterdir())
+            self.assertNotIn(str(ROOT), all_text)
+            self.assertNotIn(str(first_dir), all_text)
+            self.assertNotIn(str(Path(temp)), all_text)
+            self.assertNotIn("timestamp", all_text)
+            self.assertNotIn("generated_at", all_text)
+
+    def test_archive_validates_all_ledgers_before_writing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_dir = Path(temp)
+            bad_path = temp_dir / "bad.json"
+            output_dir = temp_dir / "archive"
+            output_dir.mkdir()
+            sentinel = output_dir / "sentinel.md"
+            sentinel.write_text("keep", encoding="utf-8")
+            data = json.loads(ETF_EXAMPLE.read_text())
+            data["risks"][0]["source_ids"] = ["missing"]
+            bad_path.write_text(json.dumps(data), encoding="utf-8")
+            result = self.run_cli("archive", str(EXAMPLE), str(bad_path), "--output-dir", str(output_dir))
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("ledger: leveraged-etf-discipline", result.stderr)
+            self.assertIn("unknown source missing", result.stderr)
+            self.assertEqual(sentinel.read_text(), "keep")
+            self.assertFalse((output_dir / "manifest.json").exists())
+
+    def test_archive_disambiguates_duplicate_and_reserved_ledger_filenames(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_dir = Path(temp)
+            first_path = temp_dir / "first.json"
+            second_path = temp_dir / "second.json"
+            third_path = temp_dir / "third.json"
+            first_data = json.loads(EXAMPLE.read_text())
+            second_data = json.loads(ETF_EXAMPLE.read_text())
+            third_data = json.loads(EXAMPLE.read_text())
+            second_data["thesis_id"] = first_data["thesis_id"]
+            third_data["thesis_id"] = "manifest"
+            first_path.write_text(json.dumps(first_data), encoding="utf-8")
+            second_path.write_text(json.dumps(second_data), encoding="utf-8")
+            third_path.write_text(json.dumps(third_data), encoding="utf-8")
+            output_dir = temp_dir / "archive"
+            result = self.run_cli(
+                "archive",
+                str(first_path),
+                str(second_path),
+                str(third_path),
+                "--output-dir",
+                str(output_dir),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue((output_dir / "oklo-ai-power.json").exists())
+            self.assertTrue((output_dir / "oklo-ai-power-2.json").exists())
+            self.assertTrue((output_dir / "manifest-2.json").exists())
+            manifest = json.loads((output_dir / "manifest.json").read_text())
+            self.assertEqual(manifest["archive_format"], "portable-research-archive")
+            self.assertIn("oklo-ai-power-2-brief.md", manifest["generated_files"])
+            self.assertIn("manifest-2.json", manifest["generated_files"])
+            self.assertEqual(len(manifest["generated_files"]), len(set(manifest["generated_files"])))
+
+    def test_archive_cleanly_overwrites_output_dir_and_links_are_local(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            output_dir = Path(temp) / "archive"
+            output_dir.mkdir()
+            stale_file = output_dir / "stale.md"
+            stale_dir = output_dir / "nested"
+            stale_dir.mkdir()
+            (stale_dir / "stale.md").write_text("stale", encoding="utf-8")
+            stale_file.write_text("stale", encoding="utf-8")
+            result = self.run_cli("archive", str(EXAMPLE), str(ETF_EXAMPLE), "--output-dir", str(output_dir))
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertFalse(stale_file.exists())
+            self.assertFalse(stale_dir.exists())
+            manifest = json.loads((output_dir / "manifest.json").read_text())
+            readme_links = [
+                line.removeprefix("- [").split("](", 1)[1].removesuffix(")")
+                for line in (output_dir / "README.md").read_text().splitlines()
+                if line.startswith("- [")
+            ]
+            self.assertEqual(readme_links, manifest["generated_files"])
+            for href in readme_links:
+                self.assertIn(href, manifest["generated_files"])
+                self.assertNotIn("://", href)
+                self.assertFalse(href.startswith(("/", "#")))
+
+    def test_archive_refuses_to_replace_workspace_ancestor(self) -> None:
+        result = self.run_cli("archive", str(EXAMPLE), str(ETF_EXAMPLE), "--output-dir", str(ROOT.parent))
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("refusing to replace current working directory or ancestor", result.stderr)
+
+    def test_archive_requires_two_ledgers(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            result = self.run_cli("archive", str(EXAMPLE), "--output-dir", str(Path(temp) / "archive"))
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("requires at least two", result.stderr)
+
+    def test_archive_does_not_add_workflow_files_or_dependencies(self) -> None:
+        workflow_files = list((ROOT / ".github" / "workflows").glob("*")) if (ROOT / ".github" / "workflows").exists() else []
+        dependency_files = [
+            path
+            for pattern in ("requirements*.txt", "Pipfile", "poetry.lock", "uv.lock")
+            for path in ROOT.glob(pattern)
+        ]
+        pyproject = (ROOT / "pyproject.toml").read_text()
+        self.assertEqual(workflow_files, [])
+        self.assertEqual(dependency_files, [])
+        self.assertIn("dependencies = []", pyproject)
+
     def test_html_dashboard_writes_static_no_js_dashboard_and_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             output_dir = Path(temp) / "html-dashboard"
@@ -1829,7 +2010,7 @@ class CliTests(unittest.TestCase):
             self.assertNotIn("<script", (output_dir / "index.html").read_text().lower())
             self.assertNotIn("@import", (output_dir / "style.css").read_text().lower())
             manifest = json.loads((output_dir / "manifest.json").read_text())
-            self.assertEqual(manifest["tool_version"], "1.3.0")
+            self.assertEqual(manifest["tool_version"], "1.4.0")
             self.assertEqual(manifest["ledger_ids"], ["oklo-ai-power", "leveraged-etf-discipline"])
             self.assertEqual(manifest["generated_files"], expected_files)
             self.assertNotIn("timestamp", manifest)
@@ -2025,7 +2206,7 @@ class CliTests(unittest.TestCase):
             self.assertEqual(second.returncode, 0, second.stderr)
             self.assertEqual(output_a.read_text(), output_b.read_text())
             payload = json.loads(output_a.read_text())
-            self.assertEqual(payload["ledger_version"], "1.3.0")
+            self.assertEqual(payload["ledger_version"], "1.4.0")
             self.assertEqual(payload["thesis_id"], "msft-thesis")
             self.assertEqual(payload["sources"][0]["id"], "S1")
             self.assertEqual(payload["assumptions"][0]["source_ids"], ["S1"])

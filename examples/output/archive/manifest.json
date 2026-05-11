@@ -1,21 +1,25 @@
 {
+  "archive_format": "portable-research-archive",
   "generated_files": [
-    "index.md",
+    "README.md",
+    "oklo-ai-power.json",
     "oklo-ai-power-brief.md",
     "oklo-ai-power-risk.md",
     "oklo-ai-power-history.md",
-    "oklo-ai-power-decision-memo.md",
-    "oklo-ai-power-scenario-plan.md",
+    "oklo-ai-power-decision.md",
+    "oklo-ai-power-scenario.md",
+    "leveraged-etf-discipline.json",
     "leveraged-etf-discipline-brief.md",
     "leveraged-etf-discipline-risk.md",
     "leveraged-etf-discipline-history.md",
-    "leveraged-etf-discipline-decision-memo.md",
-    "leveraged-etf-discipline-scenario-plan.md",
-    "portfolio-summary.md",
+    "leveraged-etf-discipline-decision.md",
+    "leveraged-etf-discipline-scenario.md",
+    "portfolio.md",
     "evidence-audit.md",
     "watchlist.md",
     "action-plan.md",
-    "manifest.json"
+    "manifest.json",
+    "archive-summary.json"
   ],
   "ledger_ids": [
     "oklo-ai-power",

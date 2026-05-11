@@ -6,10 +6,9 @@ timelines, thesis drift comparisons, catalyst calendars, evidence coverage
 reports, broker/institution matrices, exposure checklists, deterministic
 starter ledger generation, decision memos, scenario plans, portfolio-level
 summaries, portfolio evidence audits, review queues, weekly watchlists, weekly
-action plans, static demo bundles, and no-JS HTML dashboards. v1.3.0 expands
-the static demo bundle and HTML dashboard to include evidence-audit and
-action-plan outputs while preserving compatibility with v0.1.0 through v1.2.0
-ledgers.
+action plans, static demo bundles, portable research archives, and no-JS HTML
+dashboards. v1.4.0 adds the portable archive workflow while preserving
+compatibility with v0.1.0 through v1.3.0 ledgers.
 
 This project is for research organization only. It is not investment advice.
 
@@ -147,6 +146,13 @@ Write a static deterministic Markdown demo bundle:
 python -m invest_thesis_ledger demo-bundle examples/oklo-ai-power.json examples/leveraged-etf-discipline.json --output-dir demo-bundle
 ```
 
+Write a deterministic portable research archive with source ledgers, rendered
+reports, manifest, README index, and SHA-256 summary:
+
+```bash
+python -m invest_thesis_ledger archive examples/oklo-ai-power.json examples/leveraged-etf-discipline.json --output-dir research-archive
+```
+
 Write a static deterministic no-JS HTML dashboard:
 
 ```bash
@@ -167,7 +173,7 @@ input file list.
 
 ## Ledger Format
 
-Ledgers are JSON objects. The v1.3.0 required fields are:
+Ledgers are JSON objects. The v1.4.0 required fields are:
 
 - `ledger_version`
 - `thesis_id`
@@ -204,7 +210,7 @@ ID.
 optional string `tags`; `exposure` combines these risk tags with position rules
 into a checklist.
 
-The formal v1.3.0 schema reference is in `docs/ledger-schema.md`.
+The formal v1.4.0 schema reference is in `docs/ledger-schema.md`.
 
 See:
 
@@ -254,6 +260,15 @@ Checked-in deterministic CLI output fixtures are available under
 - `examples/output/demo-bundle/action-plan.md`
 - per-ledger demo bundle artifacts for brief, risk, history, decision memo, and
   scenario plan reports
+- `examples/output/archive/README.md`
+- `examples/output/archive/manifest.json`
+- `examples/output/archive/archive-summary.json`
+- `examples/output/archive/portfolio.md`
+- `examples/output/archive/evidence-audit.md`
+- `examples/output/archive/watchlist.md`
+- `examples/output/archive/action-plan.md`
+- per-ledger archive JSON copies and brief, risk, history, decision, and
+  scenario reports
 - `examples/output/html-dashboard/index.html`
 - `examples/output/html-dashboard/style.css`
 - `examples/output/html-dashboard/manifest.json`
@@ -326,6 +341,16 @@ per-ledger brief/risk/history/decision memo/scenario plan reports,
 `portfolio-summary.md`, `evidence-audit.md`, `watchlist.md`, `action-plan.md`,
 and `manifest.json`. The manifest lists generated files, tool version, and
 input ledger IDs only; it intentionally contains no timestamps.
+
+`archive` validates all input ledgers before writing anything, then cleanly
+overwrites the target output directory with a portable research archive:
+`README.md`, `manifest.json`, `archive-summary.json`, deterministic per-ledger
+JSON copies, per-ledger brief/risk/history/decision/scenario reports,
+`portfolio.md`, `evidence-audit.md`, `watchlist.md`, and `action-plan.md`.
+The summary records counts and SHA-256 file hashes using relative filenames
+only. `archive-summary.json` is listed in `generated_files` but excluded from
+`file_hashes` so the summary does not need to hash its own bytes. Archive
+metadata contains no timestamps or absolute paths.
 
 `html-dashboard` validates all input ledgers before writing anything, then
 cleanly overwrites the target output directory with static HTML/CSS files:

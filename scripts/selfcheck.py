@@ -63,6 +63,25 @@ FIXTURE_OUTPUTS = [
     "demo-bundle/watchlist.md",
     "demo-bundle/action-plan.md",
     "demo-bundle/manifest.json",
+    "archive/README.md",
+    "archive/oklo-ai-power.json",
+    "archive/oklo-ai-power-brief.md",
+    "archive/oklo-ai-power-risk.md",
+    "archive/oklo-ai-power-history.md",
+    "archive/oklo-ai-power-decision.md",
+    "archive/oklo-ai-power-scenario.md",
+    "archive/leveraged-etf-discipline.json",
+    "archive/leveraged-etf-discipline-brief.md",
+    "archive/leveraged-etf-discipline-risk.md",
+    "archive/leveraged-etf-discipline-history.md",
+    "archive/leveraged-etf-discipline-decision.md",
+    "archive/leveraged-etf-discipline-scenario.md",
+    "archive/portfolio.md",
+    "archive/evidence-audit.md",
+    "archive/watchlist.md",
+    "archive/action-plan.md",
+    "archive/manifest.json",
+    "archive/archive-summary.json",
     "html-dashboard/index.html",
     "html-dashboard/style.css",
     "html-dashboard/oklo-ai-power.html",
@@ -317,6 +336,18 @@ def main() -> int:
                 str(EXAMPLES[1]),
                 "--output-dir",
                 str(temp_dir / "demo-bundle"),
+            ]
+        )
+        _run(
+            [
+                sys.executable,
+                "-m",
+                "invest_thesis_ledger",
+                "archive",
+                str(EXAMPLES[0]),
+                str(EXAMPLES[1]),
+                "--output-dir",
+                str(temp_dir / "archive"),
             ]
         )
         _run(

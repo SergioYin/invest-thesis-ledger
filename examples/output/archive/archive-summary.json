@@ -1,0 +1,53 @@
+{
+  "archive": {
+    "file_count": 19,
+    "hashed_file_count": 18,
+    "ledger_count": 2
+  },
+  "file_hashes": {
+    "README.md": "796c33cfa87d5498f1dfe25229cb5a889b5e832f101ebaf4790e168597b7b5e9",
+    "action-plan.md": "7570d817d6b0a19d883af501e4558ddf8a99becb3e79e7d8b0b92c328c9303b4",
+    "evidence-audit.md": "3bcf4a344fd3586ec883da023f4cdefda1fcf23755e54a7bd10791f6be5a9ffa",
+    "leveraged-etf-discipline-brief.md": "592202cb279540ac7decc6401820d94cbd9f6a12d299b07665cbacb1ef4fc3dd",
+    "leveraged-etf-discipline-decision.md": "a22ea0840a0763a68298ba357004f524ccc189c43e78fe13a9975c50871b9242",
+    "leveraged-etf-discipline-history.md": "52129766ff0c0cd8b3182e6868dde5bc4bd9bac1fcb73d4dbbb70b87da47cf0a",
+    "leveraged-etf-discipline-risk.md": "b607dbb5b2c1f3f3c466e34d88173be8f38f18303495ec4aa2b3288c8eef74f8",
+    "leveraged-etf-discipline-scenario.md": "43906b1b7cb0b42ab6a176ba905166b5da9bc65eab2a9d4654e170f17d54e7e1",
+    "leveraged-etf-discipline.json": "f4c465c662a980ca89953f3a765ad3524e43a218a2b49eab32d4efd943057645",
+    "manifest.json": "26372915c27a9b8c959a6486f3392a17f0a4f5e2d8d1721b80a13df1d6f33355",
+    "oklo-ai-power-brief.md": "e6ca94ba893dc546d3d2b952d13a442411b178abf06ef87fd01c9b1523f3c95b",
+    "oklo-ai-power-decision.md": "c337d02fc79d4a1baa95cba4fd9252b41215b5e50a49bea30eed8e95ab834e7a",
+    "oklo-ai-power-history.md": "589668656e412c7d63a829d78309da16d93d1bd919982fec13537d764980f486",
+    "oklo-ai-power-risk.md": "6d6801a49f4384fad8d0d2a59b115d77115cbb6d5552f0f4e8429abcc851e147",
+    "oklo-ai-power-scenario.md": "65a74923f65ac35731197ace912b5a574b83864fdbc87d8c66c07a3d4e70d890",
+    "oklo-ai-power.json": "23781e84864b7d41eb72c608bd576e60cf7965dfddd2bf4421f784d17c4be614",
+    "portfolio.md": "76fc06866d012ba3334d853536f1e09de4f5e60c0b56a381bc58f130689d9ebc",
+    "watchlist.md": "19e1357124572dff7cef0d3943a40c3c6a93b41301761550850d58a74b0be9ed"
+  },
+  "generated_files": [
+    "README.md",
+    "oklo-ai-power.json",
+    "oklo-ai-power-brief.md",
+    "oklo-ai-power-risk.md",
+    "oklo-ai-power-history.md",
+    "oklo-ai-power-decision.md",
+    "oklo-ai-power-scenario.md",
+    "leveraged-etf-discipline.json",
+    "leveraged-etf-discipline-brief.md",
+    "leveraged-etf-discipline-risk.md",
+    "leveraged-etf-discipline-history.md",
+    "leveraged-etf-discipline-decision.md",
+    "leveraged-etf-discipline-scenario.md",
+    "portfolio.md",
+    "evidence-audit.md",
+    "watchlist.md",
+    "action-plan.md",
+    "manifest.json",
+    "archive-summary.json"
+  ],
+  "ledger_ids": [
+    "oklo-ai-power",
+    "leveraged-etf-discipline"
+  ],
+  "tool_version": "1.4.0"
+}

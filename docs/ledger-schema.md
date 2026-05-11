@@ -1,7 +1,7 @@
-# Ledger Schema v1.3.0
+# Ledger Schema v1.4.0
 
 This document defines the JSON ledger format accepted by `invest-thesis-ledger`
-v1.3.0. Ledgers are research organization records only and are not investment
+v1.4.0. Ledgers are research organization records only and are not investment
 advice.
 
 ## Document Shape
@@ -15,7 +15,7 @@ without breaking the renderer.
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `ledger_version` | string | Schema version. v1.3.0 ledgers should use `"1.3.0"`. v0.1.0 through v1.2.0 remain accepted for compatibility; other values validate with a warning. |
+| `ledger_version` | string | Schema version. v1.4.0 ledgers should use `"1.4.0"`. v0.1.0 through v1.3.0 remain accepted for compatibility; other values validate with a warning. |
 | `thesis_id` | string | Stable machine-readable ledger identifier. |
 | `title` | string | Human-readable thesis title. |
 | `asset` | object | Asset metadata. |
@@ -183,7 +183,7 @@ source, and duplicate source references within one item are invalid.
 
 ## Determinism
 
-For the same input file or ordered input file list, v1.3.0 CLI outputs are
+For the same input file or ordered input file list, v1.4.0 CLI outputs are
 deterministic:
 
 - JSON outputs are serialized with sorted keys and two-space indentation.
@@ -210,6 +210,9 @@ deterministic:
   report ordering.
 - Demo bundle manifests list generated files, tool version, and input ledger
   IDs without timestamps or wall-clock data.
+- Portable archive manifests and summaries list generated files, tool version,
+  input ledger IDs, counts, and SHA-256 file hashes without timestamps,
+  wall-clock data, or absolute paths.
 - HTML dashboard manifests list generated files, tool version, and input ledger
   IDs without timestamps or wall-clock data.
 - HTML dashboard pages escape all HTML with the Python standard library and do
@@ -221,7 +224,7 @@ deterministic:
 - `init-template` uses fixed placeholder dates so repeated runs with the same
   arguments produce byte-identical JSON.
 
-## v1.3.0 Reports
+## v1.4.0 Reports
 
 `compare <old.json> <new.json> --output drift.md --json-output drift.json`
 loads and validates both ledgers, then compares:
@@ -292,7 +295,7 @@ Evidence gaps are ordered by review priority: low-confidence assumptions, stale
 sources, unused sources, then unsupported evidence items.
 
 `init-template --asset TICKER --name NAME --type TYPE --output ledger.json`
-writes a deterministic starter ledger with v1.3.0 fields, fixed placeholder
+writes a deterministic starter ledger with v1.4.0 fields, fixed placeholder
 dates, one source-backed assumption, one risk, one review, and a thesis ID
 derived from the ticker.
 
@@ -427,6 +430,33 @@ directory with a static Markdown bundle:
 
 The manifest is deterministic and contains only `generated_files`,
 `ledger_ids`, and `tool_version`. It does not include timestamps.
+
+```bash
+archive <ledger-a.json> <ledger-b.json> [...] --output-dir research-archive
+```
+
+The `archive` command loads and validates every input ledger before writing
+output. It requires at least two ledgers and cleanly overwrites the output
+directory with a deterministic portable research archive:
+
+- `README.md` local index
+- deterministic per-ledger JSON copies
+- one brief, risk report, history report, decision report, and scenario report
+  per input ledger
+- `portfolio.md`
+- `evidence-audit.md`
+- `watchlist.md`
+- `action-plan.md`
+- `manifest.json`
+- `archive-summary.json`
+
+The manifest uses relative generated filenames only. The machine-readable
+summary includes ledger counts, file counts, `tool_version`, `ledger_ids`,
+`generated_files`, and SHA-256 hashes for every archive file except
+`archive-summary.json` itself. `archive-summary.json` remains listed in
+`generated_files`, but is excluded from `file_hashes` to avoid a recursive
+self-hash. The archive intentionally contains no timestamps, absolute paths,
+workflow files, or dependency files.
 
 ```bash
 html-dashboard <ledger-a.json> <ledger-b.json> [...] --output-dir html-dashboard
