@@ -44,6 +44,11 @@ class CliTests(unittest.TestCase):
         self.assertIn("LEDGER", brief.stdout)
         self.assertIn("write Markdown output to PATH", brief.stdout)
 
+        init_template = self.run_cli("init-template", "--help")
+        self.assertEqual(init_template.returncode, 0, init_template.stderr)
+        self.assertIn("--asset", init_template.stdout)
+        self.assertIn("write starter ledger JSON to PATH", init_template.stdout)
+
     def test_brief_is_deterministic(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             output_a = Path(temp) / "brief-a.md"
@@ -153,6 +158,82 @@ class CliTests(unittest.TestCase):
             payload = json.loads(json_path.read_text())
             self.assertEqual(payload["coverage"]["stale_source_count"], 0)
             self.assertEqual(payload["stale_sources"], [])
+
+    def test_broker_matrix_writes_markdown_and_json(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            md_path = Path(temp) / "broker.md"
+            json_path = Path(temp) / "broker.json"
+            result = self.run_cli(
+                "broker-matrix",
+                str(EXAMPLE),
+                "--output",
+                str(md_path),
+                "--json-output",
+                str(json_path),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("# Broker Matrix", md_path.read_text())
+            payload = json.loads(json_path.read_text())
+            self.assertEqual(payload["broker_views"][0]["institution"], "Grid Infrastructure Desk")
+            self.assertEqual(payload["rating_counts"]["cautious"], 1)
+
+    def test_exposure_maps_risk_tags_and_position_rules(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            md_path = Path(temp) / "exposure.md"
+            json_path = Path(temp) / "exposure.json"
+            result = self.run_cli(
+                "exposure",
+                str(EXAMPLE),
+                "--output",
+                str(md_path),
+                "--json-output",
+                str(json_path),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("# Exposure Checklist", md_path.read_text())
+            payload = json.loads(json_path.read_text())
+            self.assertEqual(payload["tag_counts"]["regulatory"], 1)
+            self.assertEqual(payload["position_rules"][0]["id"], "P1")
+            self.assertIn("RISK-R1", [item["id"] for item in payload["checklist"]])
+
+    def test_init_template_is_deterministic_and_valid(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            output_a = Path(temp) / "ledger-a.json"
+            output_b = Path(temp) / "ledger-b.json"
+            first = self.run_cli(
+                "init-template",
+                "--asset",
+                "msft",
+                "--name",
+                "Microsoft Corporation",
+                "--type",
+                "equity",
+                "--output",
+                str(output_a),
+            )
+            second = self.run_cli(
+                "init-template",
+                "--asset",
+                "msft",
+                "--name",
+                "Microsoft Corporation",
+                "--type",
+                "equity",
+                "--output",
+                str(output_b),
+            )
+            self.assertEqual(first.returncode, 0, first.stderr)
+            self.assertEqual(second.returncode, 0, second.stderr)
+            self.assertEqual(output_a.read_text(), output_b.read_text())
+            payload = json.loads(output_a.read_text())
+            self.assertEqual(payload["ledger_version"], "0.3.0")
+            self.assertEqual(payload["thesis_id"], "msft-thesis")
+            self.assertEqual(payload["sources"][0]["id"], "S1")
+            self.assertEqual(payload["assumptions"][0]["source_ids"], ["S1"])
+            self.assertEqual(payload["risks"][0]["source_ids"], ["S1"])
+            self.assertEqual(payload["reviews"][0]["source_ids"], ["S1"])
+            validate = self.run_cli("validate", str(output_a))
+            self.assertEqual(validate.returncode, 0, validate.stdout + validate.stderr)
 
     def test_compare_reports_assumption_risk_review_drift(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -274,6 +355,30 @@ class CliTests(unittest.TestCase):
                     ["oklo-ai-power-evidence.md", "oklo-ai-power-evidence.json"],
                 ),
                 (
+                    "broker-matrix",
+                    [
+                        "broker-matrix",
+                        str(EXAMPLE),
+                        "--output",
+                        str(temp_dir / "oklo-ai-power-broker.md"),
+                        "--json-output",
+                        str(temp_dir / "oklo-ai-power-broker.json"),
+                    ],
+                    ["oklo-ai-power-broker.md", "oklo-ai-power-broker.json"],
+                ),
+                (
+                    "exposure",
+                    [
+                        "exposure",
+                        str(EXAMPLE),
+                        "--output",
+                        str(temp_dir / "oklo-ai-power-exposure.md"),
+                        "--json-output",
+                        str(temp_dir / "oklo-ai-power-exposure.json"),
+                    ],
+                    ["oklo-ai-power-exposure.md", "oklo-ai-power-exposure.json"],
+                ),
+                (
                     "compare",
                     [
                         "compare",
@@ -319,6 +424,78 @@ class CliTests(unittest.TestCase):
             self.assertIn("ledger.catalysts[0].source_ids has duplicate source S1", result.stdout)
             self.assertIn("ledger.catalysts[0].source_ids references unknown source missing", result.stdout)
             self.assertIn("ledger.catalysts[1].source_ids must be a list", result.stdout)
+
+    def test_invalid_v3_optional_source_ids_and_tags_fail(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            bad_path = Path(temp) / "bad.json"
+            data = json.loads(EXAMPLE.read_text())
+            data["broker_views"][0]["source_ids"] = ["missing"]
+            data["position_rules"][0]["tags"] = "regulatory"
+            data["risks"][0]["tags"] = ["regulatory", 3]
+            bad_path.write_text(json.dumps(data), encoding="utf-8")
+            result = self.run_cli("validate", str(bad_path))
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("ledger.broker_views[0].source_ids references unknown source missing", result.stdout)
+            self.assertIn("ledger.position_rules[0].tags must be a list", result.stdout)
+            self.assertIn("ledger.risks[0].tags entries must be strings", result.stdout)
+
+    def test_invalid_broker_view_source_and_tag_fields_fail(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            bad_path = Path(temp) / "bad.json"
+            data = json.loads(EXAMPLE.read_text())
+            data["sources"][0]["id"] = ""
+            data["broker_views"][0]["id"] = "B1"
+            data["broker_views"][0]["rating"] = ["buy"]
+            data["broker_views"][0]["source_ids"] = ["S2", "S2", 5]
+            data["broker_views"].append(dict(data["broker_views"][0]))
+            data["position_rules"][0]["tags"] = ["regulatory", 7]
+            bad_path.write_text(json.dumps(data), encoding="utf-8")
+            result = self.run_cli("validate", str(bad_path))
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("ledger.sources has empty id", result.stdout)
+            self.assertIn("ledger.broker_views[0].rating must be a string", result.stdout)
+            self.assertIn("ledger.broker_views[0].source_ids has duplicate source S2", result.stdout)
+            self.assertIn("ledger.broker_views[0].source_ids entries must be strings", result.stdout)
+            self.assertIn("ledger.broker_views has duplicate id B1", result.stdout)
+            self.assertIn("ledger.position_rules[0].tags entries must be strings", result.stdout)
+
+    def test_broker_and_exposure_markdown_escape_inline_values(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_dir = Path(temp)
+            ledger_path = temp_dir / "ledger.json"
+            data = json.loads(EXAMPLE.read_text())
+            data["sources"][0]["title"] = "Title | with\nbreak"
+            data["broker_views"][0]["institution"] = "Desk | Alpha"
+            data["broker_views"][0]["thesis"] = "Line one\nLine | two"
+            data["risks"][0]["tags"] = ["reg | tag"]
+            data["position_rules"][0]["rule"] = "Keep | size\nsmall"
+            ledger_path.write_text(json.dumps(data), encoding="utf-8")
+
+            broker_md = temp_dir / "broker.md"
+            exposure_md = temp_dir / "exposure.md"
+            broker = self.run_cli(
+                "broker-matrix",
+                str(ledger_path),
+                "--output",
+                str(broker_md),
+                "--json-output",
+                str(temp_dir / "broker.json"),
+            )
+            exposure = self.run_cli(
+                "exposure",
+                str(ledger_path),
+                "--output",
+                str(exposure_md),
+                "--json-output",
+                str(temp_dir / "exposure.json"),
+            )
+            self.assertEqual(broker.returncode, 0, broker.stderr)
+            self.assertEqual(exposure.returncode, 0, exposure.stderr)
+            self.assertIn("Desk \\| Alpha", broker_md.read_text())
+            self.assertIn("Line one Line \\| two", broker_md.read_text())
+            self.assertIn("Title \\| with break", broker_md.read_text())
+            self.assertIn("reg \\| tag", exposure_md.read_text())
+            self.assertIn("Keep \\| size small", exposure_md.read_text())
 
 
 if __name__ == "__main__":

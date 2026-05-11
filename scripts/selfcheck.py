@@ -88,6 +88,57 @@ def main() -> int:
                     str(temp_dir / f"{stem}-evidence.json"),
                 ]
             )
+            _run(
+                [
+                    sys.executable,
+                    "-m",
+                    "invest_thesis_ledger",
+                    "broker-matrix",
+                    str(ledger),
+                    "--output",
+                    str(temp_dir / f"{stem}-broker.md"),
+                    "--json-output",
+                    str(temp_dir / f"{stem}-broker.json"),
+                ]
+            )
+            _run(
+                [
+                    sys.executable,
+                    "-m",
+                    "invest_thesis_ledger",
+                    "exposure",
+                    str(ledger),
+                    "--output",
+                    str(temp_dir / f"{stem}-exposure.md"),
+                    "--json-output",
+                    str(temp_dir / f"{stem}-exposure.json"),
+                ]
+            )
+            _run(
+                [
+                    sys.executable,
+                    "-m",
+                    "invest_thesis_ledger",
+                    "init-template",
+                    "--asset",
+                    "TST",
+                    "--name",
+                    "Test Asset",
+                    "--type",
+                    "equity",
+                    "--output",
+                    str(temp_dir / f"{stem}-template.json"),
+                ]
+            )
+            _run(
+                [
+                    sys.executable,
+                    "-m",
+                    "invest_thesis_ledger",
+                    "validate",
+                    str(temp_dir / f"{stem}-template.json"),
+                ]
+            )
         for old_ledger, new_ledger in COMPARE_EXAMPLES:
             stem = new_ledger.stem
             _run(

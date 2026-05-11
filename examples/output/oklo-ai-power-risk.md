@@ -11,6 +11,7 @@
 
 - Severity: high
 - Probability: medium
+- Tags: regulatory, timeline
 - Mitigation: Require dated regulatory milestones before increasing conviction.
 - Sources: [S3]
 
@@ -18,6 +19,7 @@
 
 - Severity: medium
 - Probability: high
+- Tags: valuation, narrative
 - Mitigation: Separate power-demand narrative from contracted revenue evidence.
 - Sources: [S1], [S2]
 

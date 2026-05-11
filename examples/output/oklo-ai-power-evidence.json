@@ -2,8 +2,8 @@
   "coverage": {
     "source_count": 3,
     "stale_source_count": 0,
-    "supported_items": 9,
-    "tracked_items": 9,
+    "supported_items": 13,
+    "tracked_items": 13,
     "unsupported_items": 0,
     "unused_source_count": 0
   },
@@ -22,6 +22,21 @@
         "S3"
       ],
       "type": "assumption"
+    },
+    {
+      "id": "B1",
+      "source_ids": [
+        "S1",
+        "S2"
+      ],
+      "type": "broker_view"
+    },
+    {
+      "id": "B2",
+      "source_ids": [
+        "S3"
+      ],
+      "type": "broker_view"
     },
     {
       "id": "CAT1",
@@ -44,6 +59,21 @@
         "S1"
       ],
       "type": "catalyst"
+    },
+    {
+      "id": "P1",
+      "source_ids": [
+        "S3"
+      ],
+      "type": "position_rule"
+    },
+    {
+      "id": "P2",
+      "source_ids": [
+        "S1",
+        "S2"
+      ],
+      "type": "position_rule"
     },
     {
       "id": "REV1:2026-05-12",

@@ -1,0 +1,39 @@
+{
+  "asset": {
+    "name": "Oklo Inc.",
+    "ticker": "OKLO",
+    "type": "equity"
+  },
+  "broker_views": [
+    {
+      "as_of": "2026-05-10",
+      "id": "B1",
+      "institution": "Grid Infrastructure Desk",
+      "rating": "constructive",
+      "source_ids": [
+        "S1",
+        "S2"
+      ],
+      "target": "watch for contracted megawatts",
+      "thesis": "Firm clean power scarcity could support premium economics if Oklo converts interest into binding contracts."
+    },
+    {
+      "as_of": "2026-05-11",
+      "id": "B2",
+      "institution": "Regulatory Risk Desk",
+      "rating": "cautious",
+      "source_ids": [
+        "S3"
+      ],
+      "target": "no target until licensing timeline is dated",
+      "thesis": "Commercial upside remains hard to underwrite before licensing cadence and financing runway are clearer."
+    }
+  ],
+  "rating_counts": {
+    "cautious": 1,
+    "constructive": 1
+  },
+  "thesis_id": "oklo-ai-power",
+  "title": "Oklo AI Power Demand Thesis",
+  "updated": "2026-05-12"
+}

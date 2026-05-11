@@ -20,6 +20,10 @@
       "severity": "high",
       "source_ids": [
         "S3"
+      ],
+      "tags": [
+        "regulatory",
+        "timeline"
       ]
     },
     {
@@ -31,6 +35,10 @@
       "source_ids": [
         "S1",
         "S2"
+      ],
+      "tags": [
+        "valuation",
+        "narrative"
       ]
     }
   ],

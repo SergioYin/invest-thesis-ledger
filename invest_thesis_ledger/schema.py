@@ -83,14 +83,15 @@ def validate_ledger(ledger: Mapping[str, Any]) -> Tuple[List[str], List[str]]:
     if errors:
         return errors, warnings
 
-    if ledger.get("ledger_version") not in {"0.1.0", "0.2.0"}:
-        warnings.append("ledger.ledger_version is not 0.1.0 or 0.2.0")
+    if ledger.get("ledger_version") not in {"0.1.0", "0.2.0", "0.3.0"}:
+        warnings.append("ledger.ledger_version is not 0.1.0, 0.2.0, or 0.3.0")
 
     asset = ledger["asset"]
     _require_fields("ledger.asset", asset, REQUIRED_ASSET, errors)
 
     source_ids = _validate_list_items("ledger.sources", ledger["sources"], REQUIRED_SOURCE, errors)
     _validate_unique_ids("ledger.sources", source_ids, errors)
+    _validate_nonempty_ids("ledger.sources", source_ids, errors)
     source_id_set = set(source_ids)
 
     assumption_ids = _validate_list_items(
@@ -126,8 +127,10 @@ def validate_ledger(ledger: Mapping[str, Any]) -> Tuple[List[str], List[str]]:
     for index, risk in enumerate(ledger["risks"]):
         if isinstance(risk, dict):
             _validate_source_refs(f"ledger.risks[{index}]", risk.get("source_ids", []), source_id_set, errors)
+            if "tags" in risk:
+                _validate_string_list(f"ledger.risks[{index}].tags", risk["tags"], errors)
 
-    for optional_list in ("positions", "catalysts", "checklist"):
+    for optional_list in ("positions", "catalysts", "checklist", "broker_views", "position_rules"):
         if optional_list in ledger and not isinstance(ledger[optional_list], list):
             errors.append(f"ledger.{optional_list} must be a list")
 
@@ -144,6 +147,39 @@ def validate_ledger(ledger: Mapping[str, Any]) -> Tuple[List[str], List[str]]:
                     errors.append(f"{path}.{field} must be a string")
             if "source_ids" in catalyst:
                 _validate_source_refs(path, catalyst["source_ids"], source_id_set, errors)
+
+    if isinstance(ledger.get("broker_views"), list):
+        broker_view_ids = []
+        for index, view in enumerate(ledger["broker_views"]):
+            path = f"ledger.broker_views[{index}]"
+            if not isinstance(view, dict):
+                errors.append(f"{path} must be an object")
+                continue
+            for field in ("id", "institution", "rating", "target", "as_of", "thesis"):
+                if field in view and not isinstance(view[field], str):
+                    errors.append(f"{path}.{field} must be a string")
+            if isinstance(view.get("id"), str):
+                broker_view_ids.append(view["id"])
+            if "source_ids" in view:
+                _validate_source_refs(path, view["source_ids"], source_id_set, errors)
+        _validate_unique_ids("ledger.broker_views", broker_view_ids, errors)
+        _validate_nonempty_ids("ledger.broker_views", broker_view_ids, errors)
+
+    if isinstance(ledger.get("position_rules"), list):
+        for index, rule in enumerate(ledger["position_rules"]):
+            path = f"ledger.position_rules[{index}]"
+            if isinstance(rule, str):
+                continue
+            if not isinstance(rule, dict):
+                errors.append(f"{path} must be a string or object")
+                continue
+            for field in ("id", "rule", "item", "description", "status", "exposure"):
+                if field in rule and not isinstance(rule[field], str):
+                    errors.append(f"{path}.{field} must be a string")
+            if "tags" in rule:
+                _validate_string_list(f"{path}.tags", rule["tags"], errors)
+            if "source_ids" in rule:
+                _validate_source_refs(path, rule["source_ids"], source_id_set, errors)
 
     return errors, warnings
 
@@ -214,6 +250,12 @@ def _validate_unique_ids(path: str, ids: Iterable[str], errors: List[str]) -> No
         seen.add(item_id)
 
 
+def _validate_nonempty_ids(path: str, ids: Iterable[str], errors: List[str]) -> None:
+    for item_id in ids:
+        if not item_id.strip():
+            errors.append(f"{path} has empty id")
+
+
 def _validate_source_refs(path: str, refs: Any, source_ids: set[str], errors: List[str]) -> None:
     if not isinstance(refs, list):
         errors.append(f"{path}.source_ids must be a list")
@@ -228,3 +270,12 @@ def _validate_source_refs(path: str, refs: Any, source_ids: set[str], errors: Li
             errors.append(f"{path}.source_ids has duplicate source {ref}")
         else:
             seen.add(ref)
+
+
+def _validate_string_list(path: str, values: Any, errors: List[str]) -> None:
+    if not isinstance(values, list):
+        errors.append(f"{path} must be a list")
+        return
+    for value in values:
+        if not isinstance(value, str):
+            errors.append(f"{path} entries must be strings")

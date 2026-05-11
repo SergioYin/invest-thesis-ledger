@@ -1,7 +1,7 @@
-# Ledger Schema v0.2.0
+# Ledger Schema v0.3.0
 
 This document defines the JSON ledger format accepted by `invest-thesis-ledger`
-v0.2.0. Ledgers are research organization records only and are not investment
+v0.3.0. Ledgers are research organization records only and are not investment
 advice.
 
 ## Document Shape
@@ -15,7 +15,7 @@ without breaking the renderer.
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `ledger_version` | string | Schema version. v0.2.0 ledgers should use `"0.2.0"`. v0.1.0 remains accepted for compatibility; other values validate with a warning. |
+| `ledger_version` | string | Schema version. v0.3.0 ledgers should use `"0.3.0"`. v0.1.0 and v0.2.0 remain accepted for compatibility; other values validate with a warning. |
 | `thesis_id` | string | Stable machine-readable ledger identifier. |
 | `title` | string | Human-readable thesis title. |
 | `asset` | object | Asset metadata. |
@@ -82,6 +82,12 @@ Each entry in `risks` must contain:
 Every `source_ids` entry must be a string that references an existing source,
 and duplicate source references within one item are invalid.
 
+Optional risk field:
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `tags` | array | String risk tags such as `valuation`, `regulatory`, `liquidity`, or `leverage`. |
+
 ## Reviews
 
 Each entry in `reviews` must contain:
@@ -110,6 +116,8 @@ The CLI renders these optional top-level fields when present:
 | --- | --- | --- | --- |
 | `positions` | array | `brief` | Position notes or sizing discipline. |
 | `catalysts` | array | `brief`, `calendar`, `evidence` | Catalysts or evidence that could change conviction. |
+| `broker_views` | array | `broker-matrix`, `evidence` | Broker, desk, or institution rating/target/thesis views. |
+| `position_rules` | array | `exposure`, `evidence` | Position sizing, exposure, and trade discipline rules. |
 | `checklist` | array | `risk` | Risk checklist items. |
 
 `catalysts` entries may be strings or objects. String entries are accepted for
@@ -130,6 +138,37 @@ source, and duplicate source references within one catalyst are invalid.
 `calendar` output sorts catalysts with explicit dates first by date, then
 undated catalysts by window and ID.
 
+`broker_views` entries must be objects. They can include:
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `id` | string | Broker view identifier. Defaults to `B<n>` if omitted. |
+| `institution` | string | Broker, bank, research desk, or internal institution name. |
+| `rating` | string | Rating or stance label. |
+| `target` | string | Price target, scenario target, or target discipline. |
+| `as_of` | string | View date, recommended as `YYYY-MM-DD`. |
+| `thesis` | string | Short institution thesis or rationale. |
+| `source_ids` | array | Optional source IDs supporting the view. |
+
+Every broker view `source_ids` entry must be a string that references an
+existing source, and duplicate source references within one view are invalid.
+`broker-matrix` output sorts views by institution name and ID.
+
+`position_rules` entries may be strings or objects. String entries are accepted
+as open rules with no tags or sources. Object entries can include:
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `id` | string | Position rule identifier. Defaults to `P<n>` if omitted. |
+| `rule` | string | Rule text. `item` or `description` are accepted as fallbacks by renderers. |
+| `status` | string | Status label. `done`, `closed`, `passed`, and `complete` render as checked. |
+| `exposure` | string | Exposure bucket or sizing note. |
+| `tags` | array | String tags that map the rule to risk categories. |
+| `source_ids` | array | Optional source IDs supporting the rule. |
+
+Every position rule `source_ids` entry must be a string that references an
+existing source, and duplicate source references within one rule are invalid.
+
 `checklist` entries may be strings or objects. Object entries can include:
 
 | Field | Type | Description |
@@ -140,17 +179,21 @@ undated catalysts by window and ID.
 
 ## Determinism
 
-For the same input file, v0.2.0 CLI outputs are deterministic:
+For the same input file, v0.3.0 CLI outputs are deterministic:
 
 - JSON outputs are serialized with sorted keys and two-space indentation.
 - History reviews are sorted by review date.
 - Calendar catalysts are sorted by date presence, date, window, and ID.
+- Broker views are sorted by institution and ID.
+- Position rules are sorted by ID, and exposure risk tags are sorted by tag.
 - Evidence stale-source warnings are measured against ledger `updated`, not the
   current wall-clock date.
 - Source reference lists preserve the ledger order inside each item.
 - Rendered source sections are sorted by source ID.
+- `init-template` uses fixed placeholder dates so repeated runs with the same
+  arguments produce byte-identical JSON.
 
-## v0.2.0 Reports
+## v0.3.0 Reports
 
 `compare <old.json> <new.json> --output drift.md --json-output drift.json`
 loads and validates both ledgers, then compares:
@@ -169,9 +212,24 @@ normalizes catalyst strings and objects into deterministic catalyst records with
 `id`, `title`, `date`, `window`, `status`, and `source_ids`.
 
 `evidence <ledger.json> --output evidence.md --json-output evidence.json`
-reports source coverage for assumptions, risks, reviews, and catalysts. It also
-reports unused sources and stale sources. A source is stale when its `date` is
-more than 180 days older than ledger `updated`.
+reports source coverage for assumptions, risks, reviews, catalysts, broker
+views, and position rules. It also reports unused sources and stale sources. A
+source is stale when its `date` is more than 180 days older than ledger
+`updated`.
+
+`broker-matrix <ledger.json> --output broker.md --json-output broker.json`
+normalizes optional `broker_views` into a matrix of institution, rating, target,
+as-of date, thesis, and sources. The JSON output also includes rating counts.
+
+`exposure <ledger.json> --output exposure.md --json-output exposure.json`
+maps optional risk `tags` and `position_rules` into an exposure checklist. The
+JSON output includes tag counts, normalized risks, normalized position rules,
+and combined checklist entries.
+
+`init-template --asset TICKER --name NAME --type TYPE --output ledger.json`
+writes a deterministic starter ledger with v0.3.0 fields, fixed placeholder
+dates, one source-backed assumption, one risk, one review, and a thesis ID
+derived from the ticker.
 
 See `examples/output/` for checked-in CLI output fixtures generated from
 `examples/oklo-ai-power.json` and the prior/current comparison pair in

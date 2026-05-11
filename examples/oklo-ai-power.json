@@ -1,5 +1,5 @@
 {
-  "ledger_version": "0.2.0",
+  "ledger_version": "0.3.0",
   "thesis_id": "oklo-ai-power",
   "title": "Oklo AI Power Demand Thesis",
   "asset": {
@@ -74,12 +74,33 @@
       "source_ids": ["S1"]
     }
   ],
+  "broker_views": [
+    {
+      "id": "B1",
+      "institution": "Grid Infrastructure Desk",
+      "rating": "constructive",
+      "target": "watch for contracted megawatts",
+      "as_of": "2026-05-10",
+      "thesis": "Firm clean power scarcity could support premium economics if Oklo converts interest into binding contracts.",
+      "source_ids": ["S1", "S2"]
+    },
+    {
+      "id": "B2",
+      "institution": "Regulatory Risk Desk",
+      "rating": "cautious",
+      "target": "no target until licensing timeline is dated",
+      "as_of": "2026-05-11",
+      "thesis": "Commercial upside remains hard to underwrite before licensing cadence and financing runway are clearer.",
+      "source_ids": ["S3"]
+    }
+  ],
   "risks": [
     {
       "id": "R1",
       "name": "Licensing delay",
       "severity": "high",
       "probability": "medium",
+      "tags": ["regulatory", "timeline"],
       "mitigation": "Require dated regulatory milestones before increasing conviction.",
       "source_ids": ["S3"]
     },
@@ -88,7 +109,26 @@
       "name": "Narrative valuation",
       "severity": "medium",
       "probability": "high",
+      "tags": ["valuation", "narrative"],
       "mitigation": "Separate power-demand narrative from contracted revenue evidence.",
+      "source_ids": ["S1", "S2"]
+    }
+  ],
+  "position_rules": [
+    {
+      "id": "P1",
+      "rule": "Keep status at watchlist until a dated licensing update is source-backed.",
+      "status": "open",
+      "exposure": "watchlist",
+      "tags": ["regulatory", "timeline"],
+      "source_ids": ["S3"]
+    },
+    {
+      "id": "P2",
+      "rule": "Do not size from AI power narrative without named contract evidence.",
+      "status": "open",
+      "exposure": "no position",
+      "tags": ["valuation", "narrative"],
       "source_ids": ["S1", "S2"]
     }
   ],

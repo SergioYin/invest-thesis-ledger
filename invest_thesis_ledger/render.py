@@ -81,6 +81,7 @@ def risk_payload(ledger: Mapping[str, Any]) -> Dict[str, Any]:
                 "severity": item["severity"],
                 "probability": item["probability"],
                 "mitigation": item["mitigation"],
+                "tags": list(item.get("tags", [])) if isinstance(item.get("tags", []), list) else [],
                 "source_ids": list(item["source_ids"]),
             }
             for item in ledger["risks"]
@@ -111,6 +112,7 @@ def render_risk(ledger: Mapping[str, Any]) -> str:
                 "",
                 f"- Severity: {item['severity']}",
                 f"- Probability: {item['probability']}",
+                f"- Tags: {', '.join(item['tags']) if item['tags'] else 'none'}",
                 f"- Mitigation: {item['mitigation']}",
                 f"- Sources: {_refs(item['source_ids'])}",
                 "",
@@ -260,6 +262,173 @@ def render_calendar(ledger: Mapping[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def broker_matrix_payload(ledger: Mapping[str, Any]) -> Dict[str, Any]:
+    """Build structured broker/institution view output."""
+
+    views = [_normalize_broker_view(item, index) for index, item in enumerate(ledger.get("broker_views", []), start=1)]
+    views.sort(key=lambda item: (item["institution"].lower(), item["id"]))
+    return {
+        "thesis_id": ledger["thesis_id"],
+        "title": ledger["title"],
+        "updated": ledger["updated"],
+        "asset": dict(ledger["asset"]),
+        "broker_views": views,
+        "rating_counts": _count_by(views, "rating"),
+    }
+
+
+def render_broker_matrix(ledger: Mapping[str, Any]) -> str:
+    """Render a Markdown broker/institution rating and target matrix."""
+
+    payload = broker_matrix_payload(ledger)
+    lines = [
+        f"# Broker Matrix: {payload['title']}",
+        "",
+        "> This is a research organization tool, not investment advice.",
+        "",
+        f"- Ledger ID: {payload['thesis_id']}",
+        f"- Updated: {payload['updated']}",
+        f"- Asset: {payload['asset']['ticker']} ({payload['asset']['name']})",
+        "",
+        "## Views",
+        "",
+        "| ID | Institution | Rating | Target | As Of | Thesis | Sources |",
+        "| --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    if payload["broker_views"]:
+        for item in payload["broker_views"]:
+            lines.append(
+                "| "
+                + " | ".join(
+                    [
+                        _cell(item["id"]),
+                        _cell(item["institution"]),
+                        _cell(item["rating"]),
+                        _cell(item["target"]),
+                        _cell(item["as_of"]),
+                        _cell(item["thesis"]),
+                        _cell(_refs(item["source_ids"])),
+                    ]
+                )
+                + " |"
+            )
+    else:
+        lines.append("| none | none recorded | none | none | none | none | none |")
+    lines.extend(["", "## Rating Counts", ""])
+    if payload["rating_counts"]:
+        for rating, count in payload["rating_counts"].items():
+            lines.append(f"- {_inline(rating)}: {count}")
+    else:
+        lines.append("- No broker views recorded.")
+    lines.extend(["", "## Sources", ""])
+    lines.extend(_source_lines(ledger))
+    return "\n".join(lines) + "\n"
+
+
+def exposure_payload(ledger: Mapping[str, Any]) -> Dict[str, Any]:
+    """Build structured exposure checklist output from risks and position rules."""
+
+    risks = []
+    tag_counts: Dict[str, int] = {}
+    for risk in ledger.get("risks", []):
+        tags = list(risk.get("tags", [])) if isinstance(risk.get("tags", []), list) else []
+        for tag in tags:
+            if isinstance(tag, str):
+                tag_counts[tag] = tag_counts.get(tag, 0) + 1
+        risks.append(
+            {
+                "id": risk["id"],
+                "name": risk["name"],
+                "severity": risk["severity"],
+                "probability": risk["probability"],
+                "tags": [tag for tag in tags if isinstance(tag, str)],
+                "source_ids": list(risk["source_ids"]),
+            }
+        )
+    rules = [_normalize_position_rule(item, index) for index, item in enumerate(ledger.get("position_rules", []), start=1)]
+    rules.sort(key=lambda item: item["id"])
+    checklist = []
+    for item in risks:
+        checklist.append(
+            {
+                "id": f"RISK-{item['id']}",
+                "type": "risk",
+                "item": item["name"],
+                "status": "review",
+                "tags": item["tags"],
+                "source_ids": item["source_ids"],
+            }
+        )
+    for item in rules:
+        checklist.append(
+            {
+                "id": f"RULE-{item['id']}",
+                "type": "position_rule",
+                "item": item["rule"],
+                "status": item["status"],
+                "tags": item["tags"],
+                "source_ids": item["source_ids"],
+            }
+        )
+    checklist.sort(key=lambda item: (item["type"], item["id"]))
+    return {
+        "thesis_id": ledger["thesis_id"],
+        "title": ledger["title"],
+        "updated": ledger["updated"],
+        "asset": dict(ledger["asset"]),
+        "tag_counts": {key: tag_counts[key] for key in sorted(tag_counts)},
+        "risks": sorted(risks, key=lambda item: item["id"]),
+        "position_rules": rules,
+        "checklist": checklist,
+    }
+
+
+def render_exposure(ledger: Mapping[str, Any]) -> str:
+    """Render a Markdown exposure checklist."""
+
+    payload = exposure_payload(ledger)
+    lines = [
+        f"# Exposure Checklist: {payload['title']}",
+        "",
+        "> This is a research organization tool, not investment advice.",
+        "",
+        f"- Ledger ID: {payload['thesis_id']}",
+        f"- Updated: {payload['updated']}",
+        f"- Asset: {payload['asset']['ticker']} ({payload['asset']['name']})",
+        "",
+        "## Risk Tags",
+        "",
+    ]
+    if payload["tag_counts"]:
+        for tag, count in payload["tag_counts"].items():
+            lines.append(f"- {_inline(tag)}: {count}")
+    else:
+        lines.append("- No risk tags recorded.")
+    lines.extend(["", "## Position Rules", ""])
+    if payload["position_rules"]:
+        for item in payload["position_rules"]:
+            lines.append(
+                f"- [{_checkbox(item['status'])}] {_inline(item['id'])}: {_inline(item['rule'])} "
+                f"(status: {_inline(item['status'])}; exposure: {_inline(item['exposure']) if item['exposure'] else 'not specified'}; "
+                f"tags: {_inline_join(item['tags'])}; sources: {_refs(item['source_ids'])})"
+            )
+    else:
+        lines.append("- No position rules recorded.")
+    lines.extend(["", "## Checklist", ""])
+    if payload["checklist"]:
+        for item in payload["checklist"]:
+            lines.append(
+                f"- [{_checkbox(item['status'])}] {_inline(item['id'])}: {_inline(item['item'])} "
+                f"({_inline(item['type'])}; tags: {_inline_join(item['tags'])}; "
+                f"sources: {_refs(item['source_ids'])})"
+            )
+    else:
+        lines.append("- No exposure checklist items recorded.")
+    lines.extend(["", "## Sources", ""])
+    lines.extend(_source_lines(ledger))
+    return "\n".join(lines) + "\n"
+
+
 def evidence_payload(ledger: Mapping[str, Any]) -> Dict[str, Any]:
     """Build structured source coverage and stale-source output."""
 
@@ -271,6 +440,8 @@ def evidence_payload(ledger: Mapping[str, Any]) -> Dict[str, Any]:
     records.extend(_evidence_records("risk", ledger.get("risks", []), source_ids, usage))
     records.extend(_evidence_records("review", _reviews_with_ids(ledger.get("reviews", [])), source_ids, usage))
     records.extend(_evidence_records("catalyst", calendar_payload(ledger)["catalysts"], source_ids, usage))
+    records.extend(_evidence_records("broker_view", broker_matrix_payload(ledger)["broker_views"], source_ids, usage))
+    records.extend(_evidence_records("position_rule", exposure_payload(ledger)["position_rules"], source_ids, usage))
     stale_sources = _stale_sources(ledger)
     unsupported = [item for item in records if not item["source_ids"]]
     return {
@@ -366,7 +537,7 @@ def to_json(data: Mapping[str, Any]) -> str:
 
 
 def _refs(source_ids: Sequence[str]) -> str:
-    return ", ".join(f"[{source_id}]" for source_id in source_ids) if source_ids else "none"
+    return ", ".join(f"[{_inline(source_id)}]" for source_id in source_ids) if source_ids else "none"
 
 
 def _source_lines(ledger: Mapping[str, Any]) -> List[str]:
@@ -375,8 +546,8 @@ def _source_lines(ledger: Mapping[str, Any]) -> List[str]:
     for source_id in sorted(sources):
         source = sources[source_id]
         lines.append(
-            f"- [{source_id}] {source['title']}. {source['publisher']}, "
-            f"{source['date']}. {source['url']}"
+            f"- [{_inline(source_id)}] {_inline(source['title'])}. {_inline(source['publisher'])}, "
+            f"{_inline(source['date'])}. {_inline(source['url'])}"
         )
     return lines
 
@@ -472,6 +643,44 @@ def _normalize_catalyst(item: Any, index: int) -> Dict[str, Any]:
     return {"id": f"CAT{index}", "title": str(item), "date": "", "window": "", "status": "watch", "source_ids": []}
 
 
+def _normalize_broker_view(item: Any, index: int) -> Dict[str, Any]:
+    if isinstance(item, dict):
+        source_ids = item.get("source_ids", [])
+        return {
+            "id": str(item.get("id", f"B{index}")),
+            "institution": str(item.get("institution", "")),
+            "rating": str(item.get("rating", "")),
+            "target": str(item.get("target", "")),
+            "as_of": str(item.get("as_of", item.get("date", ""))),
+            "thesis": str(item.get("thesis", "")),
+            "source_ids": list(source_ids) if isinstance(source_ids, list) else [],
+        }
+    return {
+        "id": f"B{index}",
+        "institution": str(item),
+        "rating": "",
+        "target": "",
+        "as_of": "",
+        "thesis": "",
+        "source_ids": [],
+    }
+
+
+def _normalize_position_rule(item: Any, index: int) -> Dict[str, Any]:
+    if isinstance(item, dict):
+        source_ids = item.get("source_ids", [])
+        tags = item.get("tags", [])
+        return {
+            "id": str(item.get("id", f"P{index}")),
+            "rule": str(item.get("rule") or item.get("item") or item.get("description") or ""),
+            "status": str(item.get("status", "open")),
+            "exposure": str(item.get("exposure", "")),
+            "tags": [str(tag) for tag in tags] if isinstance(tags, list) else [],
+            "source_ids": list(source_ids) if isinstance(source_ids, list) else [],
+        }
+    return {"id": f"P{index}", "rule": str(item), "status": "open", "exposure": "", "tags": [], "source_ids": []}
+
+
 def _catalyst_timing(item: Mapping[str, Any]) -> str:
     parts = []
     if item["date"]:
@@ -522,3 +731,23 @@ def _parse_date(value: str) -> Optional[date]:
         return date.fromisoformat(value)
     except ValueError:
         return None
+
+
+def _count_by(items: Sequence[Mapping[str, Any]], field: str) -> Dict[str, int]:
+    counts: Dict[str, int] = {}
+    for item in items:
+        value = str(item.get(field, "")) or "unspecified"
+        counts[value] = counts.get(value, 0) + 1
+    return {key: counts[key] for key in sorted(counts)}
+
+
+def _cell(value: Any) -> str:
+    return _inline(value)
+
+
+def _inline(value: Any) -> str:
+    return str(value).replace("|", "\\|").replace("\r", " ").replace("\n", " ")
+
+
+def _inline_join(values: Sequence[Any]) -> str:
+    return ", ".join(_inline(value) for value in values) if values else "none"

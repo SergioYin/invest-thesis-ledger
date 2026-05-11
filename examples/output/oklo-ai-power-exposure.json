@@ -1,0 +1,130 @@
+{
+  "asset": {
+    "name": "Oklo Inc.",
+    "ticker": "OKLO",
+    "type": "equity"
+  },
+  "checklist": [
+    {
+      "id": "RULE-P1",
+      "item": "Keep status at watchlist until a dated licensing update is source-backed.",
+      "source_ids": [
+        "S3"
+      ],
+      "status": "open",
+      "tags": [
+        "regulatory",
+        "timeline"
+      ],
+      "type": "position_rule"
+    },
+    {
+      "id": "RULE-P2",
+      "item": "Do not size from AI power narrative without named contract evidence.",
+      "source_ids": [
+        "S1",
+        "S2"
+      ],
+      "status": "open",
+      "tags": [
+        "valuation",
+        "narrative"
+      ],
+      "type": "position_rule"
+    },
+    {
+      "id": "RISK-R1",
+      "item": "Licensing delay",
+      "source_ids": [
+        "S3"
+      ],
+      "status": "review",
+      "tags": [
+        "regulatory",
+        "timeline"
+      ],
+      "type": "risk"
+    },
+    {
+      "id": "RISK-R2",
+      "item": "Narrative valuation",
+      "source_ids": [
+        "S1",
+        "S2"
+      ],
+      "status": "review",
+      "tags": [
+        "valuation",
+        "narrative"
+      ],
+      "type": "risk"
+    }
+  ],
+  "position_rules": [
+    {
+      "exposure": "watchlist",
+      "id": "P1",
+      "rule": "Keep status at watchlist until a dated licensing update is source-backed.",
+      "source_ids": [
+        "S3"
+      ],
+      "status": "open",
+      "tags": [
+        "regulatory",
+        "timeline"
+      ]
+    },
+    {
+      "exposure": "no position",
+      "id": "P2",
+      "rule": "Do not size from AI power narrative without named contract evidence.",
+      "source_ids": [
+        "S1",
+        "S2"
+      ],
+      "status": "open",
+      "tags": [
+        "valuation",
+        "narrative"
+      ]
+    }
+  ],
+  "risks": [
+    {
+      "id": "R1",
+      "name": "Licensing delay",
+      "probability": "medium",
+      "severity": "high",
+      "source_ids": [
+        "S3"
+      ],
+      "tags": [
+        "regulatory",
+        "timeline"
+      ]
+    },
+    {
+      "id": "R2",
+      "name": "Narrative valuation",
+      "probability": "high",
+      "severity": "medium",
+      "source_ids": [
+        "S1",
+        "S2"
+      ],
+      "tags": [
+        "valuation",
+        "narrative"
+      ]
+    }
+  ],
+  "tag_counts": {
+    "narrative": 1,
+    "regulatory": 1,
+    "timeline": 1,
+    "valuation": 1
+  },
+  "thesis_id": "oklo-ai-power",
+  "title": "Oklo AI Power Demand Thesis",
+  "updated": "2026-05-12"
+}

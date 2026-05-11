@@ -9,14 +9,18 @@ from typing import Callable, Optional, Sequence
 
 from . import __version__
 from .render import (
+    broker_matrix_payload,
     calendar_payload,
     compare_payload,
     evidence_payload,
+    exposure_payload,
     history_payload,
+    render_broker_matrix,
     render_brief,
     render_calendar,
     render_compare,
     render_evidence,
+    render_exposure,
     render_history,
     render_risk,
     risk_payload,
@@ -73,6 +77,25 @@ def build_parser() -> argparse.ArgumentParser:
     _add_ledger_arg(evidence)
     _add_output_args(evidence)
     evidence.set_defaults(func=_cmd_evidence)
+
+    broker_matrix = subparsers.add_parser(
+        "broker-matrix", help="render broker/institution rating, target, and thesis matrix"
+    )
+    _add_ledger_arg(broker_matrix)
+    _add_output_args(broker_matrix)
+    broker_matrix.set_defaults(func=_cmd_broker_matrix)
+
+    exposure = subparsers.add_parser("exposure", help="render exposure checklist from risks and position rules")
+    _add_ledger_arg(exposure)
+    _add_output_args(exposure)
+    exposure.set_defaults(func=_cmd_exposure)
+
+    init_template = subparsers.add_parser("init-template", help="create a deterministic starter ledger")
+    init_template.add_argument("--asset", required=True, metavar="TICKER", help="asset ticker or symbol")
+    init_template.add_argument("--name", required=True, metavar="NAME", help="asset or issuer name")
+    init_template.add_argument("--type", required=True, metavar="TYPE", help="asset class or instrument type")
+    init_template.add_argument("--output", required=True, metavar="PATH", help="write starter ledger JSON to PATH")
+    init_template.set_defaults(func=_cmd_init_template)
     return parser
 
 
@@ -164,6 +187,33 @@ def _cmd_evidence(args: argparse.Namespace) -> int:
     )
 
 
+def _cmd_broker_matrix(args: argparse.Namespace) -> int:
+    return _render_validated(
+        args.ledger,
+        (
+            (args.output, render_broker_matrix),
+            (args.json_output, lambda ledger: to_json(broker_matrix_payload(ledger))),
+        ),
+    )
+
+
+def _cmd_exposure(args: argparse.Namespace) -> int:
+    return _render_validated(
+        args.ledger,
+        (
+            (args.output, render_exposure),
+            (args.json_output, lambda ledger: to_json(exposure_payload(ledger))),
+        ),
+    )
+
+
+def _cmd_init_template(args: argparse.Namespace) -> int:
+    ledger = _starter_ledger(args.asset, args.name, args.type)
+    _write_text(args.output, to_json(ledger))
+    sys.stdout.write(f"wrote: {args.output}\n")
+    return 0
+
+
 def _render_validated(
     ledger_path: str,
     outputs: Sequence[tuple[str, Callable[[dict], str]]],
@@ -195,3 +245,65 @@ def _write_text(path: str, text: str) -> None:
     output_path = Path(path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(text, encoding="utf-8")
+
+
+def _starter_ledger(asset: str, name: str, asset_type: str) -> dict:
+    ticker = asset.strip().upper()
+    slug = "".join(char.lower() if char.isalnum() else "-" for char in ticker).strip("-") or "asset"
+    clean_name = name.strip()
+    clean_type = asset_type.strip()
+    return {
+        "ledger_version": "0.3.0",
+        "thesis_id": f"{slug}-thesis",
+        "title": f"{clean_name} Thesis Ledger",
+        "asset": {
+            "name": clean_name,
+            "type": clean_type,
+            "ticker": ticker,
+        },
+        "created": "1970-01-01",
+        "updated": "1970-01-01",
+        "thesis": "TODO: state the current investment thesis.",
+        "sources": [
+            {
+                "id": "S1",
+                "title": "TODO: primary source title",
+                "publisher": "TODO: publisher",
+                "date": "1970-01-01",
+                "url": "TODO: source URL or internal reference",
+            }
+        ],
+        "positions": [],
+        "assumptions": [
+            {
+                "id": "A1",
+                "statement": f"TODO: key assumption for {clean_name or ticker}.",
+                "confidence": "watch",
+                "source_ids": ["S1"],
+            }
+        ],
+        "broker_views": [],
+        "catalysts": [],
+        "risks": [
+            {
+                "id": "R1",
+                "name": "TODO: primary risk",
+                "severity": "watch",
+                "probability": "watch",
+                "mitigation": "TODO: mitigation or review trigger.",
+                "tags": ["TODO"],
+                "source_ids": ["S1"],
+            }
+        ],
+        "position_rules": [],
+        "checklist": [],
+        "reviews": [
+            {
+                "date": "1970-01-01",
+                "decision": "watch",
+                "summary": "TODO: initial review summary.",
+                "drift": "none recorded",
+                "source_ids": ["S1"],
+            }
+        ],
+    }

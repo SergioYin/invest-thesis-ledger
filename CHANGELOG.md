@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0 - 2026-05-12
+
+- Added `broker-matrix` command for broker, desk, or institution rating/target/thesis matrices.
+- Added `exposure` command for mapping risk tags and position rules into exposure checklists.
+- Added `init-template` command for deterministic starter ledger generation.
+- Expanded optional schema support for `broker_views`, `position_rules`, and risk `tags`.
+- Updated examples, demo fixtures, tests, schema docs, README, and selfcheck for the v0.3.0 finance workflow expansion.
+
 ## 0.2.0 - 2026-05-12
 
 - Added `compare` command for deterministic thesis, assumption, risk, and review drift reports.

@@ -1,5 +1,5 @@
 {
-  "ledger_version": "0.2.0",
+  "ledger_version": "0.3.0",
   "thesis_id": "leveraged-etf-discipline",
   "title": "Leveraged ETF Discipline Ledger",
   "asset": {
@@ -66,6 +66,7 @@
       "name": "Volatility drag",
       "severity": "high",
       "probability": "high",
+      "tags": ["leverage", "volatility", "path-dependency"],
       "mitigation": "Use only with explicit holding-period limit and daily review.",
       "source_ids": ["S1", "S2"]
     },
@@ -74,7 +75,26 @@
       "name": "Oversized exposure",
       "severity": "high",
       "probability": "medium",
+      "tags": ["sizing", "leverage"],
       "mitigation": "Cap notional exposure before order entry.",
+      "source_ids": ["S1"]
+    }
+  ],
+  "position_rules": [
+    {
+      "id": "P1",
+      "rule": "Limit planned holding period to five trading days.",
+      "status": "open",
+      "exposure": "time-boxed tactical",
+      "tags": ["path-dependency", "volatility"],
+      "source_ids": ["S1", "S2"]
+    },
+    {
+      "id": "P2",
+      "rule": "Cap notional exposure before order entry.",
+      "status": "open",
+      "exposure": "reduced notional",
+      "tags": ["sizing", "leverage"],
       "source_ids": ["S1"]
     }
   ],
