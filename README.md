@@ -2,9 +2,11 @@
 
 A zero-dependency Python package and CLI for maintaining investment thesis
 ledgers as JSON, then rendering deterministic briefs, risk reports, review
-timelines, thesis drift comparisons, catalyst calendars, and evidence coverage
-reports. v0.3.0 also adds broker/institution matrices, exposure checklists,
-and deterministic starter ledger generation.
+timelines, thesis drift comparisons, catalyst calendars, evidence coverage
+reports, broker/institution matrices, exposure checklists, deterministic
+starter ledger generation, and portfolio-level summaries. v0.4.0 adds the
+portfolio aggregation command while preserving compatibility with v0.1.0,
+v0.2.0, and v0.3.0 ledgers.
 
 This project is for research organization only. It is not investment advice.
 
@@ -93,6 +95,12 @@ Render an exposure checklist from `position_rules` and risk `tags`:
 python -m invest_thesis_ledger exposure examples/oklo-ai-power.json --output exposure.md --json-output exposure.json
 ```
 
+Aggregate two or more ledgers into a portfolio summary:
+
+```bash
+python -m invest_thesis_ledger portfolio examples/oklo-ai-power.json examples/leveraged-etf-discipline.json --output portfolio.md --json-output portfolio.json
+```
+
 Create a deterministic starter ledger:
 
 ```bash
@@ -102,11 +110,12 @@ python -m invest_thesis_ledger init-template --asset MSFT --name "Microsoft Corp
 The starter includes one placeholder source, assumption, risk, and review so it
 validates immediately and shows the expected source-linking pattern.
 
-All generated outputs are deterministic for the same input file.
+All generated outputs are deterministic for the same input file or ordered
+input file list.
 
 ## Ledger Format
 
-Ledgers are JSON objects. The v0.3.0 required fields are:
+Ledgers are JSON objects. The v0.4.0 required fields are:
 
 - `ledger_version`
 - `thesis_id`
@@ -143,7 +152,7 @@ ID.
 optional string `tags`; `exposure` combines these risk tags with position rules
 into a checklist.
 
-The formal v0.3.0 schema reference is in `docs/ledger-schema.md`.
+The formal v0.4.0 schema reference is in `docs/ledger-schema.md`.
 
 See:
 
@@ -171,6 +180,8 @@ Checked-in deterministic CLI output fixtures are available under
 - `examples/output/oklo-ai-power-exposure.json`
 - `examples/output/oklo-ai-power-drift.md`
 - `examples/output/oklo-ai-power-drift.json`
+- `examples/output/portfolio-summary.md`
+- `examples/output/portfolio-summary.json`
 
 ## Development
 

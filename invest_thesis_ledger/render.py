@@ -429,6 +429,217 @@ def render_exposure(ledger: Mapping[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def portfolio_payload(ledgers: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
+    """Build deterministic portfolio-level summary output."""
+
+    assets = []
+    risk_severity_counts: Dict[str, int] = {}
+    risk_tag_counts: Dict[str, int] = {}
+    catalyst_status_counts: Dict[str, int] = {}
+    catalyst_window_counts: Dict[str, int] = {}
+    catalysts = []
+    broker_rating_counts: Dict[str, Dict[str, int]] = {}
+    review_decision_counts: Dict[str, int] = {}
+    stale_source_warnings = []
+
+    for ledger in ledgers:
+        ledger_id = str(ledger["thesis_id"])
+        asset = ledger["asset"]
+        ticker = str(asset["ticker"])
+        assets.append(
+            {
+                "thesis_id": ledger_id,
+                "title": ledger["title"],
+                "ticker": ticker,
+                "name": asset["name"],
+                "type": asset["type"],
+                "updated": ledger["updated"],
+            }
+        )
+
+        for risk in ledger.get("risks", []):
+            severity = str(risk.get("severity", "")) or "unspecified"
+            risk_severity_counts[severity] = risk_severity_counts.get(severity, 0) + 1
+            tags = risk.get("tags", [])
+            if isinstance(tags, list):
+                for tag in tags:
+                    if isinstance(tag, str):
+                        risk_tag_counts[tag] = risk_tag_counts.get(tag, 0) + 1
+
+        for catalyst in calendar_payload(ledger)["catalysts"]:
+            status = catalyst["status"] or "unspecified"
+            window = catalyst["window"] or "unspecified"
+            catalyst_status_counts[status] = catalyst_status_counts.get(status, 0) + 1
+            catalyst_window_counts[window] = catalyst_window_counts.get(window, 0) + 1
+            catalysts.append(
+                {
+                    "ledger_id": ledger_id,
+                    "ticker": ticker,
+                    "id": catalyst["id"],
+                    "title": catalyst["title"],
+                    "status": catalyst["status"],
+                    "date": catalyst["date"],
+                    "window": catalyst["window"],
+                    "source_ids": catalyst["source_ids"],
+                }
+            )
+
+        for view in broker_matrix_payload(ledger)["broker_views"]:
+            institution = view["institution"] or "unspecified"
+            rating = view["rating"] or "unspecified"
+            if institution not in broker_rating_counts:
+                broker_rating_counts[institution] = {}
+            broker_rating_counts[institution][rating] = broker_rating_counts[institution].get(rating, 0) + 1
+
+        for review in ledger.get("reviews", []):
+            if isinstance(review, dict):
+                decision = str(review.get("decision", "")) or "unspecified"
+                review_decision_counts[decision] = review_decision_counts.get(decision, 0) + 1
+
+        for source in evidence_payload(ledger)["stale_sources"]:
+            warning = dict(source)
+            warning["ledger_id"] = ledger_id
+            warning["ticker"] = ticker
+            stale_source_warnings.append(warning)
+
+    assets.sort(
+        key=lambda item: (
+            item["ticker"],
+            item["thesis_id"],
+            item["name"],
+            item["type"],
+            item["updated"],
+            item["title"],
+        )
+    )
+    catalysts.sort(
+        key=lambda item: (
+            item["date"] == "",
+            item["date"],
+            item["window"],
+            item["ticker"],
+            item["ledger_id"],
+            item["id"],
+            item["title"],
+        )
+    )
+    stale_source_warnings.sort(
+        key=lambda item: (
+            item["ledger_id"],
+            item["ticker"],
+            item["id"],
+            item["date"],
+            item["title"],
+            item["age_days"],
+        )
+    )
+    return {
+        "portfolio": {
+            "asset_count": len(assets),
+            "thesis_count": len(ledgers),
+        },
+        "assets": assets,
+        "risk_severity_counts": _sorted_counts(risk_severity_counts),
+        "risk_tag_counts": _sorted_counts(risk_tag_counts),
+        "catalyst_status_counts": _sorted_counts(catalyst_status_counts),
+        "catalyst_window_counts": _sorted_counts(catalyst_window_counts),
+        "catalysts": catalysts,
+        "broker_rating_counts": {
+            institution: _sorted_counts(ratings) for institution, ratings in sorted(broker_rating_counts.items())
+        },
+        "review_decision_counts": _sorted_counts(review_decision_counts),
+        "stale_source_warnings": stale_source_warnings,
+    }
+
+
+def render_portfolio(ledgers: Sequence[Mapping[str, Any]]) -> str:
+    """Render a Markdown portfolio-level summary."""
+
+    payload = portfolio_payload(ledgers)
+    lines = [
+        "# Portfolio Summary",
+        "",
+        "> This is a research organization tool, not investment advice.",
+        "",
+        f"- Assets: {payload['portfolio']['asset_count']}",
+        f"- Thesis Count: {payload['portfolio']['thesis_count']}",
+        "",
+        "## Assets",
+        "",
+        "| Ticker | Name | Type | Ledger ID | Updated |",
+        "| --- | --- | --- | --- | --- |",
+    ]
+    for item in payload["assets"]:
+        lines.append(
+            "| "
+            + " | ".join(
+                [
+                    _cell(item["ticker"]),
+                    _cell(item["name"]),
+                    _cell(item["type"]),
+                    _cell(item["thesis_id"]),
+                    _cell(item["updated"]),
+                ]
+            )
+            + " |"
+        )
+    lines.extend(["", "## Risk Severity Counts", ""])
+    _extend_count_lines(lines, payload["risk_severity_counts"], "No risks recorded.")
+    lines.extend(["", "## Risk Tag Counts", ""])
+    _extend_count_lines(lines, payload["risk_tag_counts"], "No risk tags recorded.")
+    lines.extend(["", "## Catalyst Status Counts", ""])
+    _extend_count_lines(lines, payload["catalyst_status_counts"], "No catalysts recorded.")
+    lines.extend(["", "## Catalyst Window Counts", ""])
+    _extend_count_lines(lines, payload["catalyst_window_counts"], "No catalyst windows recorded.")
+    lines.extend(["", "## Catalyst Dates", ""])
+    if payload["catalysts"]:
+        lines.extend(
+            [
+                "| Date | Window | Status | Ticker | ID | Title | Sources |",
+                "| --- | --- | --- | --- | --- | --- | --- |",
+            ]
+        )
+        for item in payload["catalysts"]:
+            lines.append(
+                "| "
+                + " | ".join(
+                    [
+                        _cell(item["date"] or "not specified"),
+                        _cell(item["window"] or "not specified"),
+                        _cell(item["status"]),
+                        _cell(item["ticker"]),
+                        _cell(item["id"]),
+                        _cell(item["title"]),
+                        _cell(_refs(item["source_ids"])),
+                    ]
+                )
+                + " |"
+            )
+    else:
+        lines.append("- No catalysts recorded.")
+    lines.extend(["", "## Broker Rating Counts", ""])
+    if payload["broker_rating_counts"]:
+        lines.extend(["| Institution | Rating | Count |", "| --- | --- | --- |"])
+        for institution, ratings in payload["broker_rating_counts"].items():
+            for rating, count in ratings.items():
+                lines.append(f"| {_cell(institution)} | {_cell(rating)} | {count} |")
+    else:
+        lines.append("- No broker ratings recorded.")
+    lines.extend(["", "## Review Decision Counts", ""])
+    _extend_count_lines(lines, payload["review_decision_counts"], "No reviews recorded.")
+    lines.extend(["", "## Stale Source Warnings", ""])
+    if payload["stale_source_warnings"]:
+        for item in payload["stale_source_warnings"]:
+            lines.append(
+                f"- {_inline(item['ledger_id'])} [{_inline(item['id'])}] {_inline(item['title'])} "
+                f"({_inline(item['date'])}): "
+                f"{item['age_days']} days old"
+            )
+    else:
+        lines.append("- No stale sources detected.")
+    return "\n".join(lines) + "\n"
+
+
 def evidence_payload(ledger: Mapping[str, Any]) -> Dict[str, Any]:
     """Build structured source coverage and stale-source output."""
 
@@ -739,6 +950,18 @@ def _count_by(items: Sequence[Mapping[str, Any]], field: str) -> Dict[str, int]:
         value = str(item.get(field, "")) or "unspecified"
         counts[value] = counts.get(value, 0) + 1
     return {key: counts[key] for key in sorted(counts)}
+
+
+def _sorted_counts(counts: Mapping[str, int]) -> Dict[str, int]:
+    return {key: counts[key] for key in sorted(counts)}
+
+
+def _extend_count_lines(lines: List[str], counts: Mapping[str, int], empty_text: str) -> None:
+    if counts:
+        for key, count in counts.items():
+            lines.append(f"- {_inline(key)}: {count}")
+    else:
+        lines.append(f"- {empty_text}")
 
 
 def _cell(value: Any) -> str:

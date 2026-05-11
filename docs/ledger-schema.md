@@ -1,7 +1,7 @@
-# Ledger Schema v0.3.0
+# Ledger Schema v0.4.0
 
 This document defines the JSON ledger format accepted by `invest-thesis-ledger`
-v0.3.0. Ledgers are research organization records only and are not investment
+v0.4.0. Ledgers are research organization records only and are not investment
 advice.
 
 ## Document Shape
@@ -15,7 +15,7 @@ without breaking the renderer.
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `ledger_version` | string | Schema version. v0.3.0 ledgers should use `"0.3.0"`. v0.1.0 and v0.2.0 remain accepted for compatibility; other values validate with a warning. |
+| `ledger_version` | string | Schema version. v0.4.0 ledgers should use `"0.4.0"`. v0.1.0, v0.2.0, and v0.3.0 remain accepted for compatibility; other values validate with a warning. |
 | `thesis_id` | string | Stable machine-readable ledger identifier. |
 | `title` | string | Human-readable thesis title. |
 | `asset` | object | Asset metadata. |
@@ -179,13 +179,17 @@ existing source, and duplicate source references within one rule are invalid.
 
 ## Determinism
 
-For the same input file, v0.3.0 CLI outputs are deterministic:
+For the same input file or ordered input file list, v0.4.0 CLI outputs are
+deterministic:
 
 - JSON outputs are serialized with sorted keys and two-space indentation.
 - History reviews are sorted by review date.
 - Calendar catalysts are sorted by date presence, date, window, and ID.
 - Broker views are sorted by institution and ID.
 - Position rules are sorted by ID, and exposure risk tags are sorted by tag.
+- Portfolio assets are sorted by ticker and ledger ID.
+- Portfolio catalyst and stale-source lists are sorted by stable ledger and
+  item fields.
 - Evidence stale-source warnings are measured against ledger `updated`, not the
   current wall-clock date.
 - Source reference lists preserve the ledger order inside each item.
@@ -193,7 +197,7 @@ For the same input file, v0.3.0 CLI outputs are deterministic:
 - `init-template` uses fixed placeholder dates so repeated runs with the same
   arguments produce byte-identical JSON.
 
-## v0.3.0 Reports
+## v0.4.0 Reports
 
 `compare <old.json> <new.json> --output drift.md --json-output drift.json`
 loads and validates both ledgers, then compares:
@@ -227,10 +231,26 @@ JSON output includes tag counts, normalized risks, normalized position rules,
 and combined checklist entries.
 
 `init-template --asset TICKER --name NAME --type TYPE --output ledger.json`
-writes a deterministic starter ledger with v0.3.0 fields, fixed placeholder
+writes a deterministic starter ledger with v0.4.0 fields, fixed placeholder
 dates, one source-backed assumption, one risk, one review, and a thesis ID
 derived from the ticker.
 
+```bash
+portfolio <ledger-a.json> <ledger-b.json> [...] --output portfolio.md --json-output portfolio.json
+```
+
+The `portfolio` command loads and validates every input ledger before writing
+output. It requires at least two ledgers and aggregates:
+
+- assets and thesis count
+- risk severity counts
+- risk tag counts
+- catalyst status counts, window counts, and dated/windowed catalyst list
+- broker rating counts by institution and rating
+- review decision counts
+- stale source warnings using the same deterministic ledger-updated-date logic
+  as `evidence`
+
 See `examples/output/` for checked-in CLI output fixtures generated from
-`examples/oklo-ai-power.json` and the prior/current comparison pair in
-`examples/oklo-ai-power-prior.json`.
+`examples/oklo-ai-power.json`, `examples/leveraged-etf-discipline.json`, and
+the prior/current comparison pair in `examples/oklo-ai-power-prior.json`.

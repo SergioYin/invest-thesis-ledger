@@ -15,6 +15,7 @@ from .render import (
     evidence_payload,
     exposure_payload,
     history_payload,
+    portfolio_payload,
     render_broker_matrix,
     render_brief,
     render_calendar,
@@ -22,6 +23,7 @@ from .render import (
     render_evidence,
     render_exposure,
     render_history,
+    render_portfolio,
     render_risk,
     risk_payload,
     to_json,
@@ -89,6 +91,11 @@ def build_parser() -> argparse.ArgumentParser:
     _add_ledger_arg(exposure)
     _add_output_args(exposure)
     exposure.set_defaults(func=_cmd_exposure)
+
+    portfolio = subparsers.add_parser("portfolio", help="aggregate two or more ledgers into a portfolio summary")
+    portfolio.add_argument("ledgers", metavar="LEDGER", nargs="+", help="ledger JSON file")
+    _add_output_args(portfolio)
+    portfolio.set_defaults(func=_cmd_portfolio)
 
     init_template = subparsers.add_parser("init-template", help="create a deterministic starter ledger")
     init_template.add_argument("--asset", required=True, metavar="TICKER", help="asset ticker or symbol")
@@ -207,6 +214,33 @@ def _cmd_exposure(args: argparse.Namespace) -> int:
     )
 
 
+def _cmd_portfolio(args: argparse.Namespace) -> int:
+    if len(args.ledgers) < 2:
+        sys.stderr.write("error: portfolio requires at least two ledger JSON files\n")
+        return 2
+    ledgers = []
+    for path in args.ledgers:
+        ledger = _load_or_report(path)
+        if ledger is None:
+            return 2
+        ledgers.append(ledger)
+
+    validation_results = [(ledger, *validate_ledger(ledger)) for ledger in ledgers]
+    if any(errors for _, errors, _ in validation_results):
+        for ledger, errors, warnings in validation_results:
+            if errors:
+                sys.stderr.write(validation_summary(ledger, errors, warnings))
+        return 1
+    for ledger, errors, warnings in validation_results:
+        if warnings:
+            sys.stderr.write(validation_summary(ledger, errors, warnings))
+
+    _write_text(args.output, render_portfolio(ledgers))
+    _write_text(args.json_output, to_json(portfolio_payload(ledgers)))
+    sys.stdout.write(f"wrote: {args.output}, {args.json_output}\n")
+    return 0
+
+
 def _cmd_init_template(args: argparse.Namespace) -> int:
     ledger = _starter_ledger(args.asset, args.name, args.type)
     _write_text(args.output, to_json(ledger))
@@ -253,7 +287,7 @@ def _starter_ledger(asset: str, name: str, asset_type: str) -> dict:
     clean_name = name.strip()
     clean_type = asset_type.strip()
     return {
-        "ledger_version": "0.3.0",
+        "ledger_version": "0.4.0",
         "thesis_id": f"{slug}-thesis",
         "title": f"{clean_name} Thesis Ledger",
         "asset": {

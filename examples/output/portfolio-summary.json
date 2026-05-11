@@ -1,0 +1,122 @@
+{
+  "assets": [
+    {
+      "name": "Generic 2x Equity Index ETF",
+      "thesis_id": "leveraged-etf-discipline",
+      "ticker": "LEV2X",
+      "title": "Leveraged ETF Discipline Ledger",
+      "type": "fund",
+      "updated": "2026-05-12"
+    },
+    {
+      "name": "Oklo Inc.",
+      "thesis_id": "oklo-ai-power",
+      "ticker": "OKLO",
+      "title": "Oklo AI Power Demand Thesis",
+      "type": "equity",
+      "updated": "2026-05-12"
+    }
+  ],
+  "broker_rating_counts": {
+    "Grid Infrastructure Desk": {
+      "constructive": 1
+    },
+    "Regulatory Risk Desk": {
+      "cautious": 1
+    }
+  },
+  "catalyst_status_counts": {
+    "required": 2,
+    "watch": 3
+  },
+  "catalyst_window_counts": {
+    "2026-H2": 1,
+    "before entry": 1,
+    "next financing update": 1,
+    "unspecified": 2
+  },
+  "catalysts": [
+    {
+      "date": "2026-06-10",
+      "id": "CAT2",
+      "ledger_id": "leveraged-etf-discipline",
+      "source_ids": [
+        "S1"
+      ],
+      "status": "required",
+      "ticker": "LEV2X",
+      "title": "Macro event calendar supports a time-boxed tactical setup.",
+      "window": ""
+    },
+    {
+      "date": "2026-08-15",
+      "id": "CAT2",
+      "ledger_id": "oklo-ai-power",
+      "source_ids": [
+        "S3"
+      ],
+      "status": "watch",
+      "ticker": "OKLO",
+      "title": "Material licensing update with a clear review timeline.",
+      "window": ""
+    },
+    {
+      "date": "",
+      "id": "CAT1",
+      "ledger_id": "oklo-ai-power",
+      "source_ids": [
+        "S1",
+        "S2"
+      ],
+      "status": "watch",
+      "ticker": "OKLO",
+      "title": "Signed commercial power purchase agreement with credible counterparty.",
+      "window": "2026-H2"
+    },
+    {
+      "date": "",
+      "id": "CAT1",
+      "ledger_id": "leveraged-etf-discipline",
+      "source_ids": [],
+      "status": "required",
+      "ticker": "LEV2X",
+      "title": "Index breaks above predefined technical level.",
+      "window": "before entry"
+    },
+    {
+      "date": "",
+      "id": "CAT3",
+      "ledger_id": "oklo-ai-power",
+      "source_ids": [
+        "S1"
+      ],
+      "status": "watch",
+      "ticker": "OKLO",
+      "title": "Capital raise or partnership that reduces funding risk.",
+      "window": "next financing update"
+    }
+  ],
+  "portfolio": {
+    "asset_count": 2,
+    "thesis_count": 2
+  },
+  "review_decision_counts": {
+    "policy": 2,
+    "watch": 2
+  },
+  "risk_severity_counts": {
+    "high": 3,
+    "medium": 1
+  },
+  "risk_tag_counts": {
+    "leverage": 2,
+    "narrative": 1,
+    "path-dependency": 1,
+    "regulatory": 1,
+    "sizing": 1,
+    "timeline": 1,
+    "valuation": 1,
+    "volatility": 1
+  },
+  "stale_source_warnings": []
+}

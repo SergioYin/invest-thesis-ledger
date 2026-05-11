@@ -10,6 +10,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 EXAMPLE = ROOT / "examples" / "oklo-ai-power.json"
+ETF_EXAMPLE = ROOT / "examples" / "leveraged-etf-discipline.json"
 PRIOR_EXAMPLE = ROOT / "examples" / "oklo-ai-power-prior.json"
 OUTPUT = ROOT / "examples" / "output"
 
@@ -48,6 +49,12 @@ class CliTests(unittest.TestCase):
         self.assertEqual(init_template.returncode, 0, init_template.stderr)
         self.assertIn("--asset", init_template.stdout)
         self.assertIn("write starter ledger JSON to PATH", init_template.stdout)
+
+        portfolio = self.run_cli("portfolio", "--help")
+        self.assertEqual(portfolio.returncode, 0, portfolio.stderr)
+        self.assertIn("LEDGER", portfolio.stdout)
+        self.assertIn("write Markdown output to PATH", portfolio.stdout)
+        self.assertIn("write JSON output to PATH", portfolio.stdout)
 
     def test_brief_is_deterministic(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -196,6 +203,176 @@ class CliTests(unittest.TestCase):
             self.assertEqual(payload["position_rules"][0]["id"], "P1")
             self.assertIn("RISK-R1", [item["id"] for item in payload["checklist"]])
 
+    def test_portfolio_aggregates_multiple_ledgers(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            md_path = Path(temp) / "portfolio.md"
+            json_path = Path(temp) / "portfolio.json"
+            result = self.run_cli(
+                "portfolio",
+                str(EXAMPLE),
+                str(ETF_EXAMPLE),
+                "--output",
+                str(md_path),
+                "--json-output",
+                str(json_path),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("# Portfolio Summary", md_path.read_text())
+            payload = json.loads(json_path.read_text())
+            self.assertEqual(payload["portfolio"]["asset_count"], 2)
+            self.assertEqual(payload["portfolio"]["thesis_count"], 2)
+            self.assertEqual(payload["risk_severity_counts"]["high"], 3)
+            self.assertEqual(payload["risk_tag_counts"]["leverage"], 2)
+            self.assertEqual(payload["catalyst_status_counts"]["required"], 2)
+            self.assertEqual(payload["review_decision_counts"]["watch"], 2)
+            self.assertEqual(payload["broker_rating_counts"]["Grid Infrastructure Desk"]["constructive"], 1)
+            self.assertEqual(payload["stale_source_warnings"], [])
+
+    def test_portfolio_requires_two_ledgers(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            result = self.run_cli(
+                "portfolio",
+                str(EXAMPLE),
+                "--output",
+                str(Path(temp) / "portfolio.md"),
+                "--json-output",
+                str(Path(temp) / "portfolio.json"),
+            )
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("requires at least two", result.stderr)
+
+    def test_portfolio_validates_all_ledgers_before_writing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_dir = Path(temp)
+            bad_path = temp_dir / "bad.json"
+            data = json.loads(ETF_EXAMPLE.read_text())
+            data["risks"][0]["source_ids"] = ["missing"]
+            bad_path.write_text(json.dumps(data), encoding="utf-8")
+            md_path = temp_dir / "portfolio.md"
+            json_path = temp_dir / "portfolio.json"
+            result = self.run_cli(
+                "portfolio",
+                str(EXAMPLE),
+                str(bad_path),
+                "--output",
+                str(md_path),
+                "--json-output",
+                str(json_path),
+            )
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("ledger: leveraged-etf-discipline", result.stderr)
+            self.assertIn("unknown source missing", result.stderr)
+            self.assertFalse(md_path.exists())
+            self.assertFalse(json_path.exists())
+
+    def test_portfolio_reports_stale_sources(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_dir = Path(temp)
+            stale_path = temp_dir / "stale.json"
+            data = json.loads(EXAMPLE.read_text())
+            data["sources"][0]["date"] = "2025-01-01"
+            stale_path.write_text(json.dumps(data), encoding="utf-8")
+            json_path = temp_dir / "portfolio.json"
+            result = self.run_cli(
+                "portfolio",
+                str(stale_path),
+                str(ETF_EXAMPLE),
+                "--output",
+                str(temp_dir / "portfolio.md"),
+                "--json-output",
+                str(json_path),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(json_path.read_text())
+            self.assertEqual(payload["stale_source_warnings"][0]["ledger_id"], "oklo-ai-power")
+            self.assertEqual(payload["stale_source_warnings"][0]["id"], "S1")
+
+    def test_portfolio_order_does_not_depend_on_input_order_for_tied_items(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_dir = Path(temp)
+            first_path = temp_dir / "first.json"
+            second_path = temp_dir / "second.json"
+            first_data = json.loads(EXAMPLE.read_text())
+            second_data = json.loads(ETF_EXAMPLE.read_text())
+            for data in (first_data, second_data):
+                data["asset"]["ticker"] = "TIE"
+                data["catalysts"][0]["id"] = "CATX"
+                data["catalysts"][0]["date"] = "2026-07-01"
+                data["catalysts"][0]["window"] = "same"
+            first_path.write_text(json.dumps(first_data), encoding="utf-8")
+            second_path.write_text(json.dumps(second_data), encoding="utf-8")
+
+            forward_md = temp_dir / "forward.md"
+            forward_json = temp_dir / "forward.json"
+            reverse_md = temp_dir / "reverse.md"
+            reverse_json = temp_dir / "reverse.json"
+            forward = self.run_cli(
+                "portfolio",
+                str(first_path),
+                str(second_path),
+                "--output",
+                str(forward_md),
+                "--json-output",
+                str(forward_json),
+            )
+            reverse = self.run_cli(
+                "portfolio",
+                str(second_path),
+                str(first_path),
+                "--output",
+                str(reverse_md),
+                "--json-output",
+                str(reverse_json),
+            )
+            self.assertEqual(forward.returncode, 0, forward.stderr)
+            self.assertEqual(reverse.returncode, 0, reverse.stderr)
+            self.assertEqual(forward_json.read_text(), reverse_json.read_text())
+            self.assertEqual(forward_md.read_text(), reverse_md.read_text())
+
+    def test_portfolio_escapes_stale_source_markdown(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_dir = Path(temp)
+            stale_path = temp_dir / "stale.json"
+            data = json.loads(EXAMPLE.read_text())
+            data["sources"][0]["date"] = "2025-01-01"
+            data["sources"][0]["title"] = "Title | with\nbreak"
+            stale_path.write_text(json.dumps(data), encoding="utf-8")
+            md_path = temp_dir / "portfolio.md"
+            result = self.run_cli(
+                "portfolio",
+                str(stale_path),
+                str(ETF_EXAMPLE),
+                "--output",
+                str(md_path),
+                "--json-output",
+                str(temp_dir / "portfolio.json"),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("Title \\| with break", md_path.read_text())
+
+    def test_portfolio_reports_validation_warnings_without_blocking_output(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_dir = Path(temp)
+            warning_path = temp_dir / "warning.json"
+            data = json.loads(EXAMPLE.read_text())
+            data["reviews"] = list(reversed(data["reviews"]))
+            warning_path.write_text(json.dumps(data), encoding="utf-8")
+            md_path = temp_dir / "portfolio.md"
+            json_path = temp_dir / "portfolio.json"
+            result = self.run_cli(
+                "portfolio",
+                str(warning_path),
+                str(ETF_EXAMPLE),
+                "--output",
+                str(md_path),
+                "--json-output",
+                str(json_path),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("warning: ledger.reviews are not sorted by date", result.stderr)
+            self.assertTrue(md_path.exists())
+            self.assertTrue(json_path.exists())
+
     def test_init_template_is_deterministic_and_valid(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             output_a = Path(temp) / "ledger-a.json"
@@ -226,7 +403,7 @@ class CliTests(unittest.TestCase):
             self.assertEqual(second.returncode, 0, second.stderr)
             self.assertEqual(output_a.read_text(), output_b.read_text())
             payload = json.loads(output_a.read_text())
-            self.assertEqual(payload["ledger_version"], "0.3.0")
+            self.assertEqual(payload["ledger_version"], "0.4.0")
             self.assertEqual(payload["thesis_id"], "msft-thesis")
             self.assertEqual(payload["sources"][0]["id"], "S1")
             self.assertEqual(payload["assumptions"][0]["source_ids"], ["S1"])
@@ -390,6 +567,19 @@ class CliTests(unittest.TestCase):
                         str(temp_dir / "oklo-ai-power-drift.json"),
                     ],
                     ["oklo-ai-power-drift.md", "oklo-ai-power-drift.json"],
+                ),
+                (
+                    "portfolio",
+                    [
+                        "portfolio",
+                        str(EXAMPLE),
+                        str(ETF_EXAMPLE),
+                        "--output",
+                        str(temp_dir / "portfolio-summary.md"),
+                        "--json-output",
+                        str(temp_dir / "portfolio-summary.json"),
+                    ],
+                    ["portfolio-summary.md", "portfolio-summary.json"],
                 ),
             ]
             for label, args, filenames in commands:

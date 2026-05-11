@@ -17,6 +17,25 @@ EXAMPLES = [
 COMPARE_EXAMPLES = [
     (ROOT / "examples" / "oklo-ai-power-prior.json", ROOT / "examples" / "oklo-ai-power.json"),
 ]
+FIXTURE_OUTPUTS = [
+    "oklo-ai-power-brief.md",
+    "oklo-ai-power-risk.md",
+    "oklo-ai-power-risk.json",
+    "oklo-ai-power-history.md",
+    "oklo-ai-power-history.json",
+    "oklo-ai-power-calendar.md",
+    "oklo-ai-power-calendar.json",
+    "oklo-ai-power-evidence.md",
+    "oklo-ai-power-evidence.json",
+    "oklo-ai-power-broker.md",
+    "oklo-ai-power-broker.json",
+    "oklo-ai-power-exposure.md",
+    "oklo-ai-power-exposure.json",
+    "oklo-ai-power-drift.md",
+    "oklo-ai-power-drift.json",
+    "portfolio-summary.md",
+    "portfolio-summary.json",
+]
 
 
 def main() -> int:
@@ -155,6 +174,21 @@ def main() -> int:
                     str(temp_dir / f"{stem}-drift.json"),
                 ]
             )
+        _run(
+            [
+                sys.executable,
+                "-m",
+                "invest_thesis_ledger",
+                "portfolio",
+                str(EXAMPLES[0]),
+                str(EXAMPLES[1]),
+                "--output",
+                str(temp_dir / "portfolio-summary.md"),
+                "--json-output",
+                str(temp_dir / "portfolio-summary.json"),
+            ]
+        )
+        _check_fixtures(temp_dir)
         _run([sys.executable, "-m", "unittest", "discover", "-s", str(ROOT / "tests")])
     print("selfcheck: ok")
     return 0
@@ -162,6 +196,18 @@ def main() -> int:
 
 def _run(command: list[str]) -> None:
     subprocess.run(command, cwd=ROOT, check=True)
+
+
+def _check_fixtures(temp_dir: Path) -> None:
+    output_dir = ROOT / "examples" / "output"
+    drifted = []
+    for filename in FIXTURE_OUTPUTS:
+        generated = temp_dir / filename
+        checked_in = output_dir / filename
+        if generated.read_text(encoding="utf-8") != checked_in.read_text(encoding="utf-8"):
+            drifted.append(filename)
+    if drifted:
+        raise SystemExit("selfcheck: fixture drift: " + ", ".join(drifted))
 
 
 if __name__ == "__main__":

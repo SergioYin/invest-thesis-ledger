@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.0 - 2026-05-12
+
+- Added `portfolio` command for deterministic aggregation across two or more ledgers.
+- Added portfolio Markdown/JSON outputs for assets, thesis count, risk severity counts, risk tag counts, catalyst status/window/date lists, broker rating counts, review decisions, and stale source warnings.
+- Added checked-in portfolio example outputs generated from the Oklo and leveraged ETF examples.
+- Updated README, schema docs, tests, and selfcheck for portfolio coverage.
+
 ## 0.3.0 - 2026-05-12
 
 - Added `broker-matrix` command for broker, desk, or institution rating/target/thesis matrices.
