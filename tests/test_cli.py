@@ -116,6 +116,14 @@ class CliTests(unittest.TestCase):
         self.assertIn("ARCHIVE_DIR", verify_archive.stdout)
         self.assertIn("verify a deterministic portable research archive", verify_archive.stdout)
 
+        diff_archive = self.run_cli("diff-archive", "--help")
+        self.assertEqual(diff_archive.returncode, 0, diff_archive.stderr)
+        self.assertIn("OLD_ARCHIVE_DIR", diff_archive.stdout)
+        self.assertIn("NEW_ARCHIVE_DIR", diff_archive.stdout)
+        self.assertIn("compare two deterministic portable research archives", diff_archive.stdout)
+        self.assertIn("write Markdown output to PATH", diff_archive.stdout)
+        self.assertIn("write JSON output to PATH", diff_archive.stdout)
+
         decision_memo = self.run_cli("decision-memo", "--help")
         self.assertEqual(decision_memo.returncode, 0, decision_memo.stderr)
         self.assertIn("LEDGER", decision_memo.stdout)
@@ -1698,7 +1706,7 @@ class CliTests(unittest.TestCase):
             self.assertIn("# Watchlist", (output_dir / "watchlist.md").read_text())
             self.assertIn("# Weekly Action Plan", (output_dir / "action-plan.md").read_text())
             manifest = json.loads((output_dir / "manifest.json").read_text())
-            self.assertEqual(manifest["tool_version"], "1.5.0")
+            self.assertEqual(manifest["tool_version"], "1.6.0")
             self.assertEqual(manifest["ledger_ids"], ["oklo-ai-power", "leveraged-etf-discipline"])
             self.assertEqual(manifest["generated_files"], expected_files)
             index_links = [
@@ -1846,11 +1854,11 @@ class CliTests(unittest.TestCase):
             self.assertEqual(sorted(path.name for path in output_dir.iterdir()), sorted(expected_files))
             manifest = json.loads((output_dir / "manifest.json").read_text())
             self.assertEqual(manifest["archive_format"], "portable-research-archive")
-            self.assertEqual(manifest["tool_version"], "1.5.0")
+            self.assertEqual(manifest["tool_version"], "1.6.0")
             self.assertEqual(manifest["ledger_ids"], ["oklo-ai-power", "leveraged-etf-discipline"])
             self.assertEqual(manifest["generated_files"], expected_files)
             summary = json.loads((output_dir / "archive-summary.json").read_text())
-            self.assertEqual(summary["tool_version"], "1.5.0")
+            self.assertEqual(summary["tool_version"], "1.6.0")
             self.assertEqual(summary["ledger_ids"], manifest["ledger_ids"])
             self.assertEqual(summary["archive"]["ledger_count"], 2)
             self.assertEqual(summary["archive"]["file_count"], len(expected_files))
@@ -2061,6 +2069,164 @@ class CliTests(unittest.TestCase):
             self.assertEqual(result.returncode, 1)
             self.assertIn("workflow/dependency files present: .github/workflows/ci.yml, requirements.txt", result.stdout)
 
+    def test_diff_archive_reports_unchanged_fixture_copy(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            old_archive = Path(temp) / "old"
+            new_archive = Path(temp) / "new"
+            output = Path(temp) / "diff.md"
+            json_output = Path(temp) / "diff.json"
+            shutil.copytree(ARCHIVE_FIXTURE, old_archive)
+            shutil.copytree(ARCHIVE_FIXTURE, new_archive)
+            result = self.run_cli(
+                "diff-archive",
+                str(old_archive),
+                str(new_archive),
+                "--output",
+                str(output),
+                "--json-output",
+                str(json_output),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(json_output.read_text())
+            self.assertEqual(payload["status"], "unchanged")
+            self.assertEqual(payload["added_files"], [])
+            self.assertEqual(payload["removed_files"], [])
+            self.assertEqual(payload["changed_files"], [])
+            self.assertEqual(payload["unchanged_count"], 19)
+            self.assertEqual(payload["old_ledger_ids"], ["oklo-ai-power", "leveraged-etf-discipline"])
+            self.assertEqual(payload["new_ledger_ids"], payload["old_ledger_ids"])
+            self.assertIn("- Status: unchanged", output.read_text())
+            self.assertIn("- none", output.read_text())
+
+    def test_diff_archive_reports_changed_hash_for_tampered_valid_new_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            old_archive = Path(temp) / "old"
+            new_archive = Path(temp) / "new"
+            output = Path(temp) / "diff.md"
+            json_output = Path(temp) / "diff.json"
+            shutil.copytree(ARCHIVE_FIXTURE, old_archive)
+            shutil.copytree(ARCHIVE_FIXTURE, new_archive)
+            changed_path = new_archive / "portfolio.md"
+            changed_path.write_text("tampered but rehashed\n", encoding="utf-8")
+            summary_path = new_archive / "archive-summary.json"
+            summary = json.loads(summary_path.read_text())
+            summary["file_hashes"]["portfolio.md"] = hashlib.sha256(changed_path.read_bytes()).hexdigest()
+            summary_path.write_text(json.dumps(summary, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+            result = self.run_cli(
+                "diff-archive",
+                str(old_archive),
+                str(new_archive),
+                "--output",
+                str(output),
+                "--json-output",
+                str(json_output),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(json_output.read_text())
+            self.assertEqual(payload["status"], "changed")
+            self.assertEqual(payload["changed_files"], ["portfolio.md"])
+            self.assertEqual(payload["unchanged_count"], 18)
+            self.assertIn("- portfolio.md", output.read_text())
+
+    def test_diff_archive_reports_added_and_removed_files_from_manifest_and_summary(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            old_archive = Path(temp) / "old"
+            new_archive = Path(temp) / "new"
+            output = Path(temp) / "diff.md"
+            json_output = Path(temp) / "diff.json"
+            shutil.copytree(ARCHIVE_FIXTURE, old_archive)
+            shutil.copytree(ARCHIVE_FIXTURE, new_archive)
+
+            (new_archive / "notes.md").write_text("new archive note\n", encoding="utf-8")
+            (new_archive / "watchlist.md").unlink()
+            manifest_path = new_archive / "manifest.json"
+            manifest = json.loads(manifest_path.read_text())
+            manifest["generated_files"] = [
+                item for item in manifest["generated_files"] if item != "watchlist.md"
+            ] + ["notes.md"]
+            manifest_path.write_text(json.dumps(manifest, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+
+            summary_path = new_archive / "archive-summary.json"
+            summary = json.loads(summary_path.read_text())
+            summary["generated_files"] = list(manifest["generated_files"])
+            summary["file_hashes"].pop("watchlist.md")
+            summary["file_hashes"]["notes.md"] = hashlib.sha256((new_archive / "notes.md").read_bytes()).hexdigest()
+            summary["file_hashes"]["manifest.json"] = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+            summary["archive"]["file_count"] = len(summary["generated_files"])
+            summary["archive"]["hashed_file_count"] = len(summary["file_hashes"])
+            summary_path.write_text(json.dumps(summary, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+
+            result = self.run_cli(
+                "diff-archive",
+                str(old_archive),
+                str(new_archive),
+                "--output",
+                str(output),
+                "--json-output",
+                str(json_output),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(json_output.read_text())
+            self.assertEqual(payload["status"], "changed")
+            self.assertEqual(payload["added_files"], ["notes.md"])
+            self.assertEqual(payload["removed_files"], ["watchlist.md"])
+            self.assertEqual(payload["changed_files"], ["manifest.json"])
+            self.assertEqual(payload["old_file_count"], 19)
+            self.assertEqual(payload["new_file_count"], 19)
+            markdown = output.read_text()
+            self.assertIn("## Added Files\n\n- notes.md", markdown)
+            self.assertIn("## Removed Files\n\n- watchlist.md", markdown)
+
+    def test_diff_archive_reuses_invalid_archive_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            old_archive = Path(temp) / "old"
+            new_archive = Path(temp) / "new"
+            output = Path(temp) / "diff.md"
+            json_output = Path(temp) / "diff.json"
+            shutil.copytree(ARCHIVE_FIXTURE, old_archive)
+            shutil.copytree(ARCHIVE_FIXTURE, new_archive)
+            (new_archive / "portfolio.md").write_text("tampered\n", encoding="utf-8")
+            result = self.run_cli(
+                "diff-archive",
+                str(old_archive),
+                str(new_archive),
+                "--output",
+                str(output),
+                "--json-output",
+                str(json_output),
+            )
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("archive validation summary", result.stdout)
+            self.assertIn("status: invalid", result.stdout)
+            self.assertIn("sha256 mismatch: portfolio.md", result.stdout)
+            self.assertFalse(output.exists())
+            self.assertFalse(json_output.exists())
+
+    def test_diff_archive_reports_malformed_archive_as_unreadable_archive(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            old_archive = Path(temp) / "old"
+            new_archive = Path(temp) / "new"
+            output = Path(temp) / "diff.md"
+            json_output = Path(temp) / "diff.json"
+            shutil.copytree(ARCHIVE_FIXTURE, old_archive)
+            shutil.copytree(ARCHIVE_FIXTURE, new_archive)
+            (new_archive / "manifest.json").write_text("{bad json", encoding="utf-8")
+            result = self.run_cli(
+                "diff-archive",
+                str(old_archive),
+                str(new_archive),
+                "--output",
+                str(output),
+                "--json-output",
+                str(json_output),
+            )
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("malformed archive", result.stderr)
+            self.assertIn("invalid JSON in manifest.json", result.stderr)
+            self.assertEqual(result.stdout, "")
+            self.assertFalse(output.exists())
+            self.assertFalse(json_output.exists())
+
     def test_html_dashboard_writes_static_no_js_dashboard_and_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             output_dir = Path(temp) / "html-dashboard"
@@ -2093,7 +2259,7 @@ class CliTests(unittest.TestCase):
             self.assertNotIn("<script", (output_dir / "index.html").read_text().lower())
             self.assertNotIn("@import", (output_dir / "style.css").read_text().lower())
             manifest = json.loads((output_dir / "manifest.json").read_text())
-            self.assertEqual(manifest["tool_version"], "1.5.0")
+            self.assertEqual(manifest["tool_version"], "1.6.0")
             self.assertEqual(manifest["ledger_ids"], ["oklo-ai-power", "leveraged-etf-discipline"])
             self.assertEqual(manifest["generated_files"], expected_files)
             self.assertNotIn("timestamp", manifest)
@@ -2289,7 +2455,7 @@ class CliTests(unittest.TestCase):
             self.assertEqual(second.returncode, 0, second.stderr)
             self.assertEqual(output_a.read_text(), output_b.read_text())
             payload = json.loads(output_a.read_text())
-            self.assertEqual(payload["ledger_version"], "1.5.0")
+            self.assertEqual(payload["ledger_version"], "1.6.0")
             self.assertEqual(payload["thesis_id"], "msft-thesis")
             self.assertEqual(payload["sources"][0]["id"], "S1")
             self.assertEqual(payload["assumptions"][0]["source_ids"], ["S1"])

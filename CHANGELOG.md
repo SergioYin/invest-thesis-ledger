@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.6.0 - 2026-05-12
+
+- Added `diff-archive` command for deterministic Markdown and JSON diffs between two verified portable research archives.
+- Reused archive verification before diffing, with exit code 1 for invalid archives and 2 for unreadable or malformed archive inputs.
+- Compared manifest generated files, archive-summary SHA-256 hashes, ledger IDs, tool versions, and file counts with added, removed, changed, and unchanged file counts.
+- Updated package/schema version, README, schema docs, tests, selfcheck, and checked-in fixtures for v1.6.0.
+
 ## 1.5.0 - 2026-05-12
 
 - Added `verify-archive` command for deterministic portable archive verification.

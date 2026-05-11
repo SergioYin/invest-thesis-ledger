@@ -1,0 +1,19 @@
+{
+  "added_files": [],
+  "changed_files": [],
+  "new_file_count": 19,
+  "new_ledger_ids": [
+    "oklo-ai-power",
+    "leveraged-etf-discipline"
+  ],
+  "new_tool_version": "1.6.0",
+  "old_file_count": 19,
+  "old_ledger_ids": [
+    "oklo-ai-power",
+    "leveraged-etf-discipline"
+  ],
+  "old_tool_version": "1.6.0",
+  "removed_files": [],
+  "status": "unchanged",
+  "unchanged_count": 19
+}

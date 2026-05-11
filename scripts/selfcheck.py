@@ -82,6 +82,8 @@ FIXTURE_OUTPUTS = [
     "archive/action-plan.md",
     "archive/manifest.json",
     "archive/archive-summary.json",
+    "archive-diff.md",
+    "archive-diff.json",
     "html-dashboard/index.html",
     "html-dashboard/style.css",
     "html-dashboard/oklo-ai-power.html",
@@ -351,6 +353,20 @@ def main() -> int:
             ]
         )
         _run([sys.executable, "-m", "invest_thesis_ledger", "verify-archive", str(temp_dir / "archive")])
+        _run(
+            [
+                sys.executable,
+                "-m",
+                "invest_thesis_ledger",
+                "diff-archive",
+                str(temp_dir / "archive"),
+                str(temp_dir / "archive"),
+                "--output",
+                str(temp_dir / "archive-diff.md"),
+                "--json-output",
+                str(temp_dir / "archive-diff.json"),
+            ]
+        )
         _run(
             [
                 sys.executable,

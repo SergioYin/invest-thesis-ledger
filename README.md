@@ -7,8 +7,8 @@ reports, broker/institution matrices, exposure checklists, deterministic
 starter ledger generation, decision memos, scenario plans, portfolio-level
 summaries, portfolio evidence audits, review queues, weekly watchlists, weekly
 action plans, static demo bundles, portable research archives, archive
-verification, and no-JS HTML dashboards. v1.5.0 adds archive verification while
-preserving compatibility with v0.1.0 through v1.4.0 ledgers.
+verification, archive diffs, and no-JS HTML dashboards. v1.6.0 adds archive
+diffs while preserving compatibility with v0.1.0 through v1.5.0 ledgers.
 
 This project is for research organization only. It is not investment advice.
 
@@ -159,6 +159,12 @@ Verify a portable research archive:
 python -m invest_thesis_ledger verify-archive research-archive
 ```
 
+Compare two verified portable research archives:
+
+```bash
+python -m invest_thesis_ledger diff-archive old-archive new-archive --output archive-diff.md --json-output archive-diff.json
+```
+
 Write a static deterministic no-JS HTML dashboard:
 
 ```bash
@@ -179,7 +185,7 @@ input file list.
 
 ## Ledger Format
 
-Ledgers are JSON objects. The v1.5.0 required fields are:
+Ledgers are JSON objects. The v1.6.0 required fields are:
 
 - `ledger_version`
 - `thesis_id`
@@ -216,7 +222,7 @@ ID.
 optional string `tags`; `exposure` combines these risk tags with position rules
 into a checklist.
 
-The formal v1.5.0 schema reference is in `docs/ledger-schema.md`.
+The formal v1.6.0 schema reference is in `docs/ledger-schema.md`.
 
 See:
 
@@ -361,6 +367,12 @@ metadata contains no timestamps or absolute paths. `verify-archive` reads
 relative archive-local paths, SHA-256 hashes, self-hash exclusion, and the
 absence of workflow or dependency files. It exits 0 for a valid archive, 1 for
 content validation failures, and 2 for unreadable or malformed archive inputs.
+`diff-archive` first applies the same verification semantics to both archives;
+it exits 2 for unreadable or malformed archive inputs and exits 1 with
+deterministic validation errors for invalid archives. When both archives are
+valid, it writes Markdown and JSON with added, removed, changed, and unchanged
+file information plus old/new ledger IDs, tool versions, file counts, and
+changed/unchanged status.
 
 `html-dashboard` validates all input ledgers before writing anything, then
 cleanly overwrites the target output directory with static HTML/CSS files:

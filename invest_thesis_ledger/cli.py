@@ -194,6 +194,16 @@ def build_parser() -> argparse.ArgumentParser:
     verify_archive.add_argument("archive_dir", metavar="ARCHIVE_DIR", help="archive directory created by archive")
     verify_archive.set_defaults(func=_cmd_verify_archive)
 
+    diff_archive = subparsers.add_parser(
+        "diff-archive",
+        help="compare two deterministic portable research archives",
+        description="compare two deterministic portable research archives.",
+    )
+    diff_archive.add_argument("old_archive_dir", metavar="OLD_ARCHIVE_DIR", help="prior archive directory")
+    diff_archive.add_argument("new_archive_dir", metavar="NEW_ARCHIVE_DIR", help="current archive directory")
+    _add_output_args(diff_archive)
+    diff_archive.set_defaults(func=_cmd_diff_archive)
+
     html_dashboard = subparsers.add_parser(
         "html-dashboard",
         help="write a static no-JS HTML dashboard from two or more ledgers",
@@ -492,6 +502,42 @@ def _cmd_verify_archive(args: argparse.Namespace) -> int:
 
     sys.stdout.write(_archive_validation_summary(summary, errors))
     return 1 if errors else 0
+
+
+def _cmd_diff_archive(args: argparse.Namespace) -> int:
+    old_archive_dir = Path(args.old_archive_dir)
+    new_archive_dir = Path(args.new_archive_dir)
+    try:
+        old_errors, old_summary = _read_archive_for_diff(old_archive_dir)
+        new_errors, new_summary = _read_archive_for_diff(new_archive_dir)
+    except OSError as exc:
+        sys.stderr.write(f"error: cannot read archive {exc}\n")
+        return 2
+    except ValueError as exc:
+        sys.stderr.write(f"error: malformed archive {exc}\n")
+        return 2
+
+    if old_errors or new_errors:
+        if old_errors:
+            sys.stdout.write(_archive_validation_summary(old_summary, old_errors))
+        if new_errors:
+            sys.stdout.write(_archive_validation_summary(new_summary, new_errors))
+        return 1
+
+    payload = _archive_diff_payload(old_summary, new_summary)
+    _write_text(args.output, _render_archive_diff(payload))
+    _write_text(args.json_output, to_json(payload))
+    sys.stdout.write(f"wrote: {args.output}, {args.json_output}\n")
+    return 0
+
+
+def _read_archive_for_diff(archive_dir: Path) -> tuple[list[str], dict]:
+    try:
+        return _verify_archive_dir(archive_dir)
+    except OSError as exc:
+        raise OSError(f"{archive_dir}: {exc}") from exc
+    except ValueError as exc:
+        raise ValueError(f"{archive_dir}: {exc}") from exc
 
 
 def _cmd_html_dashboard(args: argparse.Namespace) -> int:
@@ -800,9 +846,11 @@ def _verify_archive_dir(archive_dir: Path) -> tuple[list[str], dict]:
 
     validation = {
         "archive_dir": str(archive_dir),
+        "archive_summary": summary,
         "file_count": len(generated_files),
         "hashed_file_count": len(file_hashes),
         "ledger_count": _summary_ledger_count(summary),
+        "manifest": manifest,
     }
     return errors, validation
 
@@ -885,6 +933,120 @@ def _archive_validation_summary(summary: Mapping[str, object], errors: Sequence[
         lines.append("errors:")
         lines.extend(f"- {error}" for error in sorted(errors))
     return "\n".join(lines) + "\n"
+
+
+def _archive_diff_payload(old_summary: Mapping[str, object], new_summary: Mapping[str, object]) -> dict:
+    old_manifest = _archive_validation_object(old_summary, "manifest")
+    new_manifest = _archive_validation_object(new_summary, "manifest")
+    old_archive_summary = _archive_validation_object(old_summary, "archive_summary")
+    new_archive_summary = _archive_validation_object(new_summary, "archive_summary")
+
+    old_files = _require_string_list(old_manifest, "generated_files", "old manifest.json")
+    new_files = _require_string_list(new_manifest, "generated_files", "new manifest.json")
+    old_hashes = _require_string_mapping(old_archive_summary, "file_hashes", "old archive-summary.json")
+    new_hashes = _require_string_mapping(new_archive_summary, "file_hashes", "new archive-summary.json")
+
+    old_file_set = set(old_files)
+    new_file_set = set(new_files)
+    added_files = sorted(new_file_set - old_file_set)
+    removed_files = sorted(old_file_set - new_file_set)
+    common_files = sorted(old_file_set & new_file_set)
+    changed_files = [
+        filename
+        for filename in common_files
+        if filename in old_hashes and filename in new_hashes and old_hashes[filename] != new_hashes[filename]
+    ]
+    unchanged_count = sum(
+        1
+        for filename in common_files
+        if filename not in old_hashes and filename not in new_hashes
+        or filename in old_hashes
+        and filename in new_hashes
+        and old_hashes[filename] == new_hashes[filename]
+    )
+
+    old_ledger_ids = _require_string_list(old_manifest, "ledger_ids", "old manifest.json")
+    new_ledger_ids = _require_string_list(new_manifest, "ledger_ids", "new manifest.json")
+    old_tool_version = str(old_manifest.get("tool_version", ""))
+    new_tool_version = str(new_manifest.get("tool_version", ""))
+    old_file_count = _archive_file_count(old_archive_summary, old_files)
+    new_file_count = _archive_file_count(new_archive_summary, new_files)
+    changed = bool(
+        added_files
+        or removed_files
+        or changed_files
+        or old_ledger_ids != new_ledger_ids
+        or old_tool_version != new_tool_version
+        or old_file_count != new_file_count
+    )
+
+    return {
+        "added_files": added_files,
+        "changed_files": changed_files,
+        "new_file_count": new_file_count,
+        "new_ledger_ids": new_ledger_ids,
+        "new_tool_version": new_tool_version,
+        "old_file_count": old_file_count,
+        "old_ledger_ids": old_ledger_ids,
+        "old_tool_version": old_tool_version,
+        "removed_files": removed_files,
+        "status": "changed" if changed else "unchanged",
+        "unchanged_count": unchanged_count,
+    }
+
+
+def _archive_validation_object(summary: Mapping[str, object], key: str) -> Mapping[str, object]:
+    value = summary.get(key)
+    if not isinstance(value, dict):
+        raise ValueError(f"archive validation missing {key}")
+    return value
+
+
+def _archive_file_count(summary: Mapping[str, object], generated_files: Sequence[str]) -> int:
+    archive = summary.get("archive")
+    if isinstance(archive, dict) and isinstance(archive.get("file_count"), int):
+        return archive["file_count"]
+    return len(generated_files)
+
+
+def _render_archive_diff(payload: Mapping[str, object]) -> str:
+    lines = [
+        "# Archive Diff",
+        "",
+        f"- Status: {payload['status']}",
+        f"- Old Tool Version: {payload['old_tool_version']}",
+        f"- New Tool Version: {payload['new_tool_version']}",
+        f"- Old File Count: {payload['old_file_count']}",
+        f"- New File Count: {payload['new_file_count']}",
+        f"- Unchanged Files: {payload['unchanged_count']}",
+        "",
+        "## Ledger IDs",
+        "",
+        f"- Old: {_archive_diff_list(payload['old_ledger_ids'])}",
+        f"- New: {_archive_diff_list(payload['new_ledger_ids'])}",
+        "",
+        "## Added Files",
+        "",
+    ]
+    lines.extend(_archive_diff_bullets(payload["added_files"]))
+    lines.extend(["", "## Removed Files", ""])
+    lines.extend(_archive_diff_bullets(payload["removed_files"]))
+    lines.extend(["", "## Changed Files", ""])
+    lines.extend(_archive_diff_bullets(payload["changed_files"]))
+    return "\n".join(lines) + "\n"
+
+
+def _archive_diff_list(value: object) -> str:
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
+        return "none"
+    items = [str(item) for item in value]
+    return ", ".join(items) if items else "none"
+
+
+def _archive_diff_bullets(value: object) -> list[str]:
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes)) or not value:
+        return ["- none"]
+    return [f"- {item}" for item in value]
 
 
 def _render_archive_readme(ledgers: Sequence[dict], generated_files: Sequence[str]) -> str:
