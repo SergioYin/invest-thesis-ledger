@@ -350,6 +350,7 @@ def main() -> int:
                 str(temp_dir / "archive"),
             ]
         )
+        _run([sys.executable, "-m", "invest_thesis_ledger", "verify-archive", str(temp_dir / "archive")])
         _run(
             [
                 sys.executable,

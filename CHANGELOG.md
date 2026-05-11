@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.5.0 - 2026-05-12
+
+- Added `verify-archive` command for deterministic portable archive verification.
+- Verified archive manifests, summaries, generated file presence, local relative paths, SHA-256 hashes, self-hash exclusion, and absence of workflow or dependency files.
+- Added explicit verifier exit codes: 0 for valid archives, 1 for content validation failures, and 2 for unreadable or malformed archive inputs.
+- Updated package/schema version, README, schema docs, tests, selfcheck, and checked-in fixtures for v1.5.0.
+
 ## 1.4.0 - 2026-05-12
 
 - Added `archive` command for deterministic portable research archives across two or more ledgers.

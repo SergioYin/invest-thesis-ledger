@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import html
+import json
 import shutil
 import sys
 import tempfile
@@ -184,6 +185,14 @@ def build_parser() -> argparse.ArgumentParser:
     archive.add_argument("ledgers", metavar="LEDGER", nargs="+", help="ledger JSON file")
     archive.add_argument("--output-dir", required=True, metavar="DIR", help="write portable archive to DIR")
     archive.set_defaults(func=_cmd_archive)
+
+    verify_archive = subparsers.add_parser(
+        "verify-archive",
+        help="verify a deterministic portable research archive",
+        description="verify a deterministic portable research archive.",
+    )
+    verify_archive.add_argument("archive_dir", metavar="ARCHIVE_DIR", help="archive directory created by archive")
+    verify_archive.set_defaults(func=_cmd_verify_archive)
 
     html_dashboard = subparsers.add_parser(
         "html-dashboard",
@@ -470,6 +479,21 @@ def _cmd_archive(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_verify_archive(args: argparse.Namespace) -> int:
+    archive_dir = Path(args.archive_dir)
+    try:
+        errors, summary = _verify_archive_dir(archive_dir)
+    except OSError as exc:
+        sys.stderr.write(f"error: cannot read archive {archive_dir}: {exc}\n")
+        return 2
+    except ValueError as exc:
+        sys.stderr.write(f"error: malformed archive {archive_dir}: {exc}\n")
+        return 2
+
+    sys.stdout.write(_archive_validation_summary(summary, errors))
+    return 1 if errors else 0
+
+
 def _cmd_html_dashboard(args: argparse.Namespace) -> int:
     ledgers, status = _load_validated_ledgers(args.ledgers, "html-dashboard")
     if ledgers is None:
@@ -697,6 +721,170 @@ def _archive_summary(
         "ledger_ids": [str(ledger["thesis_id"]) for ledger in ledgers],
         "tool_version": __version__,
     }
+
+
+_ARCHIVE_DEPENDENCY_FILENAMES = {
+    "Pipfile",
+    "Pipfile.lock",
+    "poetry.lock",
+    "pyproject.toml",
+    "requirements.txt",
+    "uv.lock",
+}
+
+
+def _verify_archive_dir(archive_dir: Path) -> tuple[list[str], dict]:
+    if not archive_dir.is_dir():
+        raise OSError(f"not a directory: {archive_dir}")
+
+    manifest = _read_archive_json(archive_dir / "manifest.json", "manifest.json")
+    summary = _read_archive_json(archive_dir / "archive-summary.json", "archive-summary.json")
+    manifest_files = _require_string_list(manifest, "generated_files", "manifest.json")
+    summary_files = _require_string_list(summary, "generated_files", "archive-summary.json")
+    file_hashes = _require_string_mapping(summary, "file_hashes", "archive-summary.json")
+
+    errors: list[str] = []
+    generated_files = _stable_unique(manifest_files + summary_files)
+    hash_files = sorted(file_hashes)
+
+    if manifest.get("archive_format") != "portable-research-archive":
+        errors.append("manifest archive_format is not portable-research-archive")
+    if manifest_files != summary_files:
+        errors.append("manifest generated_files do not match archive-summary generated_files")
+    if "archive-summary.json" not in manifest_files or "archive-summary.json" not in summary_files:
+        errors.append("archive-summary.json is missing from generated_files")
+    if "archive-summary.json" in file_hashes:
+        errors.append("archive-summary.json must be excluded from file_hashes")
+
+    expected_hash_files = sorted(filename for filename in manifest_files if filename != "archive-summary.json")
+    if hash_files != expected_hash_files:
+        missing_hashes = sorted(set(expected_hash_files) - set(hash_files))
+        extra_hashes = sorted(set(hash_files) - set(expected_hash_files))
+        if missing_hashes:
+            errors.append("missing file_hashes entries: " + ", ".join(missing_hashes))
+        if extra_hashes:
+            errors.append("unexpected file_hashes entries: " + ", ".join(extra_hashes))
+
+    for source_name, filenames in (("manifest.json", manifest_files), ("archive-summary.json", summary_files)):
+        for filename in filenames:
+            if not _is_archive_local_filename(filename):
+                errors.append(f"{source_name} generated_files contains external path: {filename}")
+    for filename in file_hashes:
+        if not _is_archive_local_filename(filename):
+            errors.append(f"archive-summary.json file_hashes contains external path: {filename}")
+
+    for filename in generated_files:
+        if _is_archive_local_filename(filename) and not (archive_dir / filename).is_file():
+            errors.append(f"missing generated file: {filename}")
+
+    for filename, expected_digest in sorted(file_hashes.items()):
+        if not _is_archive_local_filename(filename):
+            continue
+        path = archive_dir / filename
+        if not path.is_file():
+            continue
+        actual_digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        if actual_digest != expected_digest:
+            errors.append(f"sha256 mismatch: {filename}")
+
+    present_forbidden = _archive_forbidden_files(archive_dir)
+    if present_forbidden:
+        errors.append("workflow/dependency files present: " + ", ".join(present_forbidden))
+
+    archive_counts = summary.get("archive")
+    if isinstance(archive_counts, dict):
+        if archive_counts.get("file_count") != len(summary_files):
+            errors.append("archive file_count does not match generated_files")
+        if archive_counts.get("hashed_file_count") != len(file_hashes):
+            errors.append("archive hashed_file_count does not match file_hashes")
+
+    validation = {
+        "archive_dir": str(archive_dir),
+        "file_count": len(generated_files),
+        "hashed_file_count": len(file_hashes),
+        "ledger_count": _summary_ledger_count(summary),
+    }
+    return errors, validation
+
+
+def _read_archive_json(path: Path, label: str) -> dict:
+    text = path.read_text(encoding="utf-8")
+    try:
+        payload = json.loads(text)
+    except ValueError as exc:
+        raise ValueError(f"invalid JSON in {label}: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise ValueError(f"{label} must contain a JSON object")
+    return payload
+
+
+def _require_string_list(payload: Mapping[str, object], key: str, label: str) -> list[str]:
+    value = payload.get(key)
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise ValueError(f"{label} {key} must be a list of strings")
+    return list(value)
+
+
+def _require_string_mapping(payload: Mapping[str, object], key: str, label: str) -> dict[str, str]:
+    value = payload.get(key)
+    if not isinstance(value, dict) or not all(isinstance(k, str) and isinstance(v, str) for k, v in value.items()):
+        raise ValueError(f"{label} {key} must be an object mapping strings to strings")
+    return dict(value)
+
+
+def _is_archive_local_filename(filename: str) -> bool:
+    path = Path(filename)
+    return bool(filename) and not path.is_absolute() and path.name == filename and "://" not in filename
+
+
+def _archive_forbidden_files(archive_dir: Path) -> list[str]:
+    forbidden: set[str] = set()
+    for path in archive_dir.rglob("*"):
+        if not path.is_file():
+            continue
+        relative = path.relative_to(archive_dir).as_posix()
+        if relative.startswith(".github/workflows/"):
+            forbidden.add(relative)
+        if path.name in _ARCHIVE_DEPENDENCY_FILENAMES:
+            forbidden.add(relative)
+        if path.name.startswith("requirements") and path.suffix == ".txt":
+            forbidden.add(relative)
+    return sorted(forbidden)
+
+
+def _stable_unique(items: Sequence[str]) -> list[str]:
+    seen: set[str] = set()
+    unique: list[str] = []
+    for item in items:
+        if item not in seen:
+            unique.append(item)
+            seen.add(item)
+    return unique
+
+
+def _summary_ledger_count(summary: Mapping[str, object]) -> int:
+    archive = summary.get("archive")
+    if isinstance(archive, dict) and isinstance(archive.get("ledger_count"), int):
+        return archive["ledger_count"]
+    ledger_ids = summary.get("ledger_ids")
+    if isinstance(ledger_ids, list):
+        return len(ledger_ids)
+    return 0
+
+
+def _archive_validation_summary(summary: Mapping[str, object], errors: Sequence[str]) -> str:
+    lines = [
+        "archive validation summary",
+        f"archive: {summary['archive_dir']}",
+        f"ledgers: {summary['ledger_count']}",
+        f"generated_files: {summary['file_count']}",
+        f"hashed_files: {summary['hashed_file_count']}",
+        f"status: {'invalid' if errors else 'valid'}",
+    ]
+    if errors:
+        lines.append("errors:")
+        lines.extend(f"- {error}" for error in sorted(errors))
+    return "\n".join(lines) + "\n"
 
 
 def _render_archive_readme(ledgers: Sequence[dict], generated_files: Sequence[str]) -> str:
