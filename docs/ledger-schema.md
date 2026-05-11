@@ -1,7 +1,7 @@
-# Ledger Schema v1.1.0
+# Ledger Schema v1.2.0
 
 This document defines the JSON ledger format accepted by `invest-thesis-ledger`
-v1.1.0. Ledgers are research organization records only and are not investment
+v1.2.0. Ledgers are research organization records only and are not investment
 advice.
 
 ## Document Shape
@@ -15,7 +15,7 @@ without breaking the renderer.
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `ledger_version` | string | Schema version. v1.1.0 ledgers should use `"1.1.0"`. v0.1.0 through v1.0.0 remain accepted for compatibility; other values validate with a warning. |
+| `ledger_version` | string | Schema version. v1.2.0 ledgers should use `"1.2.0"`. v0.1.0 through v1.1.0 remain accepted for compatibility; other values validate with a warning. |
 | `thesis_id` | string | Stable machine-readable ledger identifier. |
 | `title` | string | Human-readable thesis title. |
 | `asset` | object | Asset metadata. |
@@ -183,7 +183,7 @@ source, and duplicate source references within one item are invalid.
 
 ## Determinism
 
-For the same input file or ordered input file list, v1.1.0 CLI outputs are
+For the same input file or ordered input file list, v1.2.0 CLI outputs are
 deterministic:
 
 - JSON outputs are serialized with sorted keys and two-space indentation.
@@ -196,6 +196,10 @@ deterministic:
   item fields.
 - Review queue and watchlist items are sorted by descending score, priority,
   ticker, ledger ID, and title.
+- Action plan items are sorted by cadence, descending review score, priority,
+  lower source quality score, stable asset/ledger fields, and finally the
+  normalized action payload so duplicate thesis IDs and tickers do not fall
+  back to input order.
 - Review queue reasons are sorted by the scoring categories documented below;
   reason item IDs use the stable order for their source report, risk,
   checklist, or position-rule type.
@@ -217,7 +221,7 @@ deterministic:
 - `init-template` uses fixed placeholder dates so repeated runs with the same
   arguments produce byte-identical JSON.
 
-## v1.1.0 Reports
+## v1.2.0 Reports
 
 `compare <old.json> <new.json> --output drift.md --json-output drift.json`
 loads and validates both ledgers, then compares:
@@ -288,7 +292,7 @@ Evidence gaps are ordered by review priority: low-confidence assumptions, stale
 sources, unused sources, then unsupported evidence items.
 
 `init-template --asset TICKER --name NAME --type TYPE --output ledger.json`
-writes a deterministic starter ledger with v1.1.0 fields, fixed placeholder
+writes a deterministic starter ledger with v1.2.0 fields, fixed placeholder
 dates, one source-backed assumption, one risk, one review, and a thesis ID
 derived from the ticker.
 
@@ -381,6 +385,28 @@ The nearest open catalyst is the earliest unresolved catalyst on or after
 earlier. Exact ties are broken by date presence, date, window, ID, title, and
 status. The latest review is selected by date, then decision, summary, and
 source IDs so same-day review ties do not depend on input order.
+
+```bash
+action-plan <ledger-a.json> <ledger-b.json> [...] --output action-plan.md --json-output action-plan.json
+```
+
+The `action-plan` command loads and validates every input ledger before writing
+output. It requires at least two ledgers and creates an educational weekly
+workflow without market data. The plan composes existing normalized payloads:
+
+- review queue scores, priorities, reasons, and next action text
+- watchlist nearest open catalyst, latest review, and weekly counts
+- evidence audit coverage and per-ledger source quality score
+- risk high-severity records and checklist status
+- exposure open position rules and tag counts
+- catalyst open status records
+
+The Markdown and JSON outputs include ranked actions with a `TBD` owner
+placeholder, cadence labels (`now`, `this-week`, or `watch`), reason codes,
+blockers, source-quality warnings, and per-ledger next checklists. Stale sources
+are source-quality blockers; unsupported and unused source records remain
+warnings for review. The rendered language is for research organization only
+and is not investment advice.
 
 ```bash
 demo-bundle <ledger-a.json> <ledger-b.json> [...] --output-dir demo-bundle

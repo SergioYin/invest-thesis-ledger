@@ -1,0 +1,639 @@
+{
+  "action_plan": {
+    "action_count": 2,
+    "educational_only": true,
+    "includes_market_data": false,
+    "ledger_count": 2,
+    "now_count": 2,
+    "this_week_count": 0,
+    "watch_count": 0
+  },
+  "actions": [
+    {
+      "action": "Review high-severity risks and update mitigation evidence.",
+      "asset_name": "Generic 2x Equity Index ETF",
+      "asset_type": "fund",
+      "blockers": [
+        {
+          "code": "CHECKLIST_OPEN",
+          "text": "C1: Record entry price, stop, target, and expiry date before trade."
+        },
+        {
+          "code": "CHECKLIST_OPEN",
+          "text": "C2: Confirm no earnings, CPI, FOMC, or other event invalidates sizing."
+        },
+        {
+          "code": "CHECKLIST_OPEN",
+          "text": "C3: Review realized leverage and tracking after each close."
+        },
+        {
+          "code": "EXPOSURE_OPEN_RULE",
+          "text": "P1: Limit planned holding period to five trading days."
+        },
+        {
+          "code": "EXPOSURE_OPEN_RULE",
+          "text": "P2: Cap notional exposure before order entry."
+        },
+        {
+          "code": "RISK_HIGH_SEVERITY",
+          "text": "R1: Volatility drag"
+        },
+        {
+          "code": "RISK_HIGH_SEVERITY",
+          "text": "R2: Oversized exposure"
+        }
+      ],
+      "cadence": "now",
+      "catalyst_payload": {
+        "open_catalysts": [
+          {
+            "date": "2026-06-10",
+            "id": "CAT2",
+            "status": "required",
+            "title": "Macro event calendar supports a time-boxed tactical setup.",
+            "window": ""
+          },
+          {
+            "date": "",
+            "id": "CAT1",
+            "status": "required",
+            "title": "Index breaks above predefined technical level.",
+            "window": "before entry"
+          }
+        ]
+      },
+      "evidence_audit_payload": {
+        "coverage": {
+          "source_count": 2,
+          "stale_source_count": 0,
+          "supported_items": 9,
+          "tracked_items": 13,
+          "unsupported_items": 4,
+          "unused_source_count": 0
+        },
+        "quality_score": 81
+      },
+      "exposure_payload": {
+        "open_position_rules": [
+          {
+            "exposure": "time-boxed tactical",
+            "id": "P1",
+            "rule": "Limit planned holding period to five trading days.",
+            "source_ids": [
+              "S1",
+              "S2"
+            ],
+            "status": "open",
+            "tags": [
+              "path-dependency",
+              "volatility"
+            ]
+          },
+          {
+            "exposure": "reduced notional",
+            "id": "P2",
+            "rule": "Cap notional exposure before order entry.",
+            "source_ids": [
+              "S1"
+            ],
+            "status": "open",
+            "tags": [
+              "sizing",
+              "leverage"
+            ]
+          }
+        ],
+        "tag_counts": {
+          "leverage": 2,
+          "path-dependency": 1,
+          "sizing": 1,
+          "volatility": 1
+        }
+      },
+      "latest_review": {
+        "date": "2026-05-19",
+        "decision": "policy"
+      },
+      "nearest_open_catalyst": {
+        "date": "2026-06-10",
+        "id": "CAT2",
+        "status": "required",
+        "title": "Macro event calendar supports a time-boxed tactical setup.",
+        "window": ""
+      },
+      "next_checklist": [
+        {
+          "id": "AP1",
+          "source": "review_queue",
+          "text": "Confirm the latest review summary and update the ledger if it has drifted."
+        },
+        {
+          "id": "AP2",
+          "source": "evidence_audit",
+          "text": "Refresh or annotate source-quality warnings before relying on the plan."
+        },
+        {
+          "id": "AP3",
+          "source": "risk_exposure_catalyst",
+          "text": "Review open risk, exposure, and catalyst records for source-backed status changes."
+        },
+        {
+          "id": "AP-RISK",
+          "source": "risk_payload",
+          "text": "Review high-severity risk IDs: R1, R2."
+        },
+        {
+          "id": "AP-CATALYST",
+          "source": "catalyst_payload",
+          "text": "Check open catalyst IDs: CAT2, CAT1."
+        },
+        {
+          "id": "AP-EXPOSURE",
+          "source": "exposure_payload",
+          "text": "Resolve open exposure rule IDs: P1, P2."
+        },
+        {
+          "id": "AP-CHECKLIST",
+          "source": "review_queue",
+          "text": "Update open checklist IDs: C1, C2, C3."
+        },
+        {
+          "id": "AP-SOURCES",
+          "source": "evidence_audit",
+          "text": "Address source warning codes: SOURCE_UNSUPPORTED_ITEM."
+        }
+      ],
+      "owner": "TBD",
+      "priority": "high",
+      "rank": 1,
+      "reason_codes": [
+        "EA_SOURCE_QUALITY_WARNING",
+        "RQ_HIGH_SEVERITY_RISKS",
+        "RQ_OPEN_CHECKLIST",
+        "RQ_OPEN_POSITION_RULES",
+        "RQ_UPCOMING_OPEN_CATALYSTS",
+        "WL_LATEST_REVIEW_RECORDED",
+        "WL_NEAREST_OPEN_CATALYST"
+      ],
+      "review_queue_payload": {
+        "next_action": "Review high-severity risks and update mitigation evidence.",
+        "reasons": [
+          {
+            "count": 2,
+            "items": [
+              "R1",
+              "R2"
+            ],
+            "score": 6,
+            "text": "2 high-severity risk(s) need human review.",
+            "type": "high_severity_risks"
+          },
+          {
+            "count": 2,
+            "items": [
+              "CAT2",
+              "CAT1"
+            ],
+            "score": 2,
+            "text": "2 upcoming or open catalyst(s) remain unresolved.",
+            "type": "upcoming_open_catalysts"
+          },
+          {
+            "count": 3,
+            "items": [
+              "C1",
+              "C2",
+              "C3"
+            ],
+            "score": 3,
+            "text": "3 checklist item(s) remain open.",
+            "type": "open_checklist"
+          },
+          {
+            "count": 2,
+            "items": [
+              "P1",
+              "P2"
+            ],
+            "score": 2,
+            "text": "2 position rule(s) remain open.",
+            "type": "open_position_rules"
+          }
+        ]
+      },
+      "risk_payload": {
+        "high_risks": [
+          {
+            "id": "R1",
+            "name": "Volatility drag",
+            "probability": "high",
+            "severity": "high"
+          },
+          {
+            "id": "R2",
+            "name": "Oversized exposure",
+            "probability": "medium",
+            "severity": "high"
+          }
+        ],
+        "risk_count": 2
+      },
+      "score": 13,
+      "source_quality_score": 81,
+      "source_quality_warnings": [
+        {
+          "code": "SOURCE_UNSUPPORTED_ITEM",
+          "item_id": "catalyst:CAT1",
+          "text": "catalyst CAT1 has no source reference."
+        },
+        {
+          "code": "SOURCE_UNSUPPORTED_ITEM",
+          "item_id": "checklist:C1",
+          "text": "checklist C1 has no source reference."
+        },
+        {
+          "code": "SOURCE_UNSUPPORTED_ITEM",
+          "item_id": "checklist:C2",
+          "text": "checklist C2 has no source reference."
+        },
+        {
+          "code": "SOURCE_UNSUPPORTED_ITEM",
+          "item_id": "checklist:C3",
+          "text": "checklist C3 has no source reference."
+        }
+      ],
+      "thesis_id": "leveraged-etf-discipline",
+      "ticker": "LEV2X",
+      "title": "Leveraged ETF Discipline Ledger",
+      "updated": "2026-05-12",
+      "watchlist_payload": {
+        "high_risk_count": 2,
+        "latest_review": {
+          "date": "2026-05-19",
+          "decision": "policy"
+        },
+        "nearest_open_catalyst": {
+          "date": "2026-06-10",
+          "id": "CAT2",
+          "status": "required",
+          "title": "Macro event calendar supports a time-boxed tactical setup.",
+          "window": ""
+        },
+        "open_position_rule_count": 2,
+        "stale_source_count": 0
+      }
+    },
+    {
+      "action": "Review high-severity risks and update mitigation evidence.",
+      "asset_name": "Oklo Inc.",
+      "asset_type": "equity",
+      "blockers": [
+        {
+          "code": "CHECKLIST_OPEN",
+          "text": "C1: Confirm latest cash balance and expected burn."
+        },
+        {
+          "code": "CHECKLIST_OPEN",
+          "text": "C2: Map each announced customer to binding contract evidence."
+        },
+        {
+          "code": "EXPOSURE_OPEN_RULE",
+          "text": "P1: Keep status at watchlist until a dated licensing update is source-backed."
+        },
+        {
+          "code": "EXPOSURE_OPEN_RULE",
+          "text": "P2: Do not size from AI power narrative without named contract evidence."
+        },
+        {
+          "code": "RISK_HIGH_SEVERITY",
+          "text": "R1: Licensing delay"
+        }
+      ],
+      "cadence": "now",
+      "catalyst_payload": {
+        "open_catalysts": [
+          {
+            "date": "2026-08-15",
+            "id": "CAT2",
+            "status": "watch",
+            "title": "Material licensing update with a clear review timeline.",
+            "window": ""
+          },
+          {
+            "date": "",
+            "id": "CAT1",
+            "status": "watch",
+            "title": "Signed commercial power purchase agreement with credible counterparty.",
+            "window": "2026-H2"
+          },
+          {
+            "date": "",
+            "id": "CAT3",
+            "status": "watch",
+            "title": "Capital raise or partnership that reduces funding risk.",
+            "window": "next financing update"
+          }
+        ]
+      },
+      "evidence_audit_payload": {
+        "coverage": {
+          "source_count": 3,
+          "stale_source_count": 0,
+          "supported_items": 13,
+          "tracked_items": 15,
+          "unsupported_items": 2,
+          "unused_source_count": 0
+        },
+        "quality_score": 92
+      },
+      "exposure_payload": {
+        "open_position_rules": [
+          {
+            "exposure": "watchlist",
+            "id": "P1",
+            "rule": "Keep status at watchlist until a dated licensing update is source-backed.",
+            "source_ids": [
+              "S3"
+            ],
+            "status": "open",
+            "tags": [
+              "regulatory",
+              "timeline"
+            ]
+          },
+          {
+            "exposure": "no position",
+            "id": "P2",
+            "rule": "Do not size from AI power narrative without named contract evidence.",
+            "source_ids": [
+              "S1",
+              "S2"
+            ],
+            "status": "open",
+            "tags": [
+              "valuation",
+              "narrative"
+            ]
+          }
+        ],
+        "tag_counts": {
+          "narrative": 1,
+          "regulatory": 1,
+          "timeline": 1,
+          "valuation": 1
+        }
+      },
+      "latest_review": {
+        "date": "2026-06-30",
+        "decision": "watch"
+      },
+      "nearest_open_catalyst": {
+        "date": "2026-08-15",
+        "id": "CAT2",
+        "status": "watch",
+        "title": "Material licensing update with a clear review timeline.",
+        "window": ""
+      },
+      "next_checklist": [
+        {
+          "id": "AP1",
+          "source": "review_queue",
+          "text": "Confirm the latest review summary and update the ledger if it has drifted."
+        },
+        {
+          "id": "AP2",
+          "source": "evidence_audit",
+          "text": "Refresh or annotate source-quality warnings before relying on the plan."
+        },
+        {
+          "id": "AP3",
+          "source": "risk_exposure_catalyst",
+          "text": "Review open risk, exposure, and catalyst records for source-backed status changes."
+        },
+        {
+          "id": "AP-RISK",
+          "source": "risk_payload",
+          "text": "Review high-severity risk IDs: R1."
+        },
+        {
+          "id": "AP-CATALYST",
+          "source": "catalyst_payload",
+          "text": "Check open catalyst IDs: CAT2, CAT1, CAT3."
+        },
+        {
+          "id": "AP-EXPOSURE",
+          "source": "exposure_payload",
+          "text": "Resolve open exposure rule IDs: P1, P2."
+        },
+        {
+          "id": "AP-CHECKLIST",
+          "source": "review_queue",
+          "text": "Update open checklist IDs: C1, C2."
+        },
+        {
+          "id": "AP-SOURCES",
+          "source": "evidence_audit",
+          "text": "Address source warning codes: SOURCE_UNSUPPORTED_ITEM."
+        }
+      ],
+      "owner": "TBD",
+      "priority": "high",
+      "rank": 2,
+      "reason_codes": [
+        "EA_SOURCE_QUALITY_WARNING",
+        "RQ_HIGH_SEVERITY_RISKS",
+        "RQ_OPEN_CHECKLIST",
+        "RQ_OPEN_POSITION_RULES",
+        "RQ_UPCOMING_OPEN_CATALYSTS",
+        "WL_LATEST_REVIEW_RECORDED",
+        "WL_NEAREST_OPEN_CATALYST"
+      ],
+      "review_queue_payload": {
+        "next_action": "Review high-severity risks and update mitigation evidence.",
+        "reasons": [
+          {
+            "count": 1,
+            "items": [
+              "R1"
+            ],
+            "score": 3,
+            "text": "1 high-severity risk(s) need human review.",
+            "type": "high_severity_risks"
+          },
+          {
+            "count": 3,
+            "items": [
+              "CAT2",
+              "CAT1",
+              "CAT3"
+            ],
+            "score": 3,
+            "text": "3 upcoming or open catalyst(s) remain unresolved.",
+            "type": "upcoming_open_catalysts"
+          },
+          {
+            "count": 2,
+            "items": [
+              "C1",
+              "C2"
+            ],
+            "score": 2,
+            "text": "2 checklist item(s) remain open.",
+            "type": "open_checklist"
+          },
+          {
+            "count": 2,
+            "items": [
+              "P1",
+              "P2"
+            ],
+            "score": 2,
+            "text": "2 position rule(s) remain open.",
+            "type": "open_position_rules"
+          }
+        ]
+      },
+      "risk_payload": {
+        "high_risks": [
+          {
+            "id": "R1",
+            "name": "Licensing delay",
+            "probability": "medium",
+            "severity": "high"
+          }
+        ],
+        "risk_count": 2
+      },
+      "score": 10,
+      "source_quality_score": 92,
+      "source_quality_warnings": [
+        {
+          "code": "SOURCE_UNSUPPORTED_ITEM",
+          "item_id": "checklist:C1",
+          "text": "checklist C1 has no source reference."
+        },
+        {
+          "code": "SOURCE_UNSUPPORTED_ITEM",
+          "item_id": "checklist:C2",
+          "text": "checklist C2 has no source reference."
+        }
+      ],
+      "thesis_id": "oklo-ai-power",
+      "ticker": "OKLO",
+      "title": "Oklo AI Power Demand Thesis",
+      "updated": "2026-05-12",
+      "watchlist_payload": {
+        "high_risk_count": 1,
+        "latest_review": {
+          "date": "2026-06-30",
+          "decision": "watch"
+        },
+        "nearest_open_catalyst": {
+          "date": "2026-08-15",
+          "id": "CAT2",
+          "status": "watch",
+          "title": "Material licensing update with a clear review timeline.",
+          "window": ""
+        },
+        "open_position_rule_count": 2,
+        "stale_source_count": 0
+      }
+    }
+  ],
+  "ledger_checklists": [
+    {
+      "next_checklist": [
+        {
+          "id": "AP1",
+          "source": "review_queue",
+          "text": "Confirm the latest review summary and update the ledger if it has drifted."
+        },
+        {
+          "id": "AP2",
+          "source": "evidence_audit",
+          "text": "Refresh or annotate source-quality warnings before relying on the plan."
+        },
+        {
+          "id": "AP3",
+          "source": "risk_exposure_catalyst",
+          "text": "Review open risk, exposure, and catalyst records for source-backed status changes."
+        },
+        {
+          "id": "AP-RISK",
+          "source": "risk_payload",
+          "text": "Review high-severity risk IDs: R1, R2."
+        },
+        {
+          "id": "AP-CATALYST",
+          "source": "catalyst_payload",
+          "text": "Check open catalyst IDs: CAT2, CAT1."
+        },
+        {
+          "id": "AP-EXPOSURE",
+          "source": "exposure_payload",
+          "text": "Resolve open exposure rule IDs: P1, P2."
+        },
+        {
+          "id": "AP-CHECKLIST",
+          "source": "review_queue",
+          "text": "Update open checklist IDs: C1, C2, C3."
+        },
+        {
+          "id": "AP-SOURCES",
+          "source": "evidence_audit",
+          "text": "Address source warning codes: SOURCE_UNSUPPORTED_ITEM."
+        }
+      ],
+      "thesis_id": "leveraged-etf-discipline",
+      "ticker": "LEV2X",
+      "title": "Leveraged ETF Discipline Ledger"
+    },
+    {
+      "next_checklist": [
+        {
+          "id": "AP1",
+          "source": "review_queue",
+          "text": "Confirm the latest review summary and update the ledger if it has drifted."
+        },
+        {
+          "id": "AP2",
+          "source": "evidence_audit",
+          "text": "Refresh or annotate source-quality warnings before relying on the plan."
+        },
+        {
+          "id": "AP3",
+          "source": "risk_exposure_catalyst",
+          "text": "Review open risk, exposure, and catalyst records for source-backed status changes."
+        },
+        {
+          "id": "AP-RISK",
+          "source": "risk_payload",
+          "text": "Review high-severity risk IDs: R1."
+        },
+        {
+          "id": "AP-CATALYST",
+          "source": "catalyst_payload",
+          "text": "Check open catalyst IDs: CAT2, CAT1, CAT3."
+        },
+        {
+          "id": "AP-EXPOSURE",
+          "source": "exposure_payload",
+          "text": "Resolve open exposure rule IDs: P1, P2."
+        },
+        {
+          "id": "AP-CHECKLIST",
+          "source": "review_queue",
+          "text": "Update open checklist IDs: C1, C2."
+        },
+        {
+          "id": "AP-SOURCES",
+          "source": "evidence_audit",
+          "text": "Address source warning codes: SOURCE_UNSUPPORTED_ITEM."
+        }
+      ],
+      "thesis_id": "oklo-ai-power",
+      "ticker": "OKLO",
+      "title": "Oklo AI Power Demand Thesis"
+    }
+  ]
+}

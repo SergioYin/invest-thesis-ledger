@@ -9,7 +9,13 @@ import unittest
 from pathlib import Path
 
 from invest_thesis_ledger.cli import _write_demo_bundle_dir
-from invest_thesis_ledger.render import decision_memo_payload, review_queue_payload, scenario_plan_payload, watchlist_payload
+from invest_thesis_ledger.render import (
+    action_plan_payload,
+    decision_memo_payload,
+    review_queue_payload,
+    scenario_plan_payload,
+    watchlist_payload,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -77,6 +83,12 @@ class CliTests(unittest.TestCase):
         self.assertIn("LEDGER", watchlist.stdout)
         self.assertIn("weekly watchlist", watchlist.stdout)
         self.assertIn("write JSON output to PATH", watchlist.stdout)
+
+        action_plan = self.run_cli("action-plan", "--help")
+        self.assertEqual(action_plan.returncode, 0, action_plan.stderr)
+        self.assertIn("LEDGER", action_plan.stdout)
+        self.assertIn("weekly action plan", action_plan.stdout)
+        self.assertIn("write JSON output to PATH", action_plan.stdout)
 
         demo_bundle = self.run_cli("demo-bundle", "--help")
         self.assertEqual(demo_bundle.returncode, 0, demo_bundle.stderr)
@@ -1322,6 +1334,233 @@ class CliTests(unittest.TestCase):
             self.assertIn("Title \\| with break", text)
             self.assertIn("Catalyst \\| with break", text)
 
+    def test_action_plan_writes_weekly_workflow_payload(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            md_path = Path(temp) / "action-plan.md"
+            json_path = Path(temp) / "action-plan.json"
+            result = self.run_cli(
+                "action-plan",
+                str(EXAMPLE),
+                str(ETF_EXAMPLE),
+                "--output",
+                str(md_path),
+                "--json-output",
+                str(json_path),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            text = md_path.read_text()
+            self.assertIn("# Weekly Action Plan", text)
+            self.assertIn("not investment advice", text)
+            self.assertIn("It does not include market data", text)
+            payload = json.loads(json_path.read_text())
+            self.assertEqual(payload["action_plan"]["ledger_count"], 2)
+            self.assertFalse(payload["action_plan"]["includes_market_data"])
+            self.assertEqual(payload["actions"][0]["owner"], "TBD")
+            self.assertEqual(payload["actions"][0]["cadence"], "now")
+            self.assertIn("RQ_HIGH_SEVERITY_RISKS", payload["actions"][0]["reason_codes"])
+            self.assertIn("review_queue_payload", payload["actions"][0])
+            self.assertIn("watchlist_payload", payload["actions"][0])
+            self.assertIn("evidence_audit_payload", payload["actions"][0])
+            self.assertIn("risk_payload", payload["actions"][0])
+            self.assertIn("exposure_payload", payload["actions"][0])
+            self.assertIn("catalyst_payload", payload["actions"][0])
+            self.assertEqual(payload["ledger_checklists"][0]["next_checklist"][0]["id"], "AP1")
+
+    def test_action_plan_payload_is_input_order_independent_for_tied_items(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_dir = Path(temp)
+            first_path = temp_dir / "first.json"
+            second_path = temp_dir / "second.json"
+            first_data = json.loads(EXAMPLE.read_text())
+            second_data = json.loads(ETF_EXAMPLE.read_text())
+            first_data["asset"]["ticker"] = "TIE"
+            second_data["asset"]["ticker"] = "TIE"
+            second_data["risks"][1]["severity"] = "medium"
+            first_path.write_text(json.dumps(first_data), encoding="utf-8")
+            second_path.write_text(json.dumps(second_data), encoding="utf-8")
+
+            forward = action_plan_payload([first_data, second_data])
+            reverse = action_plan_payload([second_data, first_data])
+            self.assertEqual(forward, reverse)
+
+            forward_md = temp_dir / "forward.md"
+            forward_json = temp_dir / "forward.json"
+            reverse_md = temp_dir / "reverse.md"
+            reverse_json = temp_dir / "reverse.json"
+            forward_result = self.run_cli(
+                "action-plan",
+                str(first_path),
+                str(second_path),
+                "--output",
+                str(forward_md),
+                "--json-output",
+                str(forward_json),
+            )
+            reverse_result = self.run_cli(
+                "action-plan",
+                str(second_path),
+                str(first_path),
+                "--output",
+                str(reverse_md),
+                "--json-output",
+                str(reverse_json),
+            )
+            self.assertEqual(forward_result.returncode, 0, forward_result.stderr)
+            self.assertEqual(reverse_result.returncode, 0, reverse_result.stderr)
+            self.assertEqual(forward_md.read_text(), reverse_md.read_text())
+            self.assertEqual(forward_json.read_text(), reverse_json.read_text())
+
+    def test_action_plan_tie_breaks_duplicate_ids_and_tickers_by_full_payload(self) -> None:
+        first_data = json.loads(EXAMPLE.read_text())
+        second_data = json.loads(EXAMPLE.read_text())
+        for data in (first_data, second_data):
+            data["thesis_id"] = "duplicate-thesis"
+            data["title"] = "Duplicate Thesis"
+            data["asset"]["ticker"] = "DUP"
+            data["updated"] = "2026-05-12"
+            data["risks"] = []
+            data["catalysts"] = []
+            data["position_rules"] = []
+            data["checklist"] = []
+            for source in data["sources"]:
+                source["date"] = "2026-05-12"
+            data["reviews"] = [
+                {
+                    "date": "2026-05-12",
+                    "decision": "hold",
+                    "summary": "Current review.",
+                    "source_ids": ["S1"],
+                }
+            ]
+        second_data["reviews"][0]["decision"] = "watch"
+
+        forward = action_plan_payload([first_data, second_data])
+        reverse = action_plan_payload([second_data, first_data])
+
+        self.assertEqual(forward, reverse)
+        self.assertEqual(
+            [item["latest_review"]["decision"] for item in forward["actions"]],
+            ["hold", "watch"],
+        )
+
+    def test_action_plan_escapes_markdown(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_dir = Path(temp)
+            first_path = temp_dir / "first.json"
+            second_path = temp_dir / "second.json"
+            first_data = json.loads(EXAMPLE.read_text())
+            first_data["title"] = "Action | title\nbreak"
+            first_data["risks"][0]["name"] = "Risk | name\nbreak"
+            first_data["position_rules"][0]["rule"] = "Rule | text\nbreak"
+            first_data["sources"][0]["date"] = "2025-01-01"
+            first_path.write_text(json.dumps(first_data), encoding="utf-8")
+            second_path.write_text(ETF_EXAMPLE.read_text(), encoding="utf-8")
+            md_path = temp_dir / "action-plan.md"
+            result = self.run_cli(
+                "action-plan",
+                str(first_path),
+                str(second_path),
+                "--output",
+                str(md_path),
+                "--json-output",
+                str(temp_dir / "action-plan.json"),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            text = md_path.read_text()
+            self.assertIn("Action \\| title break", text)
+            self.assertIn("Risk \\| name break", text)
+            self.assertIn("Rule \\| text break", text)
+
+    def test_action_plan_validates_all_ledgers_before_writing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_dir = Path(temp)
+            bad_path = temp_dir / "bad.json"
+            data = json.loads(ETF_EXAMPLE.read_text())
+            data["checklist"][0]["source_ids"] = ["missing"]
+            bad_path.write_text(json.dumps(data), encoding="utf-8")
+            md_path = temp_dir / "action-plan.md"
+            json_path = temp_dir / "action-plan.json"
+            result = self.run_cli(
+                "action-plan",
+                str(EXAMPLE),
+                str(bad_path),
+                "--output",
+                str(md_path),
+                "--json-output",
+                str(json_path),
+            )
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("ledger: leveraged-etf-discipline", result.stderr)
+            self.assertIn("unknown source missing", result.stderr)
+            self.assertFalse(md_path.exists())
+            self.assertFalse(json_path.exists())
+
+    def test_action_plan_avoids_personal_buy_sell_wording(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_dir = Path(temp)
+            first_path = temp_dir / "first.json"
+            data = json.loads(EXAMPLE.read_text())
+            data["title"] = "Sell-side buy list wording from source data"
+            data["sources"][0]["title"] = "Buy and sell wording in a source title"
+            first_path.write_text(json.dumps(data), encoding="utf-8")
+            md_path = temp_dir / "action-plan.md"
+            json_path = Path(temp) / "action-plan.json"
+            result = self.run_cli(
+                "action-plan",
+                str(first_path),
+                str(ETF_EXAMPLE),
+                "--output",
+                str(md_path),
+                "--json-output",
+                str(json_path),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(json_path.read_text())
+            generated_guidance = "\n".join(
+                [item["action"] for item in payload["actions"]]
+                + [
+                    checklist_item["text"]
+                    for item in payload["actions"]
+                    for checklist_item in item["next_checklist"]
+                ]
+            ).lower()
+            self.assertNotRegex(generated_guidance, r"\byou should\b")
+            self.assertNotRegex(generated_guidance, r"\bbuy\b")
+            self.assertNotRegex(generated_guidance, r"\bsell\b")
+
+    def test_action_plan_source_quality_warnings_are_not_all_blockers(self) -> None:
+        data = json.loads(EXAMPLE.read_text())
+        data["thesis_id"] = "source-warning-only"
+        data["title"] = "Source Warning Only"
+        data["asset"]["ticker"] = "SWO"
+        data["updated"] = "2026-05-12"
+        for source in data["sources"]:
+            source["date"] = "2026-05-12"
+        data["reviews"] = [
+            {
+                "date": "2026-05-12",
+                "decision": "watch",
+                "summary": "Current review.",
+                "source_ids": ["S1"],
+            }
+        ]
+        data["risks"] = []
+        data["catalysts"] = []
+        data["position_rules"] = []
+        data["checklist"] = []
+        data["broker_views"] = []
+        data["assumptions"][0]["source_ids"] = []
+
+        payload = action_plan_payload([data, json.loads(ETF_EXAMPLE.read_text())])
+        item = next(item for item in payload["actions"] if item["thesis_id"] == "source-warning-only")
+
+        self.assertEqual(
+            [warning["code"] for warning in item["source_quality_warnings"]],
+            ["SOURCE_UNSUPPORTED_ITEM", "SOURCE_UNUSED"],
+        )
+        self.assertEqual(item["blockers"], [])
+        self.assertEqual(item["cadence"], "watch")
+
     def test_demo_bundle_writes_static_markdown_bundle_and_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             output_dir = Path(temp) / "bundle"
@@ -1354,7 +1593,7 @@ class CliTests(unittest.TestCase):
             self.assertIn("# Portfolio Summary", (output_dir / "portfolio-summary.md").read_text())
             self.assertIn("# Watchlist", (output_dir / "watchlist.md").read_text())
             manifest = json.loads((output_dir / "manifest.json").read_text())
-            self.assertEqual(manifest["tool_version"], "1.1.0")
+            self.assertEqual(manifest["tool_version"], "1.2.0")
             self.assertEqual(manifest["ledger_ids"], ["oklo-ai-power", "leveraged-etf-discipline"])
             self.assertEqual(manifest["generated_files"], expected_files)
             index_links = [
@@ -1495,7 +1734,7 @@ class CliTests(unittest.TestCase):
             self.assertNotIn("<script", (output_dir / "index.html").read_text().lower())
             self.assertNotIn("@import", (output_dir / "style.css").read_text().lower())
             manifest = json.loads((output_dir / "manifest.json").read_text())
-            self.assertEqual(manifest["tool_version"], "1.1.0")
+            self.assertEqual(manifest["tool_version"], "1.2.0")
             self.assertEqual(manifest["ledger_ids"], ["oklo-ai-power", "leveraged-etf-discipline"])
             self.assertEqual(manifest["generated_files"], expected_files)
             self.assertNotIn("timestamp", manifest)
@@ -1684,7 +1923,7 @@ class CliTests(unittest.TestCase):
             self.assertEqual(second.returncode, 0, second.stderr)
             self.assertEqual(output_a.read_text(), output_b.read_text())
             payload = json.loads(output_a.read_text())
-            self.assertEqual(payload["ledger_version"], "1.1.0")
+            self.assertEqual(payload["ledger_version"], "1.2.0")
             self.assertEqual(payload["thesis_id"], "msft-thesis")
             self.assertEqual(payload["sources"][0]["id"], "S1")
             self.assertEqual(payload["assumptions"][0]["source_ids"], ["S1"])
@@ -1924,6 +2163,19 @@ class CliTests(unittest.TestCase):
                         str(temp_dir / "watchlist.json"),
                     ],
                     ["watchlist.md", "watchlist.json"],
+                ),
+                (
+                    "action-plan",
+                    [
+                        "action-plan",
+                        str(EXAMPLE),
+                        str(ETF_EXAMPLE),
+                        "--output",
+                        str(temp_dir / "action-plan.md"),
+                        "--json-output",
+                        str(temp_dir / "action-plan.json"),
+                    ],
+                    ["action-plan.md", "action-plan.json"],
                 ),
             ]
             for label, args, filenames in commands:

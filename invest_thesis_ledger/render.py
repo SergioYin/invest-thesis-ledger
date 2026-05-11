@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import re
 from datetime import date
-from typing import Any, Dict, List, Mapping, Optional, Sequence
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence
 
 from .schema import source_lookup
 
@@ -1045,6 +1045,113 @@ def render_watchlist(ledgers: Sequence[Mapping[str, Any]]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def action_plan_payload(ledgers: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
+    """Build a deterministic weekly action-plan workflow from portfolio reports."""
+
+    action_items = [_action_plan_item(ledger) for ledger in ledgers]
+    action_items.sort(key=_action_plan_sort_key)
+    for rank, item in enumerate(action_items, start=1):
+        item["rank"] = rank
+    return {
+        "action_plan": {
+            "ledger_count": len(action_items),
+            "action_count": len(action_items),
+            "now_count": sum(1 for item in action_items if item["cadence"] == "now"),
+            "this_week_count": sum(1 for item in action_items if item["cadence"] == "this-week"),
+            "watch_count": sum(1 for item in action_items if item["cadence"] == "watch"),
+            "educational_only": True,
+            "includes_market_data": False,
+        },
+        "actions": action_items,
+        "ledger_checklists": [
+            {
+                "thesis_id": item["thesis_id"],
+                "ticker": item["ticker"],
+                "title": item["title"],
+                "next_checklist": item["next_checklist"],
+            }
+            for item in action_items
+        ],
+    }
+
+
+def render_action_plan(ledgers: Sequence[Mapping[str, Any]]) -> str:
+    """Render a deterministic weekly action-plan workflow."""
+
+    payload = action_plan_payload(ledgers)
+    summary = payload["action_plan"]
+    lines = [
+        "# Weekly Action Plan",
+        "",
+        "> This is an educational research organization tool, not investment advice. It does not include market data.",
+        "",
+        f"- Ledgers: {summary['ledger_count']}",
+        f"- Ranked Actions: {summary['action_count']}",
+        f"- Now: {summary['now_count']}",
+        f"- This Week: {summary['this_week_count']}",
+        f"- Watch: {summary['watch_count']}",
+        "",
+        "## Ranked Actions",
+        "",
+        "| Rank | Cadence | Owner | Ticker | Ledger ID | Priority | Score | Action | Reason Codes | Source Warnings |",
+        "| ---: | --- | --- | --- | --- | --- | ---: | --- | --- | --- |",
+    ]
+    for item in payload["actions"]:
+        lines.append(
+            "| "
+            + " | ".join(
+                [
+                    str(item["rank"]),
+                    _cell(item["cadence"]),
+                    _cell(item["owner"]),
+                    _cell(item["ticker"]),
+                    _cell(item["thesis_id"]),
+                    _cell(item["priority"]),
+                    str(item["score"]),
+                    _cell(item["action"]),
+                    _cell(_inline_join(item["reason_codes"])),
+                    _cell(_inline_join([warning["code"] for warning in item["source_quality_warnings"]])),
+                ]
+            )
+            + " |"
+        )
+    lines.extend(["", "## Action Details", ""])
+    for item in payload["actions"]:
+        lines.extend(
+            [
+                f"### {item['rank']}. {_inline(item['ticker'])} - {_inline(item['title'])}",
+                "",
+                f"- Owner: {_inline(item['owner'])}",
+                f"- Cadence: {_inline(item['cadence'])}",
+                f"- Action: {_inline(item['action'])}",
+                f"- Source Quality Score: {item['source_quality_score']}",
+                f"- Reason Codes: {_inline_join(item['reason_codes'])}",
+                "",
+                "#### Blockers",
+                "",
+            ]
+        )
+        if item["blockers"]:
+            for blocker in item["blockers"]:
+                lines.append(f"- {_inline(blocker['code'])}: {_inline(blocker['text'])}")
+        else:
+            lines.append("- No blockers detected.")
+        lines.extend(["", "#### Source-Quality Warnings", ""])
+        if item["source_quality_warnings"]:
+            for warning in item["source_quality_warnings"]:
+                lines.append(f"- {_inline(warning['code'])}: {_inline(warning['text'])}")
+        else:
+            lines.append("- No source-quality warnings detected.")
+        lines.extend(["", "#### Next Checklist", ""])
+        for checklist_item in item["next_checklist"]:
+            lines.append(
+                f"- [ ] {_inline(checklist_item['id'])}: {_inline(checklist_item['text'])} "
+                f"({_inline(checklist_item['source'])})"
+            )
+        lines.append("")
+    return "\n".join(lines) + "\n"
+
+
 def decision_memo_payload(ledger: Mapping[str, Any]) -> Dict[str, Any]:
     """Build structured pre-trade/review decision memo output."""
 
@@ -1647,6 +1754,278 @@ def _watchlist_sort_key(item: Mapping[str, Any]) -> tuple[Any, ...]:
         int(item["open_position_rule_count"]),
         str(item["next_action"]),
     )
+
+
+def _action_plan_item(ledger: Mapping[str, Any]) -> Dict[str, Any]:
+    queue_item = _review_queue_item(ledger)
+    watch_item = _watchlist_item(ledger)
+    evidence = _evidence_payload(ledger, include_checklist=True)
+    exposure = exposure_payload(ledger)
+    risk = risk_payload(ledger)
+    open_checklist = [
+        item for item in risk["checklist"] if not _is_closed_status(str(item.get("status", "")))
+    ]
+    open_position_rules = [
+        item for item in exposure["position_rules"] if not _is_closed_status(str(item.get("status", "")))
+    ]
+    open_catalysts = _review_open_catalysts(ledger)
+    high_risks = [
+        item
+        for item in risk["risks"]
+        if str(item.get("severity", "")).lower() in {"high", "critical", "severe"}
+    ]
+    source_quality_warnings = _action_source_warnings(evidence)
+    blockers = _action_blockers(high_risks, open_position_rules, open_checklist, source_quality_warnings)
+    reason_codes = _action_reason_codes(queue_item["reasons"], watch_item, source_quality_warnings)
+    cadence = _action_cadence(queue_item["priority"], reason_codes, blockers)
+    return {
+        "rank": 0,
+        "thesis_id": queue_item["thesis_id"],
+        "title": queue_item["title"],
+        "updated": queue_item["updated"],
+        "ticker": queue_item["ticker"],
+        "asset_name": queue_item["asset_name"],
+        "asset_type": queue_item["asset_type"],
+        "owner": "TBD",
+        "cadence": cadence,
+        "priority": queue_item["priority"],
+        "score": queue_item["score"],
+        "action": _action_text(queue_item["next_action"]),
+        "reason_codes": reason_codes,
+        "blockers": blockers,
+        "source_quality_score": _evidence_quality_score(evidence["coverage"]),
+        "source_quality_warnings": source_quality_warnings,
+        "nearest_open_catalyst": watch_item["nearest_open_catalyst"],
+        "latest_review": watch_item["latest_review"],
+        "risk_payload": {
+            "high_risks": [
+                {
+                    "id": item["id"],
+                    "name": item["name"],
+                    "severity": item["severity"],
+                    "probability": item["probability"],
+                }
+                for item in high_risks
+            ],
+            "risk_count": len(risk["risks"]),
+        },
+        "exposure_payload": {
+            "tag_counts": exposure["tag_counts"],
+            "open_position_rules": open_position_rules,
+        },
+        "catalyst_payload": {
+            "open_catalysts": [
+                {
+                    "id": item["id"],
+                    "title": item["title"],
+                    "date": item["date"],
+                    "window": item["window"],
+                    "status": item["status"],
+                }
+                for item in open_catalysts
+            ],
+        },
+        "review_queue_payload": {
+            "next_action": queue_item["next_action"],
+            "reasons": queue_item["reasons"],
+        },
+        "watchlist_payload": {
+            "nearest_open_catalyst": watch_item["nearest_open_catalyst"],
+            "latest_review": watch_item["latest_review"],
+            "stale_source_count": watch_item["stale_source_count"],
+            "high_risk_count": watch_item["high_risk_count"],
+            "open_position_rule_count": watch_item["open_position_rule_count"],
+        },
+        "evidence_audit_payload": {
+            "coverage": evidence["coverage"],
+            "quality_score": _evidence_quality_score(evidence["coverage"]),
+        },
+        "next_checklist": _action_next_checklist(
+            queue_item["reasons"], high_risks, open_catalysts, open_position_rules, open_checklist, source_quality_warnings
+        ),
+    }
+
+
+def _action_plan_sort_key(item: Mapping[str, Any]) -> tuple[Any, ...]:
+    stable_payload = {key: value for key, value in item.items() if key != "rank"}
+    return (
+        {"now": 0, "this-week": 1, "watch": 2}.get(str(item["cadence"]), 3),
+        -int(item["score"]),
+        _priority_rank(str(item["priority"])),
+        int(item["source_quality_score"]),
+        str(item["ticker"]),
+        str(item["thesis_id"]),
+        str(item["title"]),
+        str(item["updated"]),
+        str(item["asset_name"]),
+        str(item["asset_type"]),
+        json.dumps(item.get("reason_codes", []), sort_keys=True),
+        json.dumps(item.get("blockers", []), sort_keys=True),
+        json.dumps(item.get("nearest_open_catalyst"), sort_keys=True),
+        json.dumps(stable_payload, sort_keys=True),
+    )
+
+
+def _action_reason_codes(
+    reasons: Sequence[Mapping[str, Any]], watch_item: Mapping[str, Any], source_warnings: Sequence[Mapping[str, Any]]
+) -> List[str]:
+    codes = [f"RQ_{str(reason['type']).upper()}" for reason in reasons]
+    if watch_item.get("nearest_open_catalyst"):
+        codes.append("WL_NEAREST_OPEN_CATALYST")
+    if watch_item.get("latest_review", {}).get("date"):
+        codes.append("WL_LATEST_REVIEW_RECORDED")
+    if source_warnings:
+        codes.append("EA_SOURCE_QUALITY_WARNING")
+    return sorted(set(codes))
+
+
+def _action_cadence(priority: str, reason_codes: Sequence[str], blockers: Sequence[Mapping[str, Any]]) -> str:
+    blocker_codes = {str(item["code"]) for item in blockers}
+    if priority == "high" or "RISK_HIGH_SEVERITY" in blocker_codes or "SOURCE_STALE" in blocker_codes:
+        return "now"
+    if priority == "medium" or "RQ_UPCOMING_OPEN_CATALYSTS" in reason_codes or blockers:
+        return "this-week"
+    return "watch"
+
+
+def _action_text(next_action: str) -> str:
+    replacements = {
+        "Run a human review and record a new review entry.": "Run a human review and record a new review entry.",
+        "Review high-severity risks and update mitigation evidence.": "Review high-severity risks and update mitigation evidence.",
+        "Check catalyst status and update dated evidence.": "Check catalyst status and update dated evidence.",
+        "Refresh stale sources before relying on the thesis.": "Refresh stale sources before relying on the thesis.",
+        "Resolve open position rules before changing exposure.": "Resolve open position rules before changing exposure.",
+        "Close or update open checklist items.": "Close or update open checklist items.",
+    }
+    return replacements.get(next_action, "Keep the ledger on the weekly research watch cycle.")
+
+
+def _action_source_warnings(evidence: Mapping[str, Any]) -> List[Dict[str, str]]:
+    warnings = []
+    for item in evidence.get("stale_sources", []):
+        warnings.append(
+            {
+                "code": "SOURCE_STALE",
+                "text": f"{item['id']} is {item['age_days']} day(s) older than ledger.updated.",
+                "item_id": str(item["id"]),
+            }
+        )
+    for item in evidence.get("items", []):
+        if not item.get("source_ids"):
+            warnings.append(
+                {
+                    "code": "SOURCE_UNSUPPORTED_ITEM",
+                    "text": f"{item['type']} {item['id']} has no source reference.",
+                    "item_id": f"{item['type']}:{item['id']}",
+                }
+            )
+    for source_id in evidence.get("unused_sources", []):
+        warnings.append(
+            {
+                "code": "SOURCE_UNUSED",
+                "text": f"{source_id} is not linked to a tracked item.",
+                "item_id": str(source_id),
+            }
+        )
+    warnings.sort(key=lambda item: (item["code"], item["item_id"], item["text"]))
+    return warnings
+
+
+def _action_blockers(
+    high_risks: Sequence[Mapping[str, Any]],
+    open_position_rules: Sequence[Mapping[str, Any]],
+    open_checklist: Sequence[Mapping[str, Any]],
+    source_warnings: Sequence[Mapping[str, Any]],
+) -> List[Dict[str, str]]:
+    blockers = []
+    for item in high_risks:
+        blockers.append({"code": "RISK_HIGH_SEVERITY", "text": f"{item['id']}: {item['name']}"})
+    for item in open_position_rules:
+        blockers.append({"code": "EXPOSURE_OPEN_RULE", "text": f"{item['id']}: {item['rule']}"})
+    for item in open_checklist:
+        blockers.append({"code": "CHECKLIST_OPEN", "text": f"{item['id']}: {item['item']}"})
+    for item in source_warnings:
+        if item["code"] == "SOURCE_STALE":
+            blockers.append({"code": item["code"], "text": item["text"]})
+    blockers.sort(key=lambda item: (item["code"], item["text"]))
+    return blockers
+
+
+def _action_next_checklist(
+    reasons: Sequence[Mapping[str, Any]],
+    high_risks: Sequence[Mapping[str, Any]],
+    open_catalysts: Sequence[Mapping[str, Any]],
+    open_position_rules: Sequence[Mapping[str, Any]],
+    open_checklist: Sequence[Mapping[str, Any]],
+    source_warnings: Sequence[Mapping[str, Any]],
+) -> List[Dict[str, str]]:
+    items = [
+        {
+            "id": "AP1",
+            "text": "Confirm the latest review summary and update the ledger if it has drifted.",
+            "source": "review_queue",
+        },
+        {
+            "id": "AP2",
+            "text": "Refresh or annotate source-quality warnings before relying on the plan.",
+            "source": "evidence_audit",
+        },
+        {
+            "id": "AP3",
+            "text": "Review open risk, exposure, and catalyst records for source-backed status changes.",
+            "source": "risk_exposure_catalyst",
+        },
+    ]
+    if high_risks:
+        items.append(
+            {
+                "id": "AP-RISK",
+                "text": f"Review high-severity risk IDs: {_plain_join(item['id'] for item in high_risks)}.",
+                "source": "risk_payload",
+            }
+        )
+    if open_catalysts:
+        items.append(
+            {
+                "id": "AP-CATALYST",
+                "text": f"Check open catalyst IDs: {_plain_join(item['id'] for item in open_catalysts)}.",
+                "source": "catalyst_payload",
+            }
+        )
+    if open_position_rules:
+        items.append(
+            {
+                "id": "AP-EXPOSURE",
+                "text": f"Resolve open exposure rule IDs: {_plain_join(item['id'] for item in open_position_rules)}.",
+                "source": "exposure_payload",
+            }
+        )
+    if open_checklist:
+        items.append(
+            {
+                "id": "AP-CHECKLIST",
+                "text": f"Update open checklist IDs: {_plain_join(item['id'] for item in open_checklist)}.",
+                "source": "review_queue",
+            }
+        )
+    if source_warnings:
+        warning_codes = sorted({str(item["code"]) for item in source_warnings})
+        items.append(
+            {
+                "id": "AP-SOURCES",
+                "text": f"Address source warning codes: {_plain_join(warning_codes)}.",
+                "source": "evidence_audit",
+            }
+        )
+    if not reasons:
+        items.append(
+            {
+                "id": "AP-WATCH",
+                "text": "Keep the ledger on the weekly watch cycle and record any new source-backed changes.",
+                "source": "watchlist",
+            }
+        )
+    return items
 
 
 def _evidence_quality_score(coverage: Mapping[str, Any]) -> int:
@@ -2275,3 +2654,8 @@ def _inline(value: Any) -> str:
 
 def _inline_join(values: Sequence[Any]) -> str:
     return ", ".join(_inline(value) for value in values) if values else "none"
+
+
+def _plain_join(values: Iterable[Any]) -> str:
+    items = [str(value) for value in values]
+    return ", ".join(items) if items else "none"

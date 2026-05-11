@@ -12,6 +12,7 @@ from typing import Callable, Mapping, Optional, Sequence
 
 from . import __version__
 from .render import (
+    action_plan_payload,
     broker_matrix_payload,
     calendar_payload,
     compare_payload,
@@ -21,6 +22,7 @@ from .render import (
     exposure_payload,
     history_payload,
     portfolio_payload,
+    render_action_plan,
     render_broker_matrix,
     render_brief,
     render_calendar,
@@ -154,6 +156,15 @@ def build_parser() -> argparse.ArgumentParser:
     watchlist.add_argument("ledgers", metavar="LEDGER", nargs="+", help="ledger JSON file")
     _add_output_args(watchlist)
     watchlist.set_defaults(func=_cmd_watchlist)
+
+    action_plan = subparsers.add_parser(
+        "action-plan",
+        help="render a weekly action plan from two or more ledgers",
+        description="render a weekly action plan from two or more ledgers.",
+    )
+    action_plan.add_argument("ledgers", metavar="LEDGER", nargs="+", help="ledger JSON file")
+    _add_output_args(action_plan)
+    action_plan.set_defaults(func=_cmd_action_plan)
 
     demo_bundle = subparsers.add_parser(
         "demo-bundle",
@@ -382,6 +393,17 @@ def _cmd_watchlist(args: argparse.Namespace) -> int:
 
     _write_text(args.output, render_watchlist(ledgers))
     _write_text(args.json_output, to_json(watchlist_payload(ledgers)))
+    sys.stdout.write(f"wrote: {args.output}, {args.json_output}\n")
+    return 0
+
+
+def _cmd_action_plan(args: argparse.Namespace) -> int:
+    ledgers, status = _load_validated_ledgers(args.ledgers, "action-plan")
+    if ledgers is None:
+        return status
+
+    _write_text(args.output, render_action_plan(ledgers))
+    _write_text(args.json_output, to_json(action_plan_payload(ledgers)))
     sys.stdout.write(f"wrote: {args.output}, {args.json_output}\n")
     return 0
 
@@ -1051,7 +1073,7 @@ def _starter_ledger(asset: str, name: str, asset_type: str) -> dict:
     clean_name = name.strip()
     clean_type = asset_type.strip()
     return {
-        "ledger_version": "1.1.0",
+        "ledger_version": "1.2.0",
         "thesis_id": f"{slug}-thesis",
         "title": f"{clean_name} Thesis Ledger",
         "asset": {

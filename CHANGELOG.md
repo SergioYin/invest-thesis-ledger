@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.2.0 - 2026-05-12
+
+- Added `action-plan` command for weekly action plans across two or more ledgers.
+- Added deterministic Markdown/JSON output with ranked actions, `TBD` owner placeholders, cadence labels, reason codes, blockers, source-quality warnings, and per-ledger next checklists.
+- Composed the action plan from existing review queue, watchlist, evidence audit, risk, exposure, and catalyst payloads without market data.
+- Ranked tied duplicate thesis IDs/tickers by the normalized action payload and kept unsupported/unused source-quality records as warnings rather than blockers.
+- Kept generated language educational and not investment advice, avoiding personal trading instructions.
+- Added checked-in action plan example outputs generated from the Oklo and leveraged ETF examples.
+- Updated package/schema version, README, schema docs, tests, selfcheck, and checked-in fixtures for v1.2.0.
+
 ## 1.1.0 - 2026-05-12
 
 - Added `evidence-audit` command for portfolio-level evidence quality audits across two or more ledgers.

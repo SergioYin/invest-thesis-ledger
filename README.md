@@ -5,9 +5,10 @@ ledgers as JSON, then rendering deterministic briefs, risk reports, review
 timelines, thesis drift comparisons, catalyst calendars, evidence coverage
 reports, broker/institution matrices, exposure checklists, deterministic
 starter ledger generation, decision memos, scenario plans, portfolio-level
-summaries, portfolio evidence audits, review queues, weekly watchlists, static
-demo bundles, and no-JS HTML dashboards. v1.1.0 adds the `evidence-audit`
-workflow while preserving compatibility with v0.1.0 through v1.0.0 ledgers.
+summaries, portfolio evidence audits, review queues, weekly watchlists, weekly
+action plans, static demo bundles, and no-JS HTML dashboards. v1.2.0 adds the
+`action-plan` workflow while preserving compatibility with v0.1.0 through
+v1.1.0 ledgers.
 
 This project is for research organization only. It is not investment advice.
 
@@ -132,6 +133,13 @@ Render a weekly watchlist ranked by review queue score:
 python -m invest_thesis_ledger watchlist examples/oklo-ai-power.json examples/leveraged-etf-discipline.json --output watchlist.md --json-output watchlist.json
 ```
 
+Render a weekly action plan from review queue, watchlist, evidence audit, risk,
+exposure, and catalyst payloads:
+
+```bash
+python -m invest_thesis_ledger action-plan examples/oklo-ai-power.json examples/leveraged-etf-discipline.json --output action-plan.md --json-output action-plan.json
+```
+
 Write a static deterministic Markdown demo bundle:
 
 ```bash
@@ -158,7 +166,7 @@ input file list.
 
 ## Ledger Format
 
-Ledgers are JSON objects. The v1.1.0 required fields are:
+Ledgers are JSON objects. The v1.2.0 required fields are:
 
 - `ledger_version`
 - `thesis_id`
@@ -195,7 +203,7 @@ ID.
 optional string `tags`; `exposure` combines these risk tags with position rules
 into a checklist.
 
-The formal v1.1.0 schema reference is in `docs/ledger-schema.md`.
+The formal v1.2.0 schema reference is in `docs/ledger-schema.md`.
 
 See:
 
@@ -235,6 +243,8 @@ Checked-in deterministic CLI output fixtures are available under
 - `examples/output/review-queue.json`
 - `examples/output/watchlist.md`
 - `examples/output/watchlist.json`
+- `examples/output/action-plan.md`
+- `examples/output/action-plan.json`
 - `examples/output/demo-bundle/index.md`
 - `examples/output/demo-bundle/manifest.json`
 - `examples/output/demo-bundle/portfolio-summary.md`
@@ -298,6 +308,12 @@ broker views, position rules, and checklist items. It reports unsupported
 items, unused sources, stale sources using the same ledger `updated` logic as
 `evidence`, duplicate source URLs that appear in more than one ledger, and a
 deterministic per-ledger evidence quality score ranked from highest to lowest.
+
+`action-plan` validates all input ledgers before writing anything, then ranks
+weekly research actions by cadence, review score, priority, lower source
+quality score, stable ledger fields, and the normalized action payload. Stale
+sources are source-quality blockers; unsupported and unused source records are
+warnings for review.
 
 `demo-bundle` validates all input ledgers before writing anything, then cleanly
 overwrites the target output directory with static Markdown files: `index.md`,
