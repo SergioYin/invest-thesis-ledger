@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.0 - 2026-05-12
+
+- Added `html-dashboard` command for static deterministic no-JS HTML dashboards across two or more ledgers.
+- Added HTML output with `index.html`, `style.css`, one per-ledger page, `portfolio.html`, `watchlist.html`, and timestamp-free `manifest.json`.
+- Reused existing brief, risk, history, decision memo, scenario plan, portfolio, and watchlist payloads for dashboard content.
+- Escaped generated HTML with the Python standard library only; no external CSS, JavaScript, images, or fonts are used.
+- Updated package/schema version, README, schema docs, tests, selfcheck, and checked-in example fixtures for v1.0.0.
+
 ## 0.9.0 - 2026-05-12
 
 - Added `demo-bundle` command for static deterministic Markdown bundles across two or more ledgers.

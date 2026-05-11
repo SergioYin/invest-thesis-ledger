@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import argparse
+import html
 import shutil
 import sys
 import tempfile
 from pathlib import Path
-from typing import Callable, Optional, Sequence
+from typing import Callable, Mapping, Optional, Sequence
 
 from . import __version__
 from .render import (
@@ -151,6 +152,15 @@ def build_parser() -> argparse.ArgumentParser:
     demo_bundle.add_argument("ledgers", metavar="LEDGER", nargs="+", help="ledger JSON file")
     demo_bundle.add_argument("--output-dir", required=True, metavar="DIR", help="write static demo bundle to DIR")
     demo_bundle.set_defaults(func=_cmd_demo_bundle)
+
+    html_dashboard = subparsers.add_parser(
+        "html-dashboard",
+        help="write a static no-JS HTML dashboard from two or more ledgers",
+        description="write a static no-JS HTML dashboard from two or more ledgers.",
+    )
+    html_dashboard.add_argument("ledgers", metavar="LEDGER", nargs="+", help="ledger JSON file")
+    html_dashboard.add_argument("--output-dir", required=True, metavar="DIR", help="write static HTML dashboard to DIR")
+    html_dashboard.set_defaults(func=_cmd_html_dashboard)
 
     init_template = subparsers.add_parser("init-template", help="create a deterministic starter ledger")
     init_template.add_argument("--asset", required=True, metavar="TICKER", help="asset ticker or symbol")
@@ -380,6 +390,32 @@ def _cmd_demo_bundle(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_html_dashboard(args: argparse.Namespace) -> int:
+    ledgers, status = _load_validated_ledgers(args.ledgers, "html-dashboard")
+    if ledgers is None:
+        return status
+
+    output_dir = Path(args.output_dir)
+    files = _html_dashboard_files(ledgers)
+    if output_dir.exists() and (not output_dir.is_dir() or output_dir.is_symlink()):
+        sys.stderr.write(f"error: output dir is not a directory: {output_dir}\n")
+        return 2
+    if output_dir.resolve() == Path.cwd().resolve():
+        sys.stderr.write(f"error: refusing to replace current working directory: {output_dir}\n")
+        return 2
+
+    try:
+        _write_demo_bundle_dir(output_dir, files)
+    except OSError as exc:
+        sys.stderr.write(f"error: cannot write HTML dashboard {output_dir}: {exc}\n")
+        return 2
+    except ValueError as exc:
+        sys.stderr.write(f"error: cannot write HTML dashboard {output_dir}: {exc}\n")
+        return 2
+    sys.stdout.write(f"wrote: {output_dir}\n")
+    return 0
+
+
 def _cmd_init_template(args: argparse.Namespace) -> int:
     ledger = _starter_ledger(args.asset, args.name, args.type)
     _write_text(args.output, to_json(ledger))
@@ -538,6 +574,425 @@ def _render_demo_bundle_index(ledgers: Sequence[dict], generated_files: Sequence
     return "\n".join(lines) + "\n"
 
 
+def _html_dashboard_files(ledgers: Sequence[dict]) -> list[tuple[str, str]]:
+    ledger_prefixes = _bundle_prefixes(ledgers)
+    ledger_pages = [
+        (f"{ledger_id}.html", _render_html_ledger_page(ledger, ledger_id))
+        for ledger, ledger_id in zip(ledgers, ledger_prefixes)
+    ]
+    body_files: list[tuple[str, str]] = []
+    body_files.extend(ledger_pages)
+    body_files.extend(
+        [
+            ("portfolio.html", _render_html_portfolio_page(ledgers)),
+            ("watchlist.html", _render_html_watchlist_page(ledgers)),
+        ]
+    )
+    filenames = ["index.html", "style.css"] + [filename for filename, _ in body_files] + ["manifest.json"]
+    manifest = {
+        "generated_files": filenames,
+        "ledger_ids": [str(ledger["thesis_id"]) for ledger in ledgers],
+        "tool_version": __version__,
+    }
+    files = [
+        ("index.html", _render_html_dashboard_index(ledgers, ledger_pages, filenames)),
+        ("style.css", _html_dashboard_css()),
+    ]
+    files.extend(body_files)
+    files.append(("manifest.json", to_json(manifest)))
+    return files
+
+
+def _render_html_dashboard_index(
+    ledgers: Sequence[dict],
+    ledger_pages: Sequence[tuple[str, str]],
+    generated_files: Sequence[str],
+) -> str:
+    rows = []
+    for ledger, (filename, _page) in zip(ledgers, ledger_pages):
+        asset = ledger["asset"]
+        rows.append(
+            "<tr>"
+            f"<td><a href=\"{_ha(filename)}\">{_h(asset['ticker'])}</a></td>"
+            f"<td>{_h(ledger['title'])}</td>"
+            f"<td>{_h(ledger['thesis_id'])}</td>"
+            f"<td>{_h(ledger['updated'])}</td>"
+            "</tr>"
+        )
+    links = "".join(f"<li><a href=\"{_ha(filename)}\">{_h(filename)}</a></li>" for filename in generated_files)
+    content = [
+        "<section class=\"summary\">",
+        "<p class=\"notice\">Research organization only. Not investment advice.</p>",
+        f"<p>Tool version {_h(__version__)}. Ledgers: {len(ledgers)}.</p>",
+        "</section>",
+        "<section>",
+        "<h2>Input Ledgers</h2>",
+        "<table><thead><tr><th scope=\"col\">Ticker</th><th scope=\"col\">Title</th><th scope=\"col\">Ledger ID</th><th scope=\"col\">Updated</th></tr></thead>",
+        "<tbody>",
+        "".join(rows),
+        "</tbody></table>",
+        "</section>",
+        "<section>",
+        "<h2>Dashboard Files</h2>",
+        f"<ul>{links}</ul>",
+        "</section>",
+    ]
+    return _html_page("Invest Thesis Ledger Dashboard", "Dashboard", "\n".join(content))
+
+
+def _render_html_ledger_page(ledger: dict, ledger_id: str) -> str:
+    risk = risk_payload(ledger)
+    history = history_payload(ledger)
+    decision = decision_memo_payload(ledger)
+    scenario = scenario_plan_payload(ledger)
+    asset = ledger["asset"]
+    content = [
+        "<nav><a href=\"index.html\">Index</a> <a href=\"portfolio.html\">Portfolio</a> <a href=\"watchlist.html\">Watchlist</a></nav>",
+        "<section class=\"summary\">",
+        f"<p class=\"eyebrow\">{_h(asset['ticker'])} / {_h(asset['type'])}</p>",
+        f"<p>{_h(asset['name'])}</p>",
+        f"<p>Ledger ID: {_h(ledger['thesis_id'])}. Updated: {_h(ledger['updated'])}.</p>",
+        "</section>",
+        "<section>",
+        "<h2>Brief</h2>",
+        f"<p>{_h(ledger['thesis'])}</p>",
+        "<h3>Assumptions</h3>",
+        _html_list(
+            [
+                f"{item['id']}: {item['statement']} (confidence: {item['confidence']}; sources: {_source_ids(item['source_ids'])})"
+                for item in ledger.get("assumptions", [])
+                if isinstance(item, dict)
+            ],
+            "No assumptions recorded.",
+        ),
+        "<h3>Catalysts</h3>",
+        _html_list(
+            [
+                f"{item['id']}: {item['title']}{_catalyst_label(item)} (status: {item['status']}; sources: {_source_ids(item['source_ids'])})"
+                for item in calendar_payload(ledger)["catalysts"]
+            ],
+            "No catalysts recorded.",
+        ),
+        "<h3>Positions</h3>",
+        _html_list([str(item) for item in ledger.get("positions", [])], "No position notes recorded."),
+        "</section>",
+        "<section>",
+        "<h2>Risk</h2>",
+        _html_table(
+            ["ID", "Name", "Severity", "Probability", "Mitigation", "Sources"],
+            [
+                [
+                    item["id"],
+                    item["name"],
+                    item["severity"],
+                    item["probability"],
+                    item["mitigation"],
+                    _source_ids(item["source_ids"]),
+                ]
+                for item in risk["risks"]
+            ],
+        ),
+        "<h3>Checklist</h3>",
+        _html_list(
+            [f"{item['id']}: {item['item']} ({item['status']})" for item in risk["checklist"]],
+            "No checklist items recorded.",
+        ),
+        "</section>",
+        "<section>",
+        "<h2>History</h2>",
+        _html_table(
+            ["Date", "Decision", "Summary", "Drift", "Sources"],
+            [
+                [
+                    item["date"],
+                    item["decision"],
+                    item["summary"],
+                    item["drift"],
+                    _source_ids(item["source_ids"]),
+                ]
+                for item in history["reviews"]
+            ],
+        ),
+        "</section>",
+        "<section>",
+        "<h2>Decision</h2>",
+        _html_definition_list(
+            [
+                ("Latest review", _review_label(decision["latest_review"])),
+                ("High risks", str(len(decision["high_risks"]))),
+                ("Open position rules", str(len(decision["exposure"]["open_position_rules"]))),
+                ("Open checklist items", str(len(decision["exposure"]["open_checklist"]))),
+                ("Stale sources", str(decision["evidence_summary"]["coverage"]["stale_source_count"])),
+            ]
+        ),
+        "<h3>Questions Before Action</h3>",
+        _html_list(
+            [f"{item['id']}: {item['question']}" for item in decision["questions_before_action"]],
+            "No questions recorded.",
+        ),
+        "</section>",
+        "<section>",
+        "<h2>Scenario</h2>",
+        _html_definition_list(
+            [
+                ("Cases", str(scenario["scenario_plan"]["case_count"])),
+                ("Open triggers", str(scenario["scenario_plan"]["trigger_count"])),
+                ("Position constraints", str(scenario["scenario_plan"]["position_constraint_count"])),
+                ("Risk mitigation actions", str(scenario["scenario_plan"]["risk_mitigation_count"])),
+                ("Evidence gaps", str(scenario["scenario_plan"]["evidence_gap_count"])),
+            ]
+        ),
+        _html_table(
+            ["Case", "Summary", "Assumptions", "Risks", "Triggers", "Evidence Gaps"],
+            [
+                [
+                    item["name"],
+                    item["summary"],
+                    str(len(item["assumptions"])),
+                    str(len(item["risks"])),
+                    str(len(item["triggers"])),
+                    str(len(item["evidence_gaps"])),
+                ]
+                for item in scenario["cases"]
+            ],
+        ),
+        "</section>",
+        "<section>",
+        "<h2>Sources</h2>",
+        _html_table(
+            ["ID", "Title", "Publisher", "Date", "URL"],
+            [
+                [source["id"], source["title"], source["publisher"], source["date"], source["url"]]
+                for source in sorted(ledger.get("sources", []), key=lambda item: str(item.get("id", "")))
+                if isinstance(source, dict)
+            ],
+        ),
+        "</section>",
+    ]
+    return _html_page(str(ledger["title"]), str(ledger["title"]), "\n".join(content))
+
+
+def _render_html_portfolio_page(ledgers: Sequence[dict]) -> str:
+    payload = portfolio_payload(ledgers)
+    content = [
+        "<nav><a href=\"index.html\">Index</a> <a href=\"watchlist.html\">Watchlist</a></nav>",
+        "<section class=\"summary\">",
+        f"<p>Assets: {payload['portfolio']['asset_count']}. Thesis count: {payload['portfolio']['thesis_count']}.</p>",
+        "</section>",
+        "<section>",
+        "<h2>Assets</h2>",
+        _html_table(
+            ["Ticker", "Name", "Type", "Ledger ID", "Updated"],
+            [
+                [item["ticker"], item["name"], item["type"], item["thesis_id"], item["updated"]]
+                for item in payload["assets"]
+            ],
+        ),
+        "</section>",
+        "<section>",
+        "<h2>Risk Summary</h2>",
+        _html_counts("Severity", payload["risk_severity_counts"])
+        + _html_counts("Tag", payload["risk_tag_counts"]),
+        "</section>",
+        "<section>",
+        "<h2>Catalyst Summary</h2>",
+        _html_counts("Status", payload["catalyst_status_counts"])
+        + _html_counts("Window", payload["catalyst_window_counts"]),
+        _html_table(
+            ["Date", "Window", "Status", "Ticker", "ID", "Title"],
+            [
+                [
+                    item["date"] or "not specified",
+                    item["window"] or "not specified",
+                    item["status"],
+                    item["ticker"],
+                    item["id"],
+                    item["title"],
+                ]
+                for item in payload["catalysts"]
+            ],
+        ),
+        "</section>",
+        "<section>",
+        "<h2>Review Decisions</h2>",
+        _html_counts("Decision", payload["review_decision_counts"]),
+        "</section>",
+        "<section>",
+        "<h2>Stale Sources</h2>",
+        _html_list(
+            [
+                f"{item['ledger_id']} {item['id']}: {item['title']} ({item['date']}), {item['age_days']} days old"
+                for item in payload["stale_source_warnings"]
+            ],
+            "No stale sources detected.",
+        ),
+        "</section>",
+    ]
+    return _html_page("Portfolio Summary", "Portfolio Summary", "\n".join(content))
+
+
+def _render_html_watchlist_page(ledgers: Sequence[dict]) -> str:
+    payload = watchlist_payload(ledgers)
+    content = [
+        "<nav><a href=\"index.html\">Index</a> <a href=\"portfolio.html\">Portfolio</a></nav>",
+        "<section class=\"summary\">",
+        f"<p>Ledgers: {payload['watchlist']['ledger_count']}. High priority: {payload['watchlist']['high_priority_count']}. "
+        f"Medium priority: {payload['watchlist']['medium_priority_count']}. Low priority: {payload['watchlist']['low_priority_count']}.</p>",
+        "</section>",
+        "<section>",
+        "<h2>Weekly Review List</h2>",
+        _html_table(
+            [
+                "Rank",
+                "Score",
+                "Ticker",
+                "Title",
+                "Priority",
+                "Next Action",
+                "Nearest Open Catalyst",
+                "Latest Review",
+                "Stale Sources",
+                "High Risks",
+                "Open Position Rules",
+            ],
+            [
+                [
+                    str(item["rank"]),
+                    str(item["review_queue_score"]),
+                    item["ticker"],
+                    item["title"],
+                    item["priority"],
+                    item["next_action"],
+                    _html_watchlist_catalyst_label(item["nearest_open_catalyst"]),
+                    _html_watchlist_review_label(item["latest_review"]),
+                    str(item["stale_source_count"]),
+                    str(item["high_risk_count"]),
+                    str(item["open_position_rule_count"]),
+                ]
+                for item in payload["items"]
+            ],
+        ),
+        "</section>",
+    ]
+    return _html_page("Watchlist", "Watchlist", "\n".join(content))
+
+
+def _html_page(title: str, heading: str, body: str) -> str:
+    return "\n".join(
+        [
+            "<!doctype html>",
+            "<html lang=\"en\">",
+            "<head>",
+            "<meta charset=\"utf-8\">",
+            "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">",
+            f"<title>{_h(title)}</title>",
+            "<link rel=\"stylesheet\" href=\"style.css\">",
+            "</head>",
+            "<body>",
+            "<main>",
+            f"<h1>{_h(heading)}</h1>",
+            body,
+            "</main>",
+            "</body>",
+            "</html>",
+            "",
+        ]
+    )
+
+
+def _html_dashboard_css() -> str:
+    return "\n".join(
+        [
+            ":root { color-scheme: light; --ink: #172026; --muted: #5c6870; --line: #d7dde2; --soft: #f4f6f8; --accent: #0f6b57; }",
+            "* { box-sizing: border-box; }",
+            "body { margin: 0; background: #ffffff; color: var(--ink); font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; line-height: 1.5; }",
+            "main { max-width: 1180px; margin: 0 auto; padding: 32px 20px 56px; }",
+            "h1 { margin: 0 0 18px; font-size: 2rem; line-height: 1.15; letter-spacing: 0; }",
+            "h2 { margin: 30px 0 12px; font-size: 1.25rem; letter-spacing: 0; }",
+            "h3 { margin: 20px 0 8px; font-size: 1rem; letter-spacing: 0; }",
+            "section { border-top: 1px solid var(--line); padding-top: 18px; margin-top: 18px; }",
+            "section.summary { background: var(--soft); border: 1px solid var(--line); border-radius: 8px; padding: 16px; }",
+            "nav { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 18px; }",
+            "a { color: var(--accent); }",
+            ".notice, .eyebrow { color: var(--muted); font-weight: 600; }",
+            "table { width: 100%; border-collapse: collapse; margin: 10px 0 18px; font-size: 0.92rem; }",
+            "th, td { border: 1px solid var(--line); padding: 8px 10px; text-align: left; vertical-align: top; }",
+            "th { background: var(--soft); font-weight: 700; }",
+            "dl { display: grid; grid-template-columns: minmax(160px, 240px) 1fr; gap: 6px 16px; }",
+            "dt { color: var(--muted); font-weight: 700; }",
+            "dd { margin: 0; }",
+            "ul { padding-left: 22px; }",
+            "@media (max-width: 720px) { main { padding: 24px 14px 42px; } table { display: block; overflow-x: auto; } dl { grid-template-columns: 1fr; } }",
+            "",
+        ]
+    )
+
+
+def _html_table(headers: Sequence[str], rows: Sequence[Sequence[str]]) -> str:
+    if not rows:
+        return "<p>No records.</p>"
+    header_html = "".join(f"<th scope=\"col\">{_h(header)}</th>" for header in headers)
+    row_html = []
+    for row in rows:
+        row_html.append("<tr>" + "".join(f"<td>{_h(cell)}</td>" for cell in row) + "</tr>")
+    return f"<table><thead><tr>{header_html}</tr></thead><tbody>{''.join(row_html)}</tbody></table>"
+
+
+def _html_list(items: Sequence[str], empty_text: str) -> str:
+    if not items:
+        return f"<p>{_h(empty_text)}</p>"
+    return "<ul>" + "".join(f"<li>{_h(item)}</li>" for item in items) + "</ul>"
+
+
+def _html_definition_list(items: Sequence[tuple[str, str]]) -> str:
+    return "<dl>" + "".join(f"<dt>{_h(term)}</dt><dd>{_h(value)}</dd>" for term, value in items) + "</dl>"
+
+
+def _html_counts(label: str, counts: Mapping[str, int]) -> str:
+    if not counts:
+        return f"<p>No {html.escape(label.lower())} counts recorded.</p>"
+    return _html_table([label, "Count"], [[key, str(value)] for key, value in counts.items()])
+
+
+def _h(value: object) -> str:
+    return html.escape(str(value), quote=True)
+
+
+def _ha(value: object) -> str:
+    return html.escape(str(value), quote=True)
+
+
+def _source_ids(source_ids: Sequence[str]) -> str:
+    return ", ".join(str(source_id) for source_id in source_ids) if source_ids else "none"
+
+
+def _catalyst_label(item: Mapping[str, str]) -> str:
+    if item.get("date"):
+        return f" on {item['date']}"
+    if item.get("window"):
+        return f" during {item['window']}"
+    return ""
+
+
+def _review_label(item: Mapping[str, str]) -> str:
+    if not item.get("date"):
+        return "No review recorded."
+    return f"{item.get('date', '')}: {item.get('decision', '')} - {item.get('summary', '')}"
+
+
+def _html_watchlist_catalyst_label(item: object) -> str:
+    if not isinstance(item, dict):
+        return "none"
+    timing = _catalyst_label(item)
+    return f"{item.get('id', '')}: {item.get('title', '')}{timing}"
+
+
+def _html_watchlist_review_label(item: object) -> str:
+    if not isinstance(item, dict) or not item.get("date"):
+        return "none"
+    return f"{item.get('date', '')}: {item.get('decision', '')}"
+
+
 def _bundle_slug(value: str) -> str:
     slug = "".join(char.lower() if char.isalnum() else "-" for char in value).strip("-")
     while "--" in slug:
@@ -574,7 +1029,7 @@ def _starter_ledger(asset: str, name: str, asset_type: str) -> dict:
     clean_name = name.strip()
     clean_type = asset_type.strip()
     return {
-        "ledger_version": "0.9.0",
+        "ledger_version": "1.0.0",
         "thesis_id": f"{slug}-thesis",
         "title": f"{clean_name} Thesis Ledger",
         "asset": {

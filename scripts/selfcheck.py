@@ -57,6 +57,13 @@ FIXTURE_OUTPUTS = [
     "demo-bundle/portfolio-summary.md",
     "demo-bundle/watchlist.md",
     "demo-bundle/manifest.json",
+    "html-dashboard/index.html",
+    "html-dashboard/style.css",
+    "html-dashboard/oklo-ai-power.html",
+    "html-dashboard/leveraged-etf-discipline.html",
+    "html-dashboard/portfolio.html",
+    "html-dashboard/watchlist.html",
+    "html-dashboard/manifest.json",
 ]
 
 
@@ -274,6 +281,18 @@ def main() -> int:
                 str(EXAMPLES[1]),
                 "--output-dir",
                 str(temp_dir / "demo-bundle"),
+            ]
+        )
+        _run(
+            [
+                sys.executable,
+                "-m",
+                "invest_thesis_ledger",
+                "html-dashboard",
+                str(EXAMPLES[0]),
+                str(EXAMPLES[1]),
+                "--output-dir",
+                str(temp_dir / "html-dashboard"),
             ]
         )
         _check_fixtures(temp_dir)

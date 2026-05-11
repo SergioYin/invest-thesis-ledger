@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "invest-thesis-ledger"
-version = "0.9.0"
+version = "1.0.0"
 description = "A zero-dependency CLI for validating and rendering investment thesis ledgers."
 readme = "README.md"
 requires-python = ">=3.9"
@@ -14,7 +14,7 @@ authors = [
 ]
 keywords = ["investment", "research", "ledger", "cli", "markdown"]
 classifiers = [
-  "Development Status :: 3 - Alpha",
+  "Development Status :: 4 - Beta",
   "Environment :: Console",
   "Intended Audience :: Financial and Insurance Industry",
   "License :: OSI Approved :: MIT License",

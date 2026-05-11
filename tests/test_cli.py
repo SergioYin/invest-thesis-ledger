@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 import tempfile
@@ -76,6 +77,12 @@ class CliTests(unittest.TestCase):
         self.assertIn("LEDGER", demo_bundle.stdout)
         self.assertIn("static Markdown demo bundle", demo_bundle.stdout)
         self.assertIn("write static demo bundle to DIR", demo_bundle.stdout)
+
+        html_dashboard = self.run_cli("html-dashboard", "--help")
+        self.assertEqual(html_dashboard.returncode, 0, html_dashboard.stderr)
+        self.assertIn("LEDGER", html_dashboard.stdout)
+        self.assertIn("static no-JS HTML dashboard", html_dashboard.stdout)
+        self.assertIn("write static HTML dashboard to DIR", html_dashboard.stdout)
 
         decision_memo = self.run_cli("decision-memo", "--help")
         self.assertEqual(decision_memo.returncode, 0, decision_memo.stderr)
@@ -1112,7 +1119,7 @@ class CliTests(unittest.TestCase):
             self.assertIn("# Portfolio Summary", (output_dir / "portfolio-summary.md").read_text())
             self.assertIn("# Watchlist", (output_dir / "watchlist.md").read_text())
             manifest = json.loads((output_dir / "manifest.json").read_text())
-            self.assertEqual(manifest["tool_version"], "0.9.0")
+            self.assertEqual(manifest["tool_version"], "1.0.0")
             self.assertEqual(manifest["ledger_ids"], ["oklo-ai-power", "leveraged-etf-discipline"])
             self.assertEqual(manifest["generated_files"], expected_files)
             index_links = [
@@ -1225,6 +1232,170 @@ class CliTests(unittest.TestCase):
             self.assertEqual(sentinel.read_text(), "keep")
             self.assertFalse((output_dir / "index.md").exists())
 
+    def test_html_dashboard_writes_static_no_js_dashboard_and_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            output_dir = Path(temp) / "html-dashboard"
+            result = self.run_cli(
+                "html-dashboard",
+                str(EXAMPLE),
+                str(ETF_EXAMPLE),
+                "--output-dir",
+                str(output_dir),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            expected_files = [
+                "index.html",
+                "style.css",
+                "oklo-ai-power.html",
+                "leveraged-etf-discipline.html",
+                "portfolio.html",
+                "watchlist.html",
+                "manifest.json",
+            ]
+            self.assertEqual(sorted(path.name for path in output_dir.iterdir()), sorted(expected_files))
+            self.assertIn("<h1>Dashboard</h1>", (output_dir / "index.html").read_text())
+            self.assertIn("<h2>Brief</h2>", (output_dir / "oklo-ai-power.html").read_text())
+            self.assertIn("<h1>Portfolio Summary</h1>", (output_dir / "portfolio.html").read_text())
+            self.assertIn("<h2>Weekly Review List</h2>", (output_dir / "watchlist.html").read_text())
+            self.assertNotIn("<script", (output_dir / "index.html").read_text().lower())
+            self.assertNotIn("@import", (output_dir / "style.css").read_text().lower())
+            manifest = json.loads((output_dir / "manifest.json").read_text())
+            self.assertEqual(manifest["tool_version"], "1.0.0")
+            self.assertEqual(manifest["ledger_ids"], ["oklo-ai-power", "leveraged-etf-discipline"])
+            self.assertEqual(manifest["generated_files"], expected_files)
+            self.assertNotIn("timestamp", manifest)
+            self.assertNotIn("generated_at", manifest)
+
+    def test_html_dashboard_links_are_generated_local_files_only(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            output_dir = Path(temp) / "html-dashboard"
+            result = self.run_cli(
+                "html-dashboard",
+                str(EXAMPLE),
+                str(ETF_EXAMPLE),
+                "--output-dir",
+                str(output_dir),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            manifest = json.loads((output_dir / "manifest.json").read_text())
+            generated_files = set(manifest["generated_files"])
+            html_files = [name for name in generated_files if name.endswith(".html")]
+
+            for filename in html_files:
+                text = (output_dir / filename).read_text()
+                hrefs = re.findall(r'href="([^"]+)"', text)
+                self.assertTrue(hrefs, filename)
+                for href in hrefs:
+                    self.assertIn(href, generated_files)
+                    self.assertNotIn("://", href)
+                    self.assertFalse(href.startswith(("/", "#")))
+                self.assertNotIn("<script", text.lower())
+                self.assertIn('<th scope="col">', text)
+
+            css_text = (output_dir / "style.css").read_text()
+            self.assertNotIn("@import", css_text.lower())
+            self.assertNotIn("url(", css_text.lower())
+
+    def test_html_dashboard_escapes_html_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_dir = Path(temp)
+            first_path = temp_dir / "first.json"
+            second_path = temp_dir / "second.json"
+            first_data = json.loads(EXAMPLE.read_text())
+            first_data["title"] = "<script>alert('x')</script> & title"
+            first_data["thesis"] = "Thesis has <b>markup</b> & details."
+            first_data["assumptions"][0]["statement"] = "Demand > supply & <unsafe>"
+            first_data["risks"][0]["name"] = "Risk <img src=x>"
+            first_data["sources"][0]["title"] = "Source & <tag>"
+            first_path.write_text(json.dumps(first_data), encoding="utf-8")
+            second_path.write_text(ETF_EXAMPLE.read_text(), encoding="utf-8")
+            output_dir = temp_dir / "html-dashboard"
+            result = self.run_cli("html-dashboard", str(first_path), str(second_path), "--output-dir", str(output_dir))
+            self.assertEqual(result.returncode, 0, result.stderr)
+            text = (output_dir / "oklo-ai-power.html").read_text()
+            self.assertIn("&lt;script&gt;alert(&#x27;x&#x27;)&lt;/script&gt; &amp; title", text)
+            self.assertIn("Thesis has &lt;b&gt;markup&lt;/b&gt; &amp; details.", text)
+            self.assertIn("Demand &gt; supply &amp; &lt;unsafe&gt;", text)
+            self.assertIn("Risk &lt;img src=x&gt;", text)
+            self.assertIn("Source &amp; &lt;tag&gt;", text)
+            self.assertNotIn("<script>alert", text)
+            self.assertNotIn("<img src=x>", text)
+
+    def test_html_dashboard_manifest_is_deterministic(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            first_dir = Path(temp) / "first"
+            second_dir = Path(temp) / "second"
+            first = self.run_cli("html-dashboard", str(EXAMPLE), str(ETF_EXAMPLE), "--output-dir", str(first_dir))
+            second = self.run_cli("html-dashboard", str(EXAMPLE), str(ETF_EXAMPLE), "--output-dir", str(second_dir))
+            self.assertEqual(first.returncode, 0, first.stderr)
+            self.assertEqual(second.returncode, 0, second.stderr)
+            self.assertEqual((first_dir / "manifest.json").read_text(), (second_dir / "manifest.json").read_text())
+            self.assertEqual((first_dir / "index.html").read_text(), (second_dir / "index.html").read_text())
+            self.assertEqual((first_dir / "oklo-ai-power.html").read_text(), (second_dir / "oklo-ai-power.html").read_text())
+
+    def test_html_dashboard_disambiguates_duplicate_ledger_ids(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_dir = Path(temp)
+            first_path = temp_dir / "first.json"
+            second_path = temp_dir / "second.json"
+            first_data = json.loads(EXAMPLE.read_text())
+            second_data = json.loads(ETF_EXAMPLE.read_text())
+            second_data["thesis_id"] = first_data["thesis_id"]
+            first_path.write_text(json.dumps(first_data), encoding="utf-8")
+            second_path.write_text(json.dumps(second_data), encoding="utf-8")
+            output_dir = temp_dir / "html-dashboard"
+            result = self.run_cli("html-dashboard", str(first_path), str(second_path), "--output-dir", str(output_dir))
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue((output_dir / "oklo-ai-power.html").exists())
+            self.assertTrue((output_dir / "oklo-ai-power-2.html").exists())
+            manifest = json.loads((output_dir / "manifest.json").read_text())
+            self.assertEqual(manifest["ledger_ids"], ["oklo-ai-power", "oklo-ai-power"])
+            self.assertIn("oklo-ai-power-2.html", manifest["generated_files"])
+            self.assertIn('href="oklo-ai-power-2.html"', (output_dir / "index.html").read_text())
+
+    def test_html_dashboard_validates_all_ledgers_before_writing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_dir = Path(temp)
+            bad_path = temp_dir / "bad.json"
+            output_dir = temp_dir / "html-dashboard"
+            output_dir.mkdir()
+            sentinel = output_dir / "sentinel.html"
+            sentinel.write_text("keep", encoding="utf-8")
+            data = json.loads(ETF_EXAMPLE.read_text())
+            data["risks"][0]["source_ids"] = ["missing"]
+            bad_path.write_text(json.dumps(data), encoding="utf-8")
+            result = self.run_cli("html-dashboard", str(EXAMPLE), str(bad_path), "--output-dir", str(output_dir))
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("ledger: leveraged-etf-discipline", result.stderr)
+            self.assertIn("unknown source missing", result.stderr)
+            self.assertEqual(sentinel.read_text(), "keep")
+            self.assertFalse((output_dir / "manifest.json").exists())
+
+    def test_html_dashboard_requires_two_ledgers(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            result = self.run_cli("html-dashboard", str(EXAMPLE), "--output-dir", str(Path(temp) / "html-dashboard"))
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("requires at least two", result.stderr)
+
+    def test_html_dashboard_refuses_symlinked_output_dir(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_dir = Path(temp)
+            real_dir = temp_dir / "real"
+            real_dir.mkdir()
+            sentinel = real_dir / "sentinel.html"
+            sentinel.write_text("keep", encoding="utf-8")
+            output_dir = temp_dir / "html-dashboard-link"
+            try:
+                output_dir.symlink_to(real_dir, target_is_directory=True)
+            except OSError as exc:
+                self.skipTest(f"symlink unavailable: {exc}")
+
+            result = self.run_cli("html-dashboard", str(EXAMPLE), str(ETF_EXAMPLE), "--output-dir", str(output_dir))
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("output dir is not a directory", result.stderr)
+            self.assertEqual(sentinel.read_text(), "keep")
+            self.assertFalse((real_dir / "manifest.json").exists())
+
     def test_portfolio_reports_validation_warnings_without_blocking_output(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             temp_dir = Path(temp)
@@ -1278,7 +1449,7 @@ class CliTests(unittest.TestCase):
             self.assertEqual(second.returncode, 0, second.stderr)
             self.assertEqual(output_a.read_text(), output_b.read_text())
             payload = json.loads(output_a.read_text())
-            self.assertEqual(payload["ledger_version"], "0.9.0")
+            self.assertEqual(payload["ledger_version"], "1.0.0")
             self.assertEqual(payload["thesis_id"], "msft-thesis")
             self.assertEqual(payload["sources"][0]["id"], "S1")
             self.assertEqual(payload["assumptions"][0]["source_ids"], ["S1"])

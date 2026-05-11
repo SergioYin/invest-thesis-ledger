@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Leveraged ETF Discipline Ledger</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<h1>Leveraged ETF Discipline Ledger</h1>
+<nav><a href="index.html">Index</a> <a href="portfolio.html">Portfolio</a> <a href="watchlist.html">Watchlist</a></nav>
+<section class="summary">
+<p class="eyebrow">LEV2X / fund</p>
+<p>Generic 2x Equity Index ETF</p>
+<p>Ledger ID: leveraged-etf-discipline. Updated: 2026-05-12.</p>
+</section>
+<section>
+<h2>Brief</h2>
+<p>Leveraged ETFs can express short-term tactical views, but path dependency, volatility drag, and position sizing rules must dominate the decision process.</p>
+<h3>Assumptions</h3>
+<ul><li>A1: The instrument is used for a defined short-term thesis rather than a long-term allocation. (confidence: high; sources: S1)</li><li>A2: Volatility conditions are reviewed before entry and daily while open. (confidence: medium; sources: S2)</li></ul>
+<h3>Catalysts</h3>
+<ul><li>CAT2: Macro event calendar supports a time-boxed tactical setup. on 2026-06-10 (status: required; sources: S1)</li><li>CAT1: Index breaks above predefined technical level. during before entry (status: required; sources: none)</li></ul>
+<h3>Positions</h3>
+<ul><li>Maximum planned holding period is five trading days.</li><li>Position size must be smaller than the equivalent unlevered exposure.</li></ul>
+</section>
+<section>
+<h2>Risk</h2>
+<table><thead><tr><th scope="col">ID</th><th scope="col">Name</th><th scope="col">Severity</th><th scope="col">Probability</th><th scope="col">Mitigation</th><th scope="col">Sources</th></tr></thead><tbody><tr><td>R1</td><td>Volatility drag</td><td>high</td><td>high</td><td>Use only with explicit holding-period limit and daily review.</td><td>S1, S2</td></tr><tr><td>R2</td><td>Oversized exposure</td><td>high</td><td>medium</td><td>Cap notional exposure before order entry.</td><td>S1</td></tr></tbody></table>
+<h3>Checklist</h3>
+<ul><li>C1: Record entry price, stop, target, and expiry date before trade. (open)</li><li>C2: Confirm no earnings, CPI, FOMC, or other event invalidates sizing. (open)</li><li>C3: Review realized leverage and tracking after each close. (open)</li></ul>
+</section>
+<section>
+<h2>History</h2>
+<table><thead><tr><th scope="col">Date</th><th scope="col">Decision</th><th scope="col">Summary</th><th scope="col">Drift</th><th scope="col">Sources</th></tr></thead><tbody><tr><td>2026-05-12</td><td>policy</td><td>Created a discipline ledger for tactical leveraged ETF use with explicit sizing, event, and exit constraints.</td><td>none recorded</td><td>S1, S2</td></tr><tr><td>2026-05-19</td><td>policy</td><td>Added catalyst requirements so trade setup, holding period, and macro event risk are checked before entry.</td><td>Workflow expanded from static risk reminder to pre-trade evidence gate.</td><td>S1</td></tr></tbody></table>
+</section>
+<section>
+<h2>Decision</h2>
+<dl><dt>Latest review</dt><dd>2026-05-19: policy - Added catalyst requirements so trade setup, holding period, and macro event risk are checked before entry.</dd><dt>High risks</dt><dd>2</dd><dt>Open position rules</dt><dd>2</dd><dt>Open checklist items</dt><dd>3</dd><dt>Stale sources</dt><dd>0</dd></dl>
+<h3>Questions Before Action</h3>
+<ul><li>Q1: Does the latest review decision still support the contemplated action?</li><li>Q2: Are all high-severity risks understood with current mitigation evidence?</li><li>Q3: Have open catalysts been checked for new source-backed status changes?</li><li>Q4: Do open position rules permit the proposed exposure?</li><li>Q5: Are stale, unused, or unsupported evidence gaps acceptable before action?</li><li>Q6: What evidence would falsify the action after execution?</li></ul>
+</section>
+<section>
+<h2>Scenario</h2>
+<dl><dt>Cases</dt><dd>3</dd><dt>Open triggers</dt><dd>2</dd><dt>Position constraints</dt><dd>2</dd><dt>Risk mitigation actions</dt><dd>2</dd><dt>Evidence gaps</dt><dd>1</dd></dl>
+<table><thead><tr><th scope="col">Case</th><th scope="col">Summary</th><th scope="col">Assumptions</th><th scope="col">Risks</th><th scope="col">Triggers</th><th scope="col">Evidence Gaps</th></tr></thead><tbody><tr><td>Base Case</td><td>Current thesis remains intact if source-backed assumptions hold and open risks stay controlled.</td><td>2</td><td>2</td><td>2</td><td>1</td></tr><tr><td>Bull Case</td><td>Upside case requires higher-conviction assumptions and positive catalysts becoming source-backed.</td><td>2</td><td>0</td><td>0</td><td>1</td></tr><tr><td>Bear Case</td><td>Downside case is driven by low-confidence assumptions, severe risks, or unresolved evidence gaps.</td><td>0</td><td>2</td><td>0</td><td>1</td></tr></tbody></table>
+</section>
+<section>
+<h2>Sources</h2>
+<table><thead><tr><th scope="col">ID</th><th scope="col">Title</th><th scope="col">Publisher</th><th scope="col">Date</th><th scope="col">URL</th></tr></thead><tbody><tr><td>S1</td><td>Leveraged and inverse ETF risk bulletin</td><td>Investor Education Desk</td><td>2026-03-15</td><td>https://example.com/leveraged-etf-risk-bulletin</td></tr><tr><td>S2</td><td>Volatility drag illustration</td><td>Portfolio Research Notes</td><td>2026-04-05</td><td>https://example.com/volatility-drag</td></tr></tbody></table>
+</section>
+</main>
+</body>
+</html>

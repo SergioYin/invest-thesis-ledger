@@ -1,0 +1,16 @@
+{
+  "generated_files": [
+    "index.html",
+    "style.css",
+    "oklo-ai-power.html",
+    "leveraged-etf-discipline.html",
+    "portfolio.html",
+    "watchlist.html",
+    "manifest.json"
+  ],
+  "ledger_ids": [
+    "oklo-ai-power",
+    "leveraged-etf-discipline"
+  ],
+  "tool_version": "1.0.0"
+}
