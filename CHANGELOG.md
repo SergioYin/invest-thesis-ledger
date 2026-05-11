@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.6.2 - 2026-05-12
+
+- Added regression coverage for hash-listed archive symlinks that are not generated files, confirming `verify-archive` reports them before hashing.
+- Updated package/schema version, tests, selfcheck, and checked-in fixtures for v1.6.2.
+
 ## 1.6.1 - 2026-05-12
 
 - Hardened `verify-archive` to reject symlink generated or hash-listed files before hashing file bytes.
