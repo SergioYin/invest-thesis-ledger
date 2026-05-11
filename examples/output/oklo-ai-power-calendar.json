@@ -1,0 +1,38 @@
+{
+  "catalysts": [
+    {
+      "date": "2026-08-15",
+      "id": "CAT2",
+      "source_ids": [
+        "S3"
+      ],
+      "status": "watch",
+      "title": "Material licensing update with a clear review timeline.",
+      "window": ""
+    },
+    {
+      "date": "",
+      "id": "CAT1",
+      "source_ids": [
+        "S1",
+        "S2"
+      ],
+      "status": "watch",
+      "title": "Signed commercial power purchase agreement with credible counterparty.",
+      "window": "2026-H2"
+    },
+    {
+      "date": "",
+      "id": "CAT3",
+      "source_ids": [
+        "S1"
+      ],
+      "status": "watch",
+      "title": "Capital raise or partnership that reduces funding risk.",
+      "window": "next financing update"
+    }
+  ],
+  "thesis_id": "oklo-ai-power",
+  "title": "Oklo AI Power Demand Thesis",
+  "updated": "2026-05-12"
+}

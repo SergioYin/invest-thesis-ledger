@@ -10,7 +10,17 @@
         "S2",
         "S3"
       ],
-      "summary": "Initial ledger created. Demand backdrop is attractive, but investability depends on licensing and financing evidence."
+      "summary": "Initial ledger created. Demand backdrop is attractive, but investability depends on licensing cadence, named customer quality, and financing evidence."
+    },
+    {
+      "date": "2026-06-30",
+      "decision": "watch",
+      "drift": "Catalyst tracking added so future reviews separate power-demand validation from Oklo-specific execution evidence.",
+      "source_ids": [
+        "S1",
+        "S3"
+      ],
+      "summary": "Maintain watchlist status until catalysts move from narrative support to dated, source-backed milestones."
     }
   ],
   "thesis_id": "oklo-ai-power",

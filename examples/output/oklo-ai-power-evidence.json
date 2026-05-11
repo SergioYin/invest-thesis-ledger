@@ -1,0 +1,86 @@
+{
+  "coverage": {
+    "source_count": 3,
+    "stale_source_count": 0,
+    "supported_items": 9,
+    "tracked_items": 9,
+    "unsupported_items": 0,
+    "unused_source_count": 0
+  },
+  "items": [
+    {
+      "id": "A1",
+      "source_ids": [
+        "S2"
+      ],
+      "type": "assumption"
+    },
+    {
+      "id": "A2",
+      "source_ids": [
+        "S1",
+        "S3"
+      ],
+      "type": "assumption"
+    },
+    {
+      "id": "CAT1",
+      "source_ids": [
+        "S1",
+        "S2"
+      ],
+      "type": "catalyst"
+    },
+    {
+      "id": "CAT2",
+      "source_ids": [
+        "S3"
+      ],
+      "type": "catalyst"
+    },
+    {
+      "id": "CAT3",
+      "source_ids": [
+        "S1"
+      ],
+      "type": "catalyst"
+    },
+    {
+      "id": "REV1:2026-05-12",
+      "source_ids": [
+        "S1",
+        "S2",
+        "S3"
+      ],
+      "type": "review"
+    },
+    {
+      "id": "REV2:2026-06-30",
+      "source_ids": [
+        "S1",
+        "S3"
+      ],
+      "type": "review"
+    },
+    {
+      "id": "R1",
+      "source_ids": [
+        "S3"
+      ],
+      "type": "risk"
+    },
+    {
+      "id": "R2",
+      "source_ids": [
+        "S1",
+        "S2"
+      ],
+      "type": "risk"
+    }
+  ],
+  "stale_sources": [],
+  "thesis_id": "oklo-ai-power",
+  "title": "Oklo AI Power Demand Thesis",
+  "unused_sources": [],
+  "updated": "2026-05-12"
+}

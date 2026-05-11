@@ -83,8 +83,8 @@ def validate_ledger(ledger: Mapping[str, Any]) -> Tuple[List[str], List[str]]:
     if errors:
         return errors, warnings
 
-    if ledger.get("ledger_version") != "0.1.0":
-        warnings.append("ledger.ledger_version is not 0.1.0")
+    if ledger.get("ledger_version") not in {"0.1.0", "0.2.0"}:
+        warnings.append("ledger.ledger_version is not 0.1.0 or 0.2.0")
 
     asset = ledger["asset"]
     _require_fields("ledger.asset", asset, REQUIRED_ASSET, errors)
@@ -130,6 +130,20 @@ def validate_ledger(ledger: Mapping[str, Any]) -> Tuple[List[str], List[str]]:
     for optional_list in ("positions", "catalysts", "checklist"):
         if optional_list in ledger and not isinstance(ledger[optional_list], list):
             errors.append(f"ledger.{optional_list} must be a list")
+
+    if isinstance(ledger.get("catalysts"), list):
+        for index, catalyst in enumerate(ledger["catalysts"]):
+            path = f"ledger.catalysts[{index}]"
+            if isinstance(catalyst, str):
+                continue
+            if not isinstance(catalyst, dict):
+                errors.append(f"{path} must be a string or object")
+                continue
+            for field in ("id", "title", "date", "window", "status"):
+                if field in catalyst and not isinstance(catalyst[field], str):
+                    errors.append(f"{path}.{field} must be a string")
+            if "source_ids" in catalyst:
+                _validate_source_refs(path, catalyst["source_ids"], source_id_set, errors)
 
     return errors, warnings
 
@@ -204,8 +218,13 @@ def _validate_source_refs(path: str, refs: Any, source_ids: set[str], errors: Li
     if not isinstance(refs, list):
         errors.append(f"{path}.source_ids must be a list")
         return
+    seen = set()
     for ref in refs:
         if not isinstance(ref, str):
             errors.append(f"{path}.source_ids entries must be strings")
         elif ref not in source_ids:
             errors.append(f"{path}.source_ids references unknown source {ref}")
+        elif ref in seen:
+            errors.append(f"{path}.source_ids has duplicate source {ref}")
+        else:
+            seen.add(ref)

@@ -21,9 +21,9 @@ Advanced nuclear developers may benefit if AI data center demand increases the v
 
 ## Catalysts
 
-- Signed commercial power purchase agreement with credible counterparty.
-- Material licensing update with a clear review timeline.
-- Capital raise or partnership that reduces funding risk.
+- CAT2: Material licensing update with a clear review timeline. (date: 2026-08-15); sources: [S3]
+- CAT1: Signed commercial power purchase agreement with credible counterparty. (window: 2026-H2); sources: [S1], [S2]
+- CAT3: Capital raise or partnership that reduces funding risk. (window: next financing update); sources: [S1]
 
 ## Current Position Notes
 

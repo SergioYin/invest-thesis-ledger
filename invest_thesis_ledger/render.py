@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, List, Mapping, Sequence
+from datetime import date
+from typing import Any, Dict, List, Mapping, Optional, Sequence
 
 from .schema import source_lookup
 
@@ -38,8 +39,10 @@ def render_brief(ledger: Mapping[str, Any]) -> str:
             f"(confidence: {item['confidence']}; sources: {_refs(item['source_ids'])})"
         )
     lines.extend(["", "## Catalysts", ""])
-    for item in ledger.get("catalysts", []):
-        lines.append(f"- {item}")
+    for item in calendar_payload(ledger)["catalysts"]:
+        timing = _catalyst_timing(item)
+        source_text = f"; sources: {_refs(item['source_ids'])}" if item["source_ids"] else ""
+        lines.append(f"- {item['id']}: {item['title']}{timing}{source_text}")
     if not ledger.get("catalysts"):
         lines.append("- None recorded.")
     lines.extend(["", "## Current Position Notes", ""])
@@ -144,6 +147,186 @@ def history_payload(ledger: Mapping[str, Any]) -> Dict[str, Any]:
     }
 
 
+def compare_payload(old: Mapping[str, Any], new: Mapping[str, Any]) -> Dict[str, Any]:
+    """Build structured thesis drift output between two ledgers."""
+
+    return {
+        "thesis_id": {
+            "old": old["thesis_id"],
+            "new": new["thesis_id"],
+            "changed": old["thesis_id"] != new["thesis_id"],
+        },
+        "title": {
+            "old": old["title"],
+            "new": new["title"],
+            "changed": old["title"] != new["title"],
+        },
+        "updated": {"old": old["updated"], "new": new["updated"]},
+        "thesis": {
+            "changed": old["thesis"] != new["thesis"],
+            "old": old["thesis"],
+            "new": new["thesis"],
+        },
+        "assumptions": _compare_by_id(
+            old.get("assumptions", []),
+            new.get("assumptions", []),
+            ("statement", "confidence", "source_ids"),
+        ),
+        "risks": _compare_by_id(
+            old.get("risks", []),
+            new.get("risks", []),
+            ("name", "severity", "probability", "mitigation", "source_ids"),
+        ),
+        "reviews": _compare_by_id(
+            _reviews_with_ids(old.get("reviews", [])),
+            _reviews_with_ids(new.get("reviews", [])),
+            ("date", "decision", "summary", "drift", "source_ids"),
+        ),
+    }
+
+
+def render_compare(old: Mapping[str, Any], new: Mapping[str, Any]) -> str:
+    """Render Markdown thesis drift output between two ledgers."""
+
+    payload = compare_payload(old, new)
+    lines = [
+        f"# Thesis Drift: {payload['title']['old']} -> {payload['title']['new']}",
+        "",
+        "> This is a research organization tool, not investment advice.",
+        "",
+        f"- Ledger ID: {payload['thesis_id']['old']} -> {payload['thesis_id']['new']}",
+        f"- Updated: {payload['updated']['old']} -> {payload['updated']['new']}",
+        "",
+        "## Thesis",
+        "",
+    ]
+    if payload["thesis"]["changed"]:
+        lines.extend(["- Status: changed", f"- Old: {payload['thesis']['old']}", f"- New: {payload['thesis']['new']}"])
+    else:
+        lines.append("- Status: unchanged")
+    lines.extend(["", "## Assumptions", ""])
+    _extend_compare_lines(lines, payload["assumptions"])
+    lines.extend(["", "## Risks", ""])
+    _extend_compare_lines(lines, payload["risks"])
+    lines.extend(["", "## Reviews", ""])
+    _extend_compare_lines(lines, payload["reviews"])
+    return "\n".join(lines) + "\n"
+
+
+def calendar_payload(ledger: Mapping[str, Any]) -> Dict[str, Any]:
+    """Build structured catalyst calendar output."""
+
+    catalysts = [_normalize_catalyst(item, index) for index, item in enumerate(ledger.get("catalysts", []), start=1)]
+    catalysts.sort(key=lambda item: (item["date"] == "", item["date"], item["window"], item["id"]))
+    return {
+        "thesis_id": ledger["thesis_id"],
+        "title": ledger["title"],
+        "updated": ledger["updated"],
+        "catalysts": catalysts,
+    }
+
+
+def render_calendar(ledger: Mapping[str, Any]) -> str:
+    """Render a Markdown catalyst calendar."""
+
+    payload = calendar_payload(ledger)
+    lines = [
+        f"# Catalyst Calendar: {payload['title']}",
+        "",
+        "> This is a research organization tool, not investment advice.",
+        "",
+        f"- Ledger ID: {payload['thesis_id']}",
+        f"- Updated: {payload['updated']}",
+        "",
+        "## Catalysts",
+        "",
+    ]
+    if not payload["catalysts"]:
+        lines.append("- No catalysts recorded.")
+    for item in payload["catalysts"]:
+        lines.extend(
+            [
+                f"### {item['id']}: {item['title']}",
+                "",
+                f"- Date: {item['date'] or 'not specified'}",
+                f"- Window: {item['window'] or 'not specified'}",
+                f"- Status: {item['status']}",
+                f"- Sources: {_refs(item['source_ids'])}",
+                "",
+            ]
+        )
+    lines.extend(["## Sources", ""])
+    lines.extend(_source_lines(ledger))
+    return "\n".join(lines) + "\n"
+
+
+def evidence_payload(ledger: Mapping[str, Any]) -> Dict[str, Any]:
+    """Build structured source coverage and stale-source output."""
+
+    sources = source_lookup(ledger)
+    source_ids = set(sources)
+    usage: Dict[str, List[str]] = {source_id: [] for source_id in source_ids}
+    records = []
+    records.extend(_evidence_records("assumption", ledger.get("assumptions", []), source_ids, usage))
+    records.extend(_evidence_records("risk", ledger.get("risks", []), source_ids, usage))
+    records.extend(_evidence_records("review", _reviews_with_ids(ledger.get("reviews", [])), source_ids, usage))
+    records.extend(_evidence_records("catalyst", calendar_payload(ledger)["catalysts"], source_ids, usage))
+    stale_sources = _stale_sources(ledger)
+    unsupported = [item for item in records if not item["source_ids"]]
+    return {
+        "thesis_id": ledger["thesis_id"],
+        "title": ledger["title"],
+        "updated": ledger["updated"],
+        "coverage": {
+            "tracked_items": len(records),
+            "supported_items": len(records) - len(unsupported),
+            "unsupported_items": len(unsupported),
+            "source_count": len(sources),
+            "unused_source_count": sum(1 for refs in usage.values() if not refs),
+            "stale_source_count": len(stale_sources),
+        },
+        "items": sorted(records, key=lambda item: (item["type"], item["id"])),
+        "unused_sources": sorted(source_id for source_id, refs in usage.items() if not refs),
+        "stale_sources": stale_sources,
+    }
+
+
+def render_evidence(ledger: Mapping[str, Any]) -> str:
+    """Render a Markdown evidence coverage report."""
+
+    payload = evidence_payload(ledger)
+    lines = [
+        f"# Evidence Report: {payload['title']}",
+        "",
+        "> This is a research organization tool, not investment advice.",
+        "",
+        f"- Ledger ID: {payload['thesis_id']}",
+        f"- Updated: {payload['updated']}",
+        "",
+        "## Coverage",
+        "",
+    ]
+    for key, value in payload["coverage"].items():
+        lines.append(f"- {key.replace('_', ' ').title()}: {value}")
+    lines.extend(["", "## Items", ""])
+    for item in payload["items"]:
+        status = "supported" if item["source_ids"] else "unsupported"
+        lines.append(f"- {item['type']} {item['id']}: {status}; sources: {_refs(item['source_ids'])}")
+    lines.extend(["", "## Stale Sources", ""])
+    if payload["stale_sources"]:
+        for item in payload["stale_sources"]:
+            lines.append(f"- [{item['id']}] {item['title']} ({item['date']}): {item['age_days']} days old")
+    else:
+        lines.append("- No stale sources detected.")
+    lines.extend(["", "## Unused Sources", ""])
+    if payload["unused_sources"]:
+        for source_id in payload["unused_sources"]:
+            lines.append(f"- [{source_id}]")
+    else:
+        lines.append("- No unused sources detected.")
+    return "\n".join(lines) + "\n"
+
+
 def render_history(ledger: Mapping[str, Any]) -> str:
     """Render a Markdown review timeline and thesis drift report."""
 
@@ -200,3 +383,142 @@ def _source_lines(ledger: Mapping[str, Any]) -> List[str]:
 
 def _checkbox(status: str) -> str:
     return "x" if status.lower() in {"done", "closed", "passed", "complete"} else " "
+
+
+def _compare_by_id(
+    old_items: Sequence[Mapping[str, Any]], new_items: Sequence[Mapping[str, Any]], fields: Sequence[str]
+) -> Dict[str, Any]:
+    old_by_id = {str(item["id"]): item for item in old_items if isinstance(item, dict) and "id" in item}
+    new_by_id = {str(item["id"]): item for item in new_items if isinstance(item, dict) and "id" in item}
+    added = []
+    removed = []
+    changed = []
+    unchanged = []
+    for item_id in sorted(new_by_id.keys() - old_by_id.keys()):
+        added.append(_project(new_by_id[item_id], fields))
+    for item_id in sorted(old_by_id.keys() - new_by_id.keys()):
+        removed.append(_project(old_by_id[item_id], fields))
+    for item_id in sorted(old_by_id.keys() & new_by_id.keys()):
+        old_projected = _project(old_by_id[item_id], fields)
+        new_projected = _project(new_by_id[item_id], fields)
+        field_changes = [field for field in fields if old_projected.get(field) != new_projected.get(field)]
+        if field_changes:
+            changed.append({"id": item_id, "changes": field_changes, "old": old_projected, "new": new_projected})
+        else:
+            unchanged.append(item_id)
+    return {"added": added, "removed": removed, "changed": changed, "unchanged": unchanged}
+
+
+def _project(item: Mapping[str, Any], fields: Sequence[str]) -> Dict[str, Any]:
+    projected = {"id": str(item["id"])}
+    for field in fields:
+        value = item.get(field, "" if field != "source_ids" else [])
+        projected[field] = list(value) if isinstance(value, list) else value
+    return projected
+
+
+def _reviews_with_ids(reviews: Sequence[Any]) -> List[Dict[str, Any]]:
+    items = []
+    review_items = [review for review in reviews if isinstance(review, dict)]
+    review_items.sort(
+        key=lambda review: (
+            str(review.get("date", "")),
+            str(review.get("decision", "")),
+            str(review.get("summary", "")),
+        )
+    )
+    for index, review in enumerate(review_items, start=1):
+        item = dict(review)
+        item["id"] = item.get("id", f"REV{index}:{item.get('date', '')}")
+        items.append(item)
+    return items
+
+
+def _extend_compare_lines(lines: List[str], section: Mapping[str, Any]) -> None:
+    for label in ("added", "removed"):
+        if section[label]:
+            lines.append(f"### {label.title()}")
+            lines.append("")
+            for item in section[label]:
+                lines.append(f"- {item['id']}: {_compare_label(item)}")
+            lines.append("")
+    if section["changed"]:
+        lines.extend(["### Changed", ""])
+        for item in section["changed"]:
+            lines.append(f"- {item['id']}: {', '.join(item['changes'])}")
+        lines.append("")
+    if not section["added"] and not section["removed"] and not section["changed"]:
+        lines.append("- No material changes.")
+
+
+def _compare_label(item: Mapping[str, Any]) -> str:
+    for field in ("statement", "name", "summary", "title"):
+        if item.get(field):
+            return str(item[field])
+    return "record"
+
+
+def _normalize_catalyst(item: Any, index: int) -> Dict[str, Any]:
+    if isinstance(item, dict):
+        source_ids = item.get("source_ids", [])
+        return {
+            "id": str(item.get("id", f"CAT{index}")),
+            "title": str(item.get("title") or item.get("name") or item.get("summary") or item.get("description") or ""),
+            "date": str(item.get("date", "")),
+            "window": str(item.get("window", "")),
+            "status": str(item.get("status", "watch")),
+            "source_ids": list(source_ids) if isinstance(source_ids, list) else [],
+        }
+    return {"id": f"CAT{index}", "title": str(item), "date": "", "window": "", "status": "watch", "source_ids": []}
+
+
+def _catalyst_timing(item: Mapping[str, Any]) -> str:
+    parts = []
+    if item["date"]:
+        parts.append(f"date: {item['date']}")
+    if item["window"]:
+        parts.append(f"window: {item['window']}")
+    return f" ({'; '.join(parts)})" if parts else ""
+
+
+def _evidence_records(
+    item_type: str, items: Sequence[Mapping[str, Any]], source_ids: set[str], usage: Dict[str, List[str]]
+) -> List[Dict[str, Any]]:
+    records = []
+    for index, item in enumerate(items, start=1):
+        item_id = str(item.get("id", f"{item_type.upper()}{index}"))
+        refs = [ref for ref in item.get("source_ids", []) if isinstance(ref, str) and ref in source_ids]
+        for ref in refs:
+            usage[ref].append(f"{item_type}:{item_id}")
+        records.append({"type": item_type, "id": item_id, "source_ids": refs})
+    return records
+
+
+def _stale_sources(ledger: Mapping[str, Any]) -> List[Dict[str, Any]]:
+    updated = _parse_date(str(ledger.get("updated", "")))
+    if updated is None:
+        return []
+    stale = []
+    for source_id, source in sorted(source_lookup(ledger).items()):
+        source_date = _parse_date(str(source.get("date", "")))
+        if source_date is None:
+            continue
+        age_days = (updated - source_date).days
+        if age_days > 180:
+            stale.append(
+                {
+                    "id": source_id,
+                    "title": source["title"],
+                    "date": source["date"],
+                    "age_days": age_days,
+                    "warning": "source is more than 180 days older than ledger.updated",
+                }
+            )
+    return stale
+
+
+def _parse_date(value: str) -> Optional[date]:
+    try:
+        return date.fromisoformat(value)
+    except ValueError:
+        return None

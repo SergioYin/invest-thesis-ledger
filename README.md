@@ -1,8 +1,9 @@
 # invest-thesis-ledger
 
 A zero-dependency Python package and CLI for maintaining investment thesis
-ledgers as JSON, then rendering deterministic briefs, risk reports, and review
-timelines.
+ledgers as JSON, then rendering deterministic briefs, risk reports, review
+timelines, thesis drift comparisons, catalyst calendars, and evidence coverage
+reports.
 
 This project is for research organization only. It is not investment advice.
 
@@ -39,7 +40,7 @@ title: Oklo AI Power Demand Thesis
 sources: 3
 assumptions: 2
 risks: 2
-reviews: 1
+reviews: 2
 status: valid
 ```
 
@@ -61,11 +62,29 @@ Render a review timeline and thesis drift report:
 python -m invest_thesis_ledger history examples/oklo-ai-power.json --output history.md --json-output history.json
 ```
 
+Compare two ledger snapshots for thesis, assumption, risk, and review drift:
+
+```bash
+python -m invest_thesis_ledger compare examples/oklo-ai-power-prior.json examples/oklo-ai-power.json --output drift.md --json-output drift.json
+```
+
+Render a catalyst calendar with optional catalyst `date` and `window` fields:
+
+```bash
+python -m invest_thesis_ledger calendar examples/oklo-ai-power.json --output calendar.md --json-output calendar.json
+```
+
+Render source coverage and deterministic stale-source warnings:
+
+```bash
+python -m invest_thesis_ledger evidence examples/oklo-ai-power.json --output evidence.md --json-output evidence.json
+```
+
 All generated outputs are deterministic for the same input file.
 
 ## Ledger Format
 
-Ledgers are JSON objects. The v0.1.0 required fields are:
+Ledgers are JSON objects. The v0.2.0 required fields are:
 
 - `ledger_version`
 - `thesis_id`
@@ -85,11 +104,18 @@ Optional fields currently rendered by the CLI:
 - `catalysts`
 - `checklist`
 
-The formal v0.1.0 schema reference is in `docs/ledger-schema.md`.
+`catalysts` may be strings or objects. Object catalysts can include `id`,
+`title`, `date`, `window`, `status`, and `source_ids`; catalyst `source_ids`
+must reference known sources and must not repeat the same source within one
+catalyst. `calendar` sorts dated catalysts first and keeps undated window-based
+catalysts deterministic.
+
+The formal v0.2.0 schema reference is in `docs/ledger-schema.md`.
 
 See:
 
 - `examples/oklo-ai-power.json`
+- `examples/oklo-ai-power-prior.json`
 - `examples/leveraged-etf-discipline.json`
 
 ## Demo Outputs
@@ -102,6 +128,12 @@ Checked-in deterministic CLI output fixtures are available under
 - `examples/output/oklo-ai-power-risk.json`
 - `examples/output/oklo-ai-power-history.md`
 - `examples/output/oklo-ai-power-history.json`
+- `examples/output/oklo-ai-power-calendar.md`
+- `examples/output/oklo-ai-power-calendar.json`
+- `examples/output/oklo-ai-power-evidence.md`
+- `examples/output/oklo-ai-power-evidence.json`
+- `examples/output/oklo-ai-power-drift.md`
+- `examples/output/oklo-ai-power-drift.json`
 
 ## Development
 
@@ -123,11 +155,12 @@ If `pytest` is available, the tests are also compatible with:
 pytest
 ```
 
-## Roadmap
+## Notes
 
-- Add more report templates while keeping deterministic output.
-- Add migration helpers for future ledger versions.
-- Add richer thesis drift analysis using explicit prior/current assumptions.
+`evidence` treats a source as stale when its `date` is more than 180 days older
+than the ledger `updated` date. Sources are not compared to the current
+wall-clock date, so stale-source warnings stay deterministic and independent of
+the day the command is run.
 
 ## License
 

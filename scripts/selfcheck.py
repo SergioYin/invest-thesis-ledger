@@ -14,6 +14,9 @@ EXAMPLES = [
     ROOT / "examples" / "oklo-ai-power.json",
     ROOT / "examples" / "leveraged-etf-discipline.json",
 ]
+COMPARE_EXAMPLES = [
+    (ROOT / "examples" / "oklo-ai-power-prior.json", ROOT / "examples" / "oklo-ai-power.json"),
+]
 
 
 def main() -> int:
@@ -57,6 +60,48 @@ def main() -> int:
                     str(temp_dir / f"{stem}-history.md"),
                     "--json-output",
                     str(temp_dir / f"{stem}-history.json"),
+                ]
+            )
+            _run(
+                [
+                    sys.executable,
+                    "-m",
+                    "invest_thesis_ledger",
+                    "calendar",
+                    str(ledger),
+                    "--output",
+                    str(temp_dir / f"{stem}-calendar.md"),
+                    "--json-output",
+                    str(temp_dir / f"{stem}-calendar.json"),
+                ]
+            )
+            _run(
+                [
+                    sys.executable,
+                    "-m",
+                    "invest_thesis_ledger",
+                    "evidence",
+                    str(ledger),
+                    "--output",
+                    str(temp_dir / f"{stem}-evidence.md"),
+                    "--json-output",
+                    str(temp_dir / f"{stem}-evidence.json"),
+                ]
+            )
+        for old_ledger, new_ledger in COMPARE_EXAMPLES:
+            stem = new_ledger.stem
+            _run(
+                [
+                    sys.executable,
+                    "-m",
+                    "invest_thesis_ledger",
+                    "compare",
+                    str(old_ledger),
+                    str(new_ledger),
+                    "--output",
+                    str(temp_dir / f"{stem}-drift.md"),
+                    "--json-output",
+                    str(temp_dir / f"{stem}-drift.json"),
                 ]
             )
         _run([sys.executable, "-m", "unittest", "discover", "-s", str(ROOT / "tests")])

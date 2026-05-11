@@ -1,0 +1,97 @@
+{
+  "assumptions": {
+    "added": [
+      {
+        "confidence": "low",
+        "id": "A2",
+        "source_ids": [
+          "S1",
+          "S3"
+        ],
+        "statement": "Oklo can preserve financing flexibility through the next licensing milestones."
+      }
+    ],
+    "changed": [],
+    "removed": [],
+    "unchanged": [
+      "A1"
+    ]
+  },
+  "reviews": {
+    "added": [
+      {
+        "date": "2026-06-30",
+        "decision": "watch",
+        "drift": "Catalyst tracking added so future reviews separate power-demand validation from Oklo-specific execution evidence.",
+        "id": "REV2:2026-06-30",
+        "source_ids": [
+          "S1",
+          "S3"
+        ],
+        "summary": "Maintain watchlist status until catalysts move from narrative support to dated, source-backed milestones."
+      }
+    ],
+    "changed": [
+      {
+        "changes": [
+          "summary"
+        ],
+        "id": "REV1:2026-05-12",
+        "new": {
+          "date": "2026-05-12",
+          "decision": "watch",
+          "drift": "none recorded",
+          "id": "REV1:2026-05-12",
+          "source_ids": [
+            "S1",
+            "S2",
+            "S3"
+          ],
+          "summary": "Initial ledger created. Demand backdrop is attractive, but investability depends on licensing cadence, named customer quality, and financing evidence."
+        },
+        "old": {
+          "date": "2026-05-12",
+          "decision": "watch",
+          "drift": "none recorded",
+          "id": "REV1:2026-05-12",
+          "source_ids": [
+            "S1",
+            "S2",
+            "S3"
+          ],
+          "summary": "Initial ledger created. Demand backdrop is attractive, but investability depends on licensing and financing evidence."
+        }
+      }
+    ],
+    "removed": [],
+    "unchanged": []
+  },
+  "risks": {
+    "added": [],
+    "changed": [],
+    "removed": [],
+    "unchanged": [
+      "R1",
+      "R2"
+    ]
+  },
+  "thesis": {
+    "changed": false,
+    "new": "Advanced nuclear developers may benefit if AI data center demand increases the value of firm, clean power, but commercialization timing and regulatory execution remain the core constraints.",
+    "old": "Advanced nuclear developers may benefit if AI data center demand increases the value of firm, clean power, but commercialization timing and regulatory execution remain the core constraints."
+  },
+  "thesis_id": {
+    "changed": false,
+    "new": "oklo-ai-power",
+    "old": "oklo-ai-power"
+  },
+  "title": {
+    "changed": false,
+    "new": "Oklo AI Power Demand Thesis",
+    "old": "Oklo AI Power Demand Thesis"
+  },
+  "updated": {
+    "new": "2026-05-12",
+    "old": "2026-05-12"
+  }
+}

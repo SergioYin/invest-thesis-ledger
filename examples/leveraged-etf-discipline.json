@@ -1,5 +1,5 @@
 {
-  "ledger_version": "0.1.0",
+  "ledger_version": "0.2.0",
   "thesis_id": "leveraged-etf-discipline",
   "title": "Leveraged ETF Discipline Ledger",
   "asset": {
@@ -45,8 +45,20 @@
     }
   ],
   "catalysts": [
-    "Index breaks above predefined technical level.",
-    "Macro event calendar supports a time-boxed tactical setup."
+    {
+      "id": "CAT1",
+      "title": "Index breaks above predefined technical level.",
+      "window": "before entry",
+      "status": "required",
+      "source_ids": []
+    },
+    {
+      "id": "CAT2",
+      "title": "Macro event calendar supports a time-boxed tactical setup.",
+      "date": "2026-06-10",
+      "status": "required",
+      "source_ids": ["S1"]
+    }
   ],
   "risks": [
     {
@@ -87,9 +99,16 @@
     {
       "date": "2026-05-12",
       "decision": "policy",
-      "summary": "Created a discipline ledger for tactical leveraged ETF use.",
+      "summary": "Created a discipline ledger for tactical leveraged ETF use with explicit sizing, event, and exit constraints.",
       "drift": "none recorded",
       "source_ids": ["S1", "S2"]
+    },
+    {
+      "date": "2026-05-19",
+      "decision": "policy",
+      "summary": "Added catalyst requirements so trade setup, holding period, and macro event risk are checked before entry.",
+      "drift": "Workflow expanded from static risk reminder to pre-trade evidence gate.",
+      "source_ids": ["S1"]
     }
   ]
 }

@@ -10,9 +10,15 @@
 
 ### 2026-05-12 - watch
 
-- Summary: Initial ledger created. Demand backdrop is attractive, but investability depends on licensing and financing evidence.
+- Summary: Initial ledger created. Demand backdrop is attractive, but investability depends on licensing cadence, named customer quality, and financing evidence.
 - Drift: none recorded
 - Sources: [S1], [S2], [S3]
+
+### 2026-06-30 - watch
+
+- Summary: Maintain watchlist status until catalysts move from narrative support to dated, source-backed milestones.
+- Drift: Catalyst tracking added so future reviews separate power-demand validation from Oklo-specific execution evidence.
+- Sources: [S1], [S3]
 
 ## Sources
 
