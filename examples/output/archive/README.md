@@ -2,7 +2,7 @@
 
 > This is a research organization tool, not investment advice.
 
-- Tool Version: 1.6.2
+- Tool Version: 1.7.0
 - Ledgers: 2
 
 ## Input Ledgers

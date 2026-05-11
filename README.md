@@ -7,9 +7,9 @@ reports, broker/institution matrices, exposure checklists, deterministic
 starter ledger generation, decision memos, scenario plans, portfolio-level
 summaries, portfolio evidence audits, review queues, weekly watchlists, weekly
 action plans, static demo bundles, portable research archives, archive
-verification, archive diffs, and no-JS HTML dashboards. v1.6.2 adds audit
-coverage for archive symlink verification while preserving compatibility with
-v0.1.0 through v1.6.1 ledgers.
+verification, archive diffs, and no-JS HTML dashboards. v1.7.0 adds concise
+exit-code-2 reporting for output write failures while preserving compatibility
+with v0.1.0 through v1.6.2 ledgers.
 
 This project is for research organization only. It is not investment advice.
 
@@ -186,7 +186,7 @@ input file list.
 
 ## Ledger Format
 
-Ledgers are JSON objects. The v1.6.2 required fields are:
+Ledgers are JSON objects. The v1.7.0 required fields are:
 
 - `ledger_version`
 - `thesis_id`
@@ -223,7 +223,7 @@ ID.
 optional string `tags`; `exposure` combines these risk tags with position rules
 into a checklist.
 
-The formal v1.6.2 schema reference is in `docs/ledger-schema.md`.
+The formal v1.7.0 schema reference is in `docs/ledger-schema.md`.
 
 See:
 

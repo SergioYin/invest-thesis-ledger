@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.7.0 - 2026-05-12
+
+- Added consistent output-write error handling for file, paired Markdown/JSON, archive diff, template, demo bundle, archive, and HTML dashboard outputs.
+- Output write failures now exit 2 with concise `error: cannot write output <path>: <reason>` stderr instead of Python tracebacks.
+- Updated package/schema version, README, schema docs, tests, selfcheck, and checked-in fixtures for v1.7.0.
+
 ## 1.6.2 - 2026-05-12
 
 - Added regression coverage for hash-listed archive symlinks that are not generated files, confirming `verify-archive` reports them before hashing.

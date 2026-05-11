@@ -284,8 +284,9 @@ def _cmd_compare(args: argparse.Namespace) -> int:
         (args.output, lambda _ledger: render_compare(old, new)),
         (args.json_output, lambda _ledger: to_json(compare_payload(old, new))),
     )
-    for output_path, renderer in outputs:
-        _write_text(output_path, renderer(new))
+    status = _write_rendered_outputs(new, outputs)
+    if status:
+        return status
     sys.stdout.write(f"wrote: {args.output}, {args.json_output}\n")
     return 0
 
@@ -371,8 +372,14 @@ def _cmd_portfolio(args: argparse.Namespace) -> int:
         if warnings:
             sys.stderr.write(validation_summary(ledger, errors, warnings))
 
-    _write_text(args.output, render_portfolio(ledgers))
-    _write_text(args.json_output, to_json(portfolio_payload(ledgers)))
+    status = _write_text_outputs(
+        (
+            (args.output, render_portfolio(ledgers)),
+            (args.json_output, to_json(portfolio_payload(ledgers))),
+        )
+    )
+    if status:
+        return status
     sys.stdout.write(f"wrote: {args.output}, {args.json_output}\n")
     return 0
 
@@ -382,8 +389,14 @@ def _cmd_evidence_audit(args: argparse.Namespace) -> int:
     if ledgers is None:
         return status
 
-    _write_text(args.output, render_evidence_audit(ledgers))
-    _write_text(args.json_output, to_json(evidence_audit_payload(ledgers)))
+    status = _write_text_outputs(
+        (
+            (args.output, render_evidence_audit(ledgers)),
+            (args.json_output, to_json(evidence_audit_payload(ledgers))),
+        )
+    )
+    if status:
+        return status
     sys.stdout.write(f"wrote: {args.output}, {args.json_output}\n")
     return 0
 
@@ -409,8 +422,14 @@ def _cmd_review_queue(args: argparse.Namespace) -> int:
         if warnings:
             sys.stderr.write(validation_summary(ledger, errors, warnings))
 
-    _write_text(args.output, render_review_queue(ledgers))
-    _write_text(args.json_output, to_json(review_queue_payload(ledgers)))
+    status = _write_text_outputs(
+        (
+            (args.output, render_review_queue(ledgers)),
+            (args.json_output, to_json(review_queue_payload(ledgers))),
+        )
+    )
+    if status:
+        return status
     sys.stdout.write(f"wrote: {args.output}, {args.json_output}\n")
     return 0
 
@@ -420,8 +439,14 @@ def _cmd_watchlist(args: argparse.Namespace) -> int:
     if ledgers is None:
         return status
 
-    _write_text(args.output, render_watchlist(ledgers))
-    _write_text(args.json_output, to_json(watchlist_payload(ledgers)))
+    status = _write_text_outputs(
+        (
+            (args.output, render_watchlist(ledgers)),
+            (args.json_output, to_json(watchlist_payload(ledgers))),
+        )
+    )
+    if status:
+        return status
     sys.stdout.write(f"wrote: {args.output}, {args.json_output}\n")
     return 0
 
@@ -431,8 +456,14 @@ def _cmd_action_plan(args: argparse.Namespace) -> int:
     if ledgers is None:
         return status
 
-    _write_text(args.output, render_action_plan(ledgers))
-    _write_text(args.json_output, to_json(action_plan_payload(ledgers)))
+    status = _write_text_outputs(
+        (
+            (args.output, render_action_plan(ledgers)),
+            (args.json_output, to_json(action_plan_payload(ledgers))),
+        )
+    )
+    if status:
+        return status
     sys.stdout.write(f"wrote: {args.output}, {args.json_output}\n")
     return 0
 
@@ -451,14 +482,9 @@ def _cmd_demo_bundle(args: argparse.Namespace) -> int:
         sys.stderr.write(f"error: refusing to replace current working directory or ancestor: {output_dir}\n")
         return 2
 
-    try:
-        _write_demo_bundle_dir(output_dir, files)
-    except OSError as exc:
-        sys.stderr.write(f"error: cannot write demo bundle {output_dir}: {exc}\n")
-        return 2
-    except ValueError as exc:
-        sys.stderr.write(f"error: cannot write demo bundle {output_dir}: {exc}\n")
-        return 2
+    status = _write_output_dir(output_dir, lambda: _write_demo_bundle_dir(output_dir, files))
+    if status:
+        return status
     sys.stdout.write(f"wrote: {output_dir}\n")
     return 0
 
@@ -477,14 +503,9 @@ def _cmd_archive(args: argparse.Namespace) -> int:
         sys.stderr.write(f"error: refusing to replace current working directory or ancestor: {output_dir}\n")
         return 2
 
-    try:
-        _write_demo_bundle_dir(output_dir, files)
-    except OSError as exc:
-        sys.stderr.write(f"error: cannot write archive {output_dir}: {exc}\n")
-        return 2
-    except ValueError as exc:
-        sys.stderr.write(f"error: cannot write archive {output_dir}: {exc}\n")
-        return 2
+    status = _write_output_dir(output_dir, lambda: _write_demo_bundle_dir(output_dir, files))
+    if status:
+        return status
     sys.stdout.write(f"wrote: {output_dir}\n")
     return 0
 
@@ -525,8 +546,14 @@ def _cmd_diff_archive(args: argparse.Namespace) -> int:
         return 1
 
     payload = _archive_diff_payload(old_summary, new_summary)
-    _write_text(args.output, _render_archive_diff(payload))
-    _write_text(args.json_output, to_json(payload))
+    status = _write_text_outputs(
+        (
+            (args.output, _render_archive_diff(payload)),
+            (args.json_output, to_json(payload)),
+        )
+    )
+    if status:
+        return status
     sys.stdout.write(f"wrote: {args.output}, {args.json_output}\n")
     return 0
 
@@ -554,21 +581,18 @@ def _cmd_html_dashboard(args: argparse.Namespace) -> int:
         sys.stderr.write(f"error: refusing to replace current working directory or ancestor: {output_dir}\n")
         return 2
 
-    try:
-        _write_demo_bundle_dir(output_dir, files)
-    except OSError as exc:
-        sys.stderr.write(f"error: cannot write HTML dashboard {output_dir}: {exc}\n")
-        return 2
-    except ValueError as exc:
-        sys.stderr.write(f"error: cannot write HTML dashboard {output_dir}: {exc}\n")
-        return 2
+    status = _write_output_dir(output_dir, lambda: _write_demo_bundle_dir(output_dir, files))
+    if status:
+        return status
     sys.stdout.write(f"wrote: {output_dir}\n")
     return 0
 
 
 def _cmd_init_template(args: argparse.Namespace) -> int:
     ledger = _starter_ledger(args.asset, args.name, args.type)
-    _write_text(args.output, to_json(ledger))
+    status = _write_text_outputs(((args.output, to_json(ledger)),))
+    if status:
+        return status
     sys.stdout.write(f"wrote: {args.output}\n")
     return 0
 
@@ -586,8 +610,9 @@ def _render_validated(
         return 1
     if warnings:
         sys.stderr.write(validation_summary(ledger, errors, warnings))
-    for output_path, renderer in outputs:
-        _write_text(output_path, renderer(ledger))
+    status = _write_rendered_outputs(ledger, outputs)
+    if status:
+        return status
     sys.stdout.write(f"wrote: {', '.join(path for path, _ in outputs)}\n")
     return 0
 
@@ -629,6 +654,48 @@ def _write_text(path: str, text: str) -> None:
     output_path = Path(path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(text, encoding="utf-8")
+
+
+def _write_rendered_outputs(ledger: dict, outputs: Sequence[tuple[str, Callable[[dict], str]]]) -> int:
+    for output_path, renderer in outputs:
+        status = _write_text_outputs(((output_path, renderer(ledger)),))
+        if status:
+            return status
+    return 0
+
+
+def _write_text_outputs(outputs: Sequence[tuple[str, str]]) -> int:
+    for output_path, text in outputs:
+        status = _write_output(output_path, lambda output_path=output_path, text=text: _write_text(output_path, text))
+        if status:
+            return status
+    return 0
+
+
+def _write_output(path: object, write: Callable[[], None]) -> int:
+    try:
+        write()
+    except OSError as exc:
+        _report_output_write_error(path, exc)
+        return 2
+    return 0
+
+
+def _write_output_dir(path: object, write: Callable[[], None]) -> int:
+    try:
+        write()
+    except OSError as exc:
+        _report_output_write_error(path, exc)
+        return 2
+    except ValueError as exc:
+        sys.stderr.write(f"error: cannot write output {path}: {exc}\n")
+        return 2
+    return 0
+
+
+def _report_output_write_error(path: object, exc: OSError) -> None:
+    reason = exc.strerror or str(exc)
+    sys.stderr.write(f"error: cannot write output {path}: {reason}\n")
 
 
 def _is_unsafe_output_dir(output_dir: Path) -> bool:

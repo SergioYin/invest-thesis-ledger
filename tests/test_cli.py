@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import hashlib
 import re
@@ -8,8 +10,10 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
+from invest_thesis_ledger import cli as cli_module
 from invest_thesis_ledger.cli import _write_demo_bundle_dir
 from invest_thesis_ledger.render import (
     action_plan_payload,
@@ -38,6 +42,13 @@ class CliTests(unittest.TestCase):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
+
+    def run_cli_in_process(self, *args: str) -> tuple[int, str, str]:
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            status = cli_module.main(args)
+        return status, stdout.getvalue(), stderr.getvalue()
 
     def test_validate_example(self) -> None:
         result = self.run_cli("validate", str(EXAMPLE))
@@ -135,6 +146,108 @@ class CliTests(unittest.TestCase):
         self.assertIn("LEDGER", scenario_plan.stdout)
         self.assertIn("base/bull/bear scenario plan", scenario_plan.stdout)
         self.assertIn("write JSON output to PATH", scenario_plan.stdout)
+
+    def test_single_file_output_write_error_returns_concise_exit_2(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            output_path = Path(temp) / "blocked.md"
+            with mock.patch.object(cli_module, "_write_text", side_effect=PermissionError(13, "Permission denied")):
+                status, stdout, stderr = self.run_cli_in_process("brief", str(EXAMPLE), "--output", str(output_path))
+
+            self.assertEqual(status, 2)
+            self.assertEqual(stdout, "")
+            self.assertEqual(stderr, f"error: cannot write output {output_path}: Permission denied\n")
+            self.assertNotIn("Traceback", stderr)
+
+    def test_paired_output_write_error_reports_failing_path(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            md_path = Path(temp) / "risk.md"
+            json_path = Path(temp) / "risk.json"
+            with mock.patch.object(
+                cli_module,
+                "_write_text",
+                side_effect=[None, OSError("disk full")],
+            ):
+                status, stdout, stderr = self.run_cli_in_process(
+                    "risk",
+                    str(EXAMPLE),
+                    "--output",
+                    str(md_path),
+                    "--json-output",
+                    str(json_path),
+                )
+
+            self.assertEqual(status, 2)
+            self.assertEqual(stdout, "")
+            self.assertEqual(stderr, f"error: cannot write output {json_path}: disk full\n")
+            self.assertNotIn("Traceback", stderr)
+
+    def test_init_template_output_write_error_returns_concise_exit_2(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            output_path = Path(temp) / "ledger.json"
+            with mock.patch.object(cli_module, "_write_text", side_effect=OSError("read-only target")):
+                status, stdout, stderr = self.run_cli_in_process(
+                    "init-template",
+                    "--asset",
+                    "TST",
+                    "--name",
+                    "Test Asset",
+                    "--type",
+                    "equity",
+                    "--output",
+                    str(output_path),
+                )
+
+            self.assertEqual(status, 2)
+            self.assertEqual(stdout, "")
+            self.assertEqual(stderr, f"error: cannot write output {output_path}: read-only target\n")
+            self.assertNotIn("Traceback", stderr)
+
+    def test_diff_archive_output_write_error_returns_concise_exit_2(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            md_path = Path(temp) / "archive-diff.md"
+            json_path = Path(temp) / "archive-diff.json"
+            with mock.patch.object(cli_module, "_write_text", side_effect=OSError("quota exceeded")):
+                status, stdout, stderr = self.run_cli_in_process(
+                    "diff-archive",
+                    str(ARCHIVE_FIXTURE),
+                    str(ARCHIVE_FIXTURE),
+                    "--output",
+                    str(md_path),
+                    "--json-output",
+                    str(json_path),
+                )
+
+            self.assertEqual(status, 2)
+            self.assertEqual(stdout, "")
+            self.assertEqual(stderr, f"error: cannot write output {md_path}: quota exceeded\n")
+            self.assertNotIn("Traceback", stderr)
+
+    def test_output_dir_write_errors_return_concise_exit_2(self) -> None:
+        commands = (
+            ("demo-bundle", "bundle"),
+            ("archive", "archive"),
+            ("html-dashboard", "html-dashboard"),
+        )
+        for command, dirname in commands:
+            with self.subTest(command=command), tempfile.TemporaryDirectory() as temp:
+                output_dir = Path(temp) / dirname
+                with mock.patch.object(
+                    cli_module,
+                    "_write_demo_bundle_dir",
+                    side_effect=PermissionError(13, "Permission denied"),
+                ):
+                    status, stdout, stderr = self.run_cli_in_process(
+                        command,
+                        str(EXAMPLE),
+                        str(ETF_EXAMPLE),
+                        "--output-dir",
+                        str(output_dir),
+                    )
+
+                self.assertEqual(status, 2)
+                self.assertEqual(stdout, "")
+                self.assertEqual(stderr, f"error: cannot write output {output_dir}: Permission denied\n")
+                self.assertNotIn("Traceback", stderr)
 
     def test_brief_is_deterministic(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -1706,7 +1819,7 @@ class CliTests(unittest.TestCase):
             self.assertIn("# Watchlist", (output_dir / "watchlist.md").read_text())
             self.assertIn("# Weekly Action Plan", (output_dir / "action-plan.md").read_text())
             manifest = json.loads((output_dir / "manifest.json").read_text())
-            self.assertEqual(manifest["tool_version"], "1.6.2")
+            self.assertEqual(manifest["tool_version"], "1.7.0")
             self.assertEqual(manifest["ledger_ids"], ["oklo-ai-power", "leveraged-etf-discipline"])
             self.assertEqual(manifest["generated_files"], expected_files)
             index_links = [
@@ -1854,11 +1967,11 @@ class CliTests(unittest.TestCase):
             self.assertEqual(sorted(path.name for path in output_dir.iterdir()), sorted(expected_files))
             manifest = json.loads((output_dir / "manifest.json").read_text())
             self.assertEqual(manifest["archive_format"], "portable-research-archive")
-            self.assertEqual(manifest["tool_version"], "1.6.2")
+            self.assertEqual(manifest["tool_version"], "1.7.0")
             self.assertEqual(manifest["ledger_ids"], ["oklo-ai-power", "leveraged-etf-discipline"])
             self.assertEqual(manifest["generated_files"], expected_files)
             summary = json.loads((output_dir / "archive-summary.json").read_text())
-            self.assertEqual(summary["tool_version"], "1.6.2")
+            self.assertEqual(summary["tool_version"], "1.7.0")
             self.assertEqual(summary["ledger_ids"], manifest["ledger_ids"])
             self.assertEqual(summary["archive"]["ledger_count"], 2)
             self.assertEqual(summary["archive"]["file_count"], len(expected_files))
@@ -2342,7 +2455,7 @@ class CliTests(unittest.TestCase):
             self.assertNotIn("<script", (output_dir / "index.html").read_text().lower())
             self.assertNotIn("@import", (output_dir / "style.css").read_text().lower())
             manifest = json.loads((output_dir / "manifest.json").read_text())
-            self.assertEqual(manifest["tool_version"], "1.6.2")
+            self.assertEqual(manifest["tool_version"], "1.7.0")
             self.assertEqual(manifest["ledger_ids"], ["oklo-ai-power", "leveraged-etf-discipline"])
             self.assertEqual(manifest["generated_files"], expected_files)
             self.assertNotIn("timestamp", manifest)
@@ -2538,7 +2651,7 @@ class CliTests(unittest.TestCase):
             self.assertEqual(second.returncode, 0, second.stderr)
             self.assertEqual(output_a.read_text(), output_b.read_text())
             payload = json.loads(output_a.read_text())
-            self.assertEqual(payload["ledger_version"], "1.6.2")
+            self.assertEqual(payload["ledger_version"], "1.7.0")
             self.assertEqual(payload["thesis_id"], "msft-thesis")
             self.assertEqual(payload["sources"][0]["id"], "S1")
             self.assertEqual(payload["assumptions"][0]["source_ids"], ["S1"])
