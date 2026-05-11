@@ -9,6 +9,17 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence
 from .schema import source_lookup
 
 
+_CLOSED_STATUSES = {"done", "closed", "passed", "complete"}
+_REVIEW_REASON_ORDER = {
+    "stale_sources": 0,
+    "high_severity_risks": 1,
+    "upcoming_open_catalysts": 2,
+    "stale_review": 3,
+    "open_checklist": 4,
+    "open_position_rules": 5,
+}
+
+
 def render_brief(ledger: Mapping[str, Any]) -> str:
     """Render a source-attributed investment thesis brief."""
 
@@ -640,6 +651,82 @@ def render_portfolio(ledgers: Sequence[Mapping[str, Any]]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def review_queue_payload(ledgers: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
+    """Build deterministic review queue output for multiple ledgers."""
+
+    items = [_review_queue_item(ledger) for ledger in ledgers]
+    items.sort(
+        key=lambda item: (
+            -item["score"],
+            _priority_rank(item["priority"]),
+            item["ticker"],
+            item["thesis_id"],
+            item["title"],
+        )
+    )
+    return {
+        "queue": {
+            "ledger_count": len(items),
+            "high_priority_count": sum(1 for item in items if item["priority"] == "high"),
+            "medium_priority_count": sum(1 for item in items if item["priority"] == "medium"),
+            "low_priority_count": sum(1 for item in items if item["priority"] == "low"),
+        },
+        "items": items,
+    }
+
+
+def render_review_queue(ledgers: Sequence[Mapping[str, Any]]) -> str:
+    """Render a Markdown queue of ledgers needing human review."""
+
+    payload = review_queue_payload(ledgers)
+    lines = [
+        "# Review Queue",
+        "",
+        "> This is a research organization tool, not investment advice.",
+        "",
+        f"- Ledgers: {payload['queue']['ledger_count']}",
+        f"- High Priority: {payload['queue']['high_priority_count']}",
+        f"- Medium Priority: {payload['queue']['medium_priority_count']}",
+        f"- Low Priority: {payload['queue']['low_priority_count']}",
+        "",
+        "## Queue",
+        "",
+        "| Priority | Score | Ticker | Ledger ID | Updated | Next Action |",
+        "| --- | ---: | --- | --- | --- | --- |",
+    ]
+    for item in payload["items"]:
+        lines.append(
+            "| "
+            + " | ".join(
+                [
+                    _cell(item["priority"]),
+                    str(item["score"]),
+                    _cell(item["ticker"]),
+                    _cell(item["thesis_id"]),
+                    _cell(item["updated"]),
+                    _cell(item["next_action"]),
+                ]
+            )
+            + " |"
+        )
+    lines.extend(["", "## Reasons", ""])
+    for item in payload["items"]:
+        lines.extend([f"### {_inline(item['ticker'])} - {_inline(item['title'])}", ""])
+        lines.append(f"- Priority: {_inline(item['priority'])}")
+        lines.append(f"- Score: {item['score']}")
+        lines.append(f"- Next Action: {_inline(item['next_action'])}")
+        if item["reasons"]:
+            for reason in item["reasons"]:
+                lines.append(
+                    f"- {_inline(reason['type'])}: {_inline(reason['text'])} "
+                    f"(count: {reason['count']}; score: {reason['score']})"
+                )
+        else:
+            lines.append("- No review triggers detected.")
+        lines.append("")
+    return "\n".join(lines) + "\n"
+
+
 def evidence_payload(ledger: Mapping[str, Any]) -> Dict[str, Any]:
     """Build structured source coverage and stale-source output."""
 
@@ -670,6 +757,117 @@ def evidence_payload(ledger: Mapping[str, Any]) -> Dict[str, Any]:
         "items": sorted(records, key=lambda item: (item["type"], item["id"])),
         "unused_sources": sorted(source_id for source_id, refs in usage.items() if not refs),
         "stale_sources": stale_sources,
+    }
+
+
+def _review_queue_item(ledger: Mapping[str, Any]) -> Dict[str, Any]:
+    ledger_id = str(ledger["thesis_id"])
+    asset = ledger["asset"]
+    stale_sources = evidence_payload(ledger)["stale_sources"]
+    high_risks = [
+        risk
+        for risk in ledger.get("risks", [])
+        if isinstance(risk, dict) and str(risk.get("severity", "")).lower() in {"high", "critical", "severe"}
+    ]
+    open_catalysts = _review_open_catalysts(ledger)
+    stale_review = _stale_review(ledger)
+    open_checklist = [
+        item for item in risk_payload(ledger)["checklist"] if not _is_closed_status(str(item.get("status", "")))
+    ]
+    open_rules = [
+        item for item in exposure_payload(ledger)["position_rules"] if not _is_closed_status(str(item.get("status", "")))
+    ]
+
+    reasons = []
+    if stale_sources:
+        reasons.append(
+            {
+                "type": "stale_sources",
+                "count": len(stale_sources),
+                "score": len(stale_sources) * 2,
+                "text": f"{len(stale_sources)} source(s) are more than 180 days older than ledger.updated.",
+                "items": [str(source["id"]) for source in stale_sources],
+            }
+        )
+    if high_risks:
+        reasons.append(
+            {
+                "type": "high_severity_risks",
+                "count": len(high_risks),
+                "score": len(high_risks) * 3,
+                "text": f"{len(high_risks)} high-severity risk(s) need human review.",
+                "items": [
+                    str(risk["id"])
+                    for risk in sorted(high_risks, key=lambda risk: str(risk.get("id", "")))
+                ],
+            }
+        )
+    if open_catalysts:
+        reasons.append(
+            {
+                "type": "upcoming_open_catalysts",
+                "count": len(open_catalysts),
+                "score": len(open_catalysts),
+                "text": f"{len(open_catalysts)} upcoming or open catalyst(s) remain unresolved.",
+                "items": [str(item["id"]) for item in open_catalysts],
+            }
+        )
+    if stale_review:
+        reasons.append(
+            {
+                "type": "stale_review",
+                "count": 1,
+                "score": 3,
+                "text": stale_review,
+                "items": [],
+            }
+        )
+    if open_checklist:
+        reasons.append(
+            {
+                "type": "open_checklist",
+                "count": len(open_checklist),
+                "score": len(open_checklist),
+                "text": f"{len(open_checklist)} checklist item(s) remain open.",
+                "items": [
+                    str(item["id"])
+                    for item in sorted(open_checklist, key=lambda item: str(item.get("id", "")))
+                ],
+            }
+        )
+    if open_rules:
+        reasons.append(
+            {
+                "type": "open_position_rules",
+                "count": len(open_rules),
+                "score": len(open_rules),
+                "text": f"{len(open_rules)} position rule(s) remain open.",
+                "items": [
+                    str(item["id"])
+                    for item in sorted(open_rules, key=lambda item: str(item.get("id", "")))
+                ],
+            }
+        )
+
+    reasons.sort(
+        key=lambda reason: (
+            _REVIEW_REASON_ORDER.get(str(reason["type"]), 99),
+            str(reason["type"]),
+        )
+    )
+    score = sum(reason["score"] for reason in reasons)
+    priority = _review_priority(score)
+    return {
+        "thesis_id": ledger_id,
+        "title": ledger["title"],
+        "updated": ledger["updated"],
+        "ticker": asset["ticker"],
+        "asset_name": asset["name"],
+        "asset_type": asset["type"],
+        "score": score,
+        "priority": priority,
+        "next_action": _review_next_action(reasons),
+        "reasons": reasons,
     }
 
 
@@ -935,6 +1133,71 @@ def _stale_sources(ledger: Mapping[str, Any]) -> List[Dict[str, Any]]:
                 }
             )
     return stale
+
+
+def _review_open_catalysts(ledger: Mapping[str, Any]) -> List[Dict[str, Any]]:
+    updated = _parse_date(str(ledger.get("updated", "")))
+    items = []
+    for catalyst in calendar_payload(ledger)["catalysts"]:
+        if _is_closed_status(catalyst["status"]):
+            continue
+        catalyst_date = _parse_date(catalyst["date"]) if catalyst["date"] else None
+        if not catalyst["date"] or updated is None or catalyst_date is None or catalyst_date >= updated:
+            items.append(catalyst)
+    items.sort(key=lambda item: (item["date"] == "", item["date"], item["window"], item["id"]))
+    return items
+
+
+def _stale_review(ledger: Mapping[str, Any]) -> str:
+    updated = _parse_date(str(ledger.get("updated", "")))
+    if updated is None:
+        return ""
+    review_dates = []
+    for review in ledger.get("reviews", []):
+        if isinstance(review, dict):
+            review_date = _parse_date(str(review.get("date", "")))
+            if review_date is not None:
+                review_dates.append(review_date)
+    if not review_dates:
+        return "No dated review is recorded."
+    latest_review = max(review_dates)
+    if latest_review < updated:
+        age_days = (updated - latest_review).days
+        return f"Latest review is {age_days} day(s) before ledger.updated."
+    return ""
+
+
+def _review_priority(score: int) -> str:
+    if score >= 8:
+        return "high"
+    if score >= 4:
+        return "medium"
+    return "low"
+
+
+def _priority_rank(priority: str) -> int:
+    return {"high": 0, "medium": 1, "low": 2}.get(priority, 3)
+
+
+def _review_next_action(reasons: Sequence[Mapping[str, Any]]) -> str:
+    reason_types = [str(reason["type"]) for reason in reasons]
+    if "stale_review" in reason_types:
+        return "Run a human review and record a new review entry."
+    if "high_severity_risks" in reason_types:
+        return "Review high-severity risks and update mitigation evidence."
+    if "upcoming_open_catalysts" in reason_types:
+        return "Check catalyst status and update dated evidence."
+    if "stale_sources" in reason_types:
+        return "Refresh stale sources before relying on the thesis."
+    if "open_position_rules" in reason_types:
+        return "Resolve open position rules before changing exposure."
+    if "open_checklist" in reason_types:
+        return "Close or update open checklist items."
+    return "No immediate human review trigger detected."
+
+
+def _is_closed_status(status: str) -> bool:
+    return status.lower() in _CLOSED_STATUSES
 
 
 def _parse_date(value: str) -> Optional[date]:

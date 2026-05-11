@@ -1,0 +1,117 @@
+{
+  "items": [
+    {
+      "asset_name": "Generic 2x Equity Index ETF",
+      "asset_type": "fund",
+      "next_action": "Review high-severity risks and update mitigation evidence.",
+      "priority": "high",
+      "reasons": [
+        {
+          "count": 2,
+          "items": [
+            "R1",
+            "R2"
+          ],
+          "score": 6,
+          "text": "2 high-severity risk(s) need human review.",
+          "type": "high_severity_risks"
+        },
+        {
+          "count": 2,
+          "items": [
+            "CAT2",
+            "CAT1"
+          ],
+          "score": 2,
+          "text": "2 upcoming or open catalyst(s) remain unresolved.",
+          "type": "upcoming_open_catalysts"
+        },
+        {
+          "count": 3,
+          "items": [
+            "C1",
+            "C2",
+            "C3"
+          ],
+          "score": 3,
+          "text": "3 checklist item(s) remain open.",
+          "type": "open_checklist"
+        },
+        {
+          "count": 2,
+          "items": [
+            "P1",
+            "P2"
+          ],
+          "score": 2,
+          "text": "2 position rule(s) remain open.",
+          "type": "open_position_rules"
+        }
+      ],
+      "score": 13,
+      "thesis_id": "leveraged-etf-discipline",
+      "ticker": "LEV2X",
+      "title": "Leveraged ETF Discipline Ledger",
+      "updated": "2026-05-12"
+    },
+    {
+      "asset_name": "Oklo Inc.",
+      "asset_type": "equity",
+      "next_action": "Review high-severity risks and update mitigation evidence.",
+      "priority": "high",
+      "reasons": [
+        {
+          "count": 1,
+          "items": [
+            "R1"
+          ],
+          "score": 3,
+          "text": "1 high-severity risk(s) need human review.",
+          "type": "high_severity_risks"
+        },
+        {
+          "count": 3,
+          "items": [
+            "CAT2",
+            "CAT1",
+            "CAT3"
+          ],
+          "score": 3,
+          "text": "3 upcoming or open catalyst(s) remain unresolved.",
+          "type": "upcoming_open_catalysts"
+        },
+        {
+          "count": 2,
+          "items": [
+            "C1",
+            "C2"
+          ],
+          "score": 2,
+          "text": "2 checklist item(s) remain open.",
+          "type": "open_checklist"
+        },
+        {
+          "count": 2,
+          "items": [
+            "P1",
+            "P2"
+          ],
+          "score": 2,
+          "text": "2 position rule(s) remain open.",
+          "type": "open_position_rules"
+        }
+      ],
+      "score": 10,
+      "thesis_id": "oklo-ai-power",
+      "ticker": "OKLO",
+      "title": "Oklo AI Power Demand Thesis",
+      "updated": "2026-05-12"
+    }
+  ],
+  "queue": {
+    "high_priority_count": 2,
+    "ledger_count": 2,
+    "low_priority_count": 0,
+    "medium_priority_count": 0
+  }
+}

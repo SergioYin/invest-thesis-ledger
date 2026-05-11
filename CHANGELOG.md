@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.0 - 2026-05-12
+
+- Added `review-queue` command for prioritizing two or more ledgers for human review.
+- Added deterministic Markdown/JSON review queue outputs with per-ledger scores, priority labels, reasons, and next action text.
+- Added checked-in review queue example outputs generated from the Oklo and leveraged ETF examples.
+- Updated README, schema docs, tests, and selfcheck for review queue coverage.
+
 ## 0.4.0 - 2026-05-12
 
 - Added `portfolio` command for deterministic aggregation across two or more ledgers.
