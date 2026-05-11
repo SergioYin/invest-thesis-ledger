@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from invest_thesis_ledger.render import decision_memo_payload, review_queue_payload, scenario_plan_payload
+from invest_thesis_ledger.render import decision_memo_payload, review_queue_payload, scenario_plan_payload, watchlist_payload
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -63,6 +63,12 @@ class CliTests(unittest.TestCase):
         self.assertIn("LEDGER", review_queue.stdout)
         self.assertIn("prioritize two or more ledgers", review_queue.stdout)
         self.assertIn("write JSON output to PATH", review_queue.stdout)
+
+        watchlist = self.run_cli("watchlist", "--help")
+        self.assertEqual(watchlist.returncode, 0, watchlist.stderr)
+        self.assertIn("LEDGER", watchlist.stdout)
+        self.assertIn("weekly watchlist", watchlist.stdout)
+        self.assertIn("write JSON output to PATH", watchlist.stdout)
 
         decision_memo = self.run_cli("decision-memo", "--help")
         self.assertEqual(decision_memo.returncode, 0, decision_memo.stderr)
@@ -850,6 +856,223 @@ class CliTests(unittest.TestCase):
             self.assertTrue(md_path.exists())
             self.assertTrue(json_path.exists())
 
+    def test_watchlist_ranks_weekly_review_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            md_path = Path(temp) / "watchlist.md"
+            json_path = Path(temp) / "watchlist.json"
+            result = self.run_cli(
+                "watchlist",
+                str(EXAMPLE),
+                str(ETF_EXAMPLE),
+                "--output",
+                str(md_path),
+                "--json-output",
+                str(json_path),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("# Watchlist", md_path.read_text())
+            payload = json.loads(json_path.read_text())
+            self.assertEqual(payload["watchlist"]["ledger_count"], 2)
+            self.assertEqual(payload["items"][0]["rank"], 1)
+            self.assertEqual(payload["items"][0]["thesis_id"], "leveraged-etf-discipline")
+            self.assertEqual(payload["items"][0]["review_queue_score"], 13)
+            self.assertEqual(payload["items"][0]["priority"], "high")
+            self.assertEqual(payload["items"][0]["nearest_open_catalyst"]["id"], "CAT2")
+            self.assertEqual(payload["items"][0]["latest_review"], {"date": "2026-05-19", "decision": "policy"})
+            self.assertEqual(payload["items"][0]["stale_source_count"], 0)
+            self.assertEqual(payload["items"][0]["high_risk_count"], 2)
+            self.assertEqual(payload["items"][0]["open_position_rule_count"], 2)
+            self.assertEqual(payload["items"][1]["thesis_id"], "oklo-ai-power")
+            self.assertEqual(payload["items"][1]["nearest_open_catalyst"]["id"], "CAT2")
+            self.assertEqual(payload["items"][1]["latest_review"], {"date": "2026-06-30", "decision": "watch"})
+
+    def test_watchlist_payload_is_input_order_independent_for_tied_items(self) -> None:
+        first_data = json.loads(EXAMPLE.read_text())
+        second_data = json.loads(ETF_EXAMPLE.read_text())
+        first_data["asset"]["ticker"] = "TIE"
+        second_data["asset"]["ticker"] = "TIE"
+        second_data["risks"][1]["severity"] = "medium"
+        forward = watchlist_payload([first_data, second_data])
+        reverse = watchlist_payload([second_data, first_data])
+        self.assertEqual(forward, reverse)
+
+    def test_watchlist_handles_duplicate_thesis_ids_without_cross_matching_ledgers(self) -> None:
+        first_data = json.loads(EXAMPLE.read_text())
+        second_data = json.loads(EXAMPLE.read_text())
+        for data in (first_data, second_data):
+            data["thesis_id"] = "duplicate-thesis"
+            data["title"] = "Duplicate Thesis"
+            data["asset"]["ticker"] = "DUP"
+            data["updated"] = "2026-05-12"
+            data["reviews"] = [
+                {
+                    "date": "2026-05-12",
+                    "decision": "watch",
+                    "summary": "Current review.",
+                    "source_ids": ["S1"],
+                }
+            ]
+            data["catalysts"] = [
+                {
+                    "id": "CAT1",
+                    "title": "Z catalyst",
+                    "date": "2026-06-01",
+                    "status": "watch",
+                    "source_ids": ["S1"],
+                }
+            ]
+        first_data["catalysts"][0]["title"] = "A catalyst"
+
+        forward = watchlist_payload([first_data, second_data])
+        reverse = watchlist_payload([second_data, first_data])
+
+        self.assertEqual(forward, reverse)
+        self.assertEqual(
+            [item["nearest_open_catalyst"]["title"] for item in forward["items"]],
+            ["A catalyst", "Z catalyst"],
+        )
+        self.assertEqual([item["thesis_id"] for item in forward["items"]], ["duplicate-thesis", "duplicate-thesis"])
+
+    def test_watchlist_nearest_open_catalyst_tie_breaks_by_stable_fields(self) -> None:
+        first_data = json.loads(EXAMPLE.read_text())
+        second_data = json.loads(ETF_EXAMPLE.read_text())
+        first_data["catalysts"] = [
+            {
+                "id": "CATX",
+                "title": "Z same-date catalyst",
+                "date": "2026-08-01",
+                "window": "same",
+                "status": "watch",
+                "source_ids": ["S1"],
+            },
+            {
+                "id": "CATX",
+                "title": "A same-date catalyst",
+                "date": "2026-08-01",
+                "window": "same",
+                "status": "watch",
+                "source_ids": ["S1"],
+            },
+        ]
+        payload = watchlist_payload([first_data, second_data])
+        item = next(item for item in payload["items"] if item["thesis_id"] == "oklo-ai-power")
+        self.assertEqual(item["nearest_open_catalyst"]["title"], "A same-date catalyst")
+
+    def test_watchlist_latest_review_tie_breaker_is_input_order_independent(self) -> None:
+        first_data = json.loads(EXAMPLE.read_text())
+        second_data = json.loads(ETF_EXAMPLE.read_text())
+        same_day_reviews = [
+            {
+                "date": "2026-07-01",
+                "decision": "hold",
+                "summary": "Z summary",
+                "source_ids": ["S1"],
+            },
+            {
+                "date": "2026-07-01",
+                "decision": "watch",
+                "summary": "A summary",
+                "source_ids": ["S1"],
+            },
+        ]
+        first_data["reviews"] = same_day_reviews
+        forward = watchlist_payload([first_data, second_data])
+        first_data["reviews"] = list(reversed(same_day_reviews))
+        reverse = watchlist_payload([first_data, second_data])
+        forward_item = next(item for item in forward["items"] if item["thesis_id"] == "oklo-ai-power")
+        reverse_item = next(item for item in reverse["items"] if item["thesis_id"] == "oklo-ai-power")
+        self.assertEqual(forward_item["latest_review"], reverse_item["latest_review"])
+        self.assertEqual(forward_item["latest_review"], {"date": "2026-07-01", "decision": "watch"})
+
+    def test_watchlist_json_shape_is_stable_when_optional_details_are_missing(self) -> None:
+        first_data = json.loads(EXAMPLE.read_text())
+        second_data = json.loads(ETF_EXAMPLE.read_text())
+        first_data["catalysts"] = []
+        first_data["reviews"] = []
+        payload = watchlist_payload([first_data, second_data])
+        item = next(item for item in payload["items"] if item["thesis_id"] == "oklo-ai-power")
+        self.assertEqual(
+            set(item),
+            {
+                "rank",
+                "thesis_id",
+                "ticker",
+                "title",
+                "review_queue_score",
+                "priority",
+                "next_action",
+                "nearest_open_catalyst",
+                "latest_review",
+                "stale_source_count",
+                "high_risk_count",
+                "open_position_rule_count",
+            },
+        )
+        self.assertIsNone(item["nearest_open_catalyst"])
+        self.assertEqual(item["latest_review"], {"date": "", "decision": ""})
+
+    def test_watchlist_requires_two_ledgers(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            result = self.run_cli(
+                "watchlist",
+                str(EXAMPLE),
+                "--output",
+                str(Path(temp) / "watchlist.md"),
+                "--json-output",
+                str(Path(temp) / "watchlist.json"),
+            )
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("requires at least two", result.stderr)
+
+    def test_watchlist_validates_all_ledgers_before_writing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_dir = Path(temp)
+            bad_path = temp_dir / "bad.json"
+            data = json.loads(ETF_EXAMPLE.read_text())
+            data["risks"][0]["source_ids"] = ["missing"]
+            bad_path.write_text(json.dumps(data), encoding="utf-8")
+            md_path = temp_dir / "watchlist.md"
+            json_path = temp_dir / "watchlist.json"
+            result = self.run_cli(
+                "watchlist",
+                str(EXAMPLE),
+                str(bad_path),
+                "--output",
+                str(md_path),
+                "--json-output",
+                str(json_path),
+            )
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("ledger: leveraged-etf-discipline", result.stderr)
+            self.assertIn("unknown source missing", result.stderr)
+            self.assertFalse(md_path.exists())
+            self.assertFalse(json_path.exists())
+
+    def test_watchlist_escapes_markdown_cells(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_dir = Path(temp)
+            first_path = temp_dir / "first.json"
+            second_path = temp_dir / "second.json"
+            first_data = json.loads(EXAMPLE.read_text())
+            first_data["title"] = "Title | with\nbreak"
+            first_data["catalysts"][1]["title"] = "Catalyst | with\nbreak"
+            first_path.write_text(json.dumps(first_data), encoding="utf-8")
+            second_path.write_text(ETF_EXAMPLE.read_text(), encoding="utf-8")
+            md_path = temp_dir / "watchlist.md"
+            result = self.run_cli(
+                "watchlist",
+                str(first_path),
+                str(second_path),
+                "--output",
+                str(md_path),
+                "--json-output",
+                str(temp_dir / "watchlist.json"),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            text = md_path.read_text()
+            self.assertIn("Title \\| with break", text)
+            self.assertIn("Catalyst \\| with break", text)
+
     def test_portfolio_reports_validation_warnings_without_blocking_output(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             temp_dir = Path(temp)
@@ -903,7 +1126,7 @@ class CliTests(unittest.TestCase):
             self.assertEqual(second.returncode, 0, second.stderr)
             self.assertEqual(output_a.read_text(), output_b.read_text())
             payload = json.loads(output_a.read_text())
-            self.assertEqual(payload["ledger_version"], "0.7.0")
+            self.assertEqual(payload["ledger_version"], "0.8.0")
             self.assertEqual(payload["thesis_id"], "msft-thesis")
             self.assertEqual(payload["sources"][0]["id"], "S1")
             self.assertEqual(payload["assumptions"][0]["source_ids"], ["S1"])
@@ -1117,6 +1340,19 @@ class CliTests(unittest.TestCase):
                         str(temp_dir / "review-queue.json"),
                     ],
                     ["review-queue.md", "review-queue.json"],
+                ),
+                (
+                    "watchlist",
+                    [
+                        "watchlist",
+                        str(EXAMPLE),
+                        str(ETF_EXAMPLE),
+                        "--output",
+                        str(temp_dir / "watchlist.md"),
+                        "--json-output",
+                        str(temp_dir / "watchlist.json"),
+                    ],
+                    ["watchlist.md", "watchlist.json"],
                 ),
             ]
             for label, args, filenames in commands:

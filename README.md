@@ -5,8 +5,8 @@ ledgers as JSON, then rendering deterministic briefs, risk reports, review
 timelines, thesis drift comparisons, catalyst calendars, evidence coverage
 reports, broker/institution matrices, exposure checklists, deterministic
 starter ledger generation, decision memos, scenario plans, portfolio-level
-summaries, and review queues. v0.7.0 adds the scenario plan workflow while
-preserving compatibility with v0.1.0 through v0.6.0 ledgers.
+summaries, review queues, and weekly watchlists. v0.8.0 adds the watchlist
+workflow while preserving compatibility with v0.1.0 through v0.7.0 ledgers.
 
 This project is for research organization only. It is not investment advice.
 
@@ -119,6 +119,12 @@ Prioritize two or more ledgers for human review:
 python -m invest_thesis_ledger review-queue examples/oklo-ai-power.json examples/leveraged-etf-discipline.json --output review-queue.md --json-output review-queue.json
 ```
 
+Render a weekly watchlist ranked by review queue score:
+
+```bash
+python -m invest_thesis_ledger watchlist examples/oklo-ai-power.json examples/leveraged-etf-discipline.json --output watchlist.md --json-output watchlist.json
+```
+
 Create a deterministic starter ledger:
 
 ```bash
@@ -133,7 +139,7 @@ input file list.
 
 ## Ledger Format
 
-Ledgers are JSON objects. The v0.7.0 required fields are:
+Ledgers are JSON objects. The v0.8.0 required fields are:
 
 - `ledger_version`
 - `thesis_id`
@@ -170,7 +176,7 @@ ID.
 optional string `tags`; `exposure` combines these risk tags with position rules
 into a checklist.
 
-The formal v0.7.0 schema reference is in `docs/ledger-schema.md`.
+The formal v0.8.0 schema reference is in `docs/ledger-schema.md`.
 
 See:
 
@@ -206,6 +212,8 @@ Checked-in deterministic CLI output fixtures are available under
 - `examples/output/portfolio-summary.json`
 - `examples/output/review-queue.md`
 - `examples/output/review-queue.json`
+- `examples/output/watchlist.md`
+- `examples/output/watchlist.json`
 
 ## Development
 
@@ -242,6 +250,14 @@ catalysts are 1 point each, stale reviews are 3 points, open checklist items
 are 1 point each, and open position rules are 1 point each. Scores of 8 or more
 are high priority, scores of 4 to 7 are medium priority, and lower scores are
 low priority.
+
+`watchlist` reuses review queue scoring to rank the weekly review list, then
+adds the fields needed for a human scan: ticker, title, priority, next action,
+nearest open catalyst, latest review date and decision, stale source count,
+high-risk count, and open position-rule count. Ranking remains deterministic
+when ledgers have duplicate `thesis_id` values or tied scores; watchlist rows
+are derived from each ledger directly and ties include latest-review and nearest
+open-catalyst details.
 
 `decision-memo` uses the same normalized broker, catalyst, exposure, and
 evidence payloads to produce a deterministic pre-trade/review memo with the

@@ -1,0 +1,56 @@
+{
+  "items": [
+    {
+      "high_risk_count": 2,
+      "latest_review": {
+        "date": "2026-05-19",
+        "decision": "policy"
+      },
+      "nearest_open_catalyst": {
+        "date": "2026-06-10",
+        "id": "CAT2",
+        "status": "required",
+        "title": "Macro event calendar supports a time-boxed tactical setup.",
+        "window": ""
+      },
+      "next_action": "Review high-severity risks and update mitigation evidence.",
+      "open_position_rule_count": 2,
+      "priority": "high",
+      "rank": 1,
+      "review_queue_score": 13,
+      "stale_source_count": 0,
+      "thesis_id": "leveraged-etf-discipline",
+      "ticker": "LEV2X",
+      "title": "Leveraged ETF Discipline Ledger"
+    },
+    {
+      "high_risk_count": 1,
+      "latest_review": {
+        "date": "2026-06-30",
+        "decision": "watch"
+      },
+      "nearest_open_catalyst": {
+        "date": "2026-08-15",
+        "id": "CAT2",
+        "status": "watch",
+        "title": "Material licensing update with a clear review timeline.",
+        "window": ""
+      },
+      "next_action": "Review high-severity risks and update mitigation evidence.",
+      "open_position_rule_count": 2,
+      "priority": "high",
+      "rank": 2,
+      "review_queue_score": 10,
+      "stale_source_count": 0,
+      "thesis_id": "oklo-ai-power",
+      "ticker": "OKLO",
+      "title": "Oklo AI Power Demand Thesis"
+    }
+  ],
+  "watchlist": {
+    "high_priority_count": 2,
+    "ledger_count": 2,
+    "low_priority_count": 0,
+    "medium_priority_count": 0
+  }
+}

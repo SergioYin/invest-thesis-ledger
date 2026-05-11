@@ -1,7 +1,7 @@
-# Ledger Schema v0.7.0
+# Ledger Schema v0.8.0
 
 This document defines the JSON ledger format accepted by `invest-thesis-ledger`
-v0.7.0. Ledgers are research organization records only and are not investment
+v0.8.0. Ledgers are research organization records only and are not investment
 advice.
 
 ## Document Shape
@@ -15,7 +15,7 @@ without breaking the renderer.
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `ledger_version` | string | Schema version. v0.7.0 ledgers should use `"0.7.0"`. v0.1.0 through v0.6.0 remain accepted for compatibility; other values validate with a warning. |
+| `ledger_version` | string | Schema version. v0.8.0 ledgers should use `"0.8.0"`. v0.1.0 through v0.7.0 remain accepted for compatibility; other values validate with a warning. |
 | `thesis_id` | string | Stable machine-readable ledger identifier. |
 | `title` | string | Human-readable thesis title. |
 | `asset` | object | Asset metadata. |
@@ -179,7 +179,7 @@ existing source, and duplicate source references within one rule are invalid.
 
 ## Determinism
 
-For the same input file or ordered input file list, v0.7.0 CLI outputs are
+For the same input file or ordered input file list, v0.8.0 CLI outputs are
 deterministic:
 
 - JSON outputs are serialized with sorted keys and two-space indentation.
@@ -190,8 +190,8 @@ deterministic:
 - Portfolio assets are sorted by ticker and ledger ID.
 - Portfolio catalyst and stale-source lists are sorted by stable ledger and
   item fields.
-- Review queue items are sorted by descending score, priority, ticker, ledger
-  ID, and title.
+- Review queue and watchlist items are sorted by descending score, priority,
+  ticker, ledger ID, and title.
 - Review queue reasons are sorted by the scoring categories documented below;
   reason item IDs use the stable order for their source report, risk,
   checklist, or position-rule type.
@@ -207,7 +207,7 @@ deterministic:
 - `init-template` uses fixed placeholder dates so repeated runs with the same
   arguments produce byte-identical JSON.
 
-## v0.7.0 Reports
+## v0.8.0 Reports
 
 `compare <old.json> <new.json> --output drift.md --json-output drift.json`
 loads and validates both ledgers, then compares:
@@ -278,7 +278,7 @@ Evidence gaps are ordered by review priority: low-confidence assumptions, stale
 sources, unused sources, then unsupported evidence items.
 
 `init-template --asset TICKER --name NAME --type TYPE --output ledger.json`
-writes a deterministic starter ledger with v0.7.0 fields, fixed placeholder
+writes a deterministic starter ledger with v0.8.0 fields, fixed placeholder
 dates, one source-backed assumption, one risk, one review, and a thesis ID
 derived from the ticker.
 
@@ -318,6 +318,34 @@ Scores of 8 or more are `high` priority, scores of 4 to 7 are `medium`
 priority, and lower scores are `low` priority. The JSON output includes
 per-ledger reason records with reason type, count, score contribution, item IDs,
 and next action text.
+
+```bash
+watchlist <ledger-a.json> <ledger-b.json> [...] --output watchlist.md --json-output watchlist.json
+```
+
+The `watchlist` command loads and validates every input ledger before writing
+output. It requires at least two ledgers and reuses review queue scoring to rank
+the weekly human review list. Duplicate `thesis_id` values are allowed in the
+input set; ranking and per-ledger watchlist details are derived from each ledger
+directly, rather than by matching rows back by thesis ID. Tied rows are ordered
+deterministically by score, priority, ticker, thesis ID, title, latest review,
+nearest open catalyst, counts, and next action. The Markdown and JSON outputs
+include:
+
+- rank and review queue score
+- ticker and title
+- priority and next action
+- nearest open catalyst
+- latest review date and decision
+- stale source count
+- high/critical/severe risk count
+- open position-rule count
+
+The nearest open catalyst is the earliest unresolved catalyst on or after
+`ledger.updated`, or an undated open catalyst when no dated candidate sorts
+earlier. Exact ties are broken by date presence, date, window, ID, title, and
+status. The latest review is selected by date, then decision, summary, and
+source IDs so same-day review ties do not depend on input order.
 
 See `examples/output/` for checked-in CLI output fixtures generated from
 `examples/oklo-ai-power.json`, `examples/leveraged-etf-discipline.json`, and

@@ -41,6 +41,8 @@ FIXTURE_OUTPUTS = [
     "portfolio-summary.json",
     "review-queue.md",
     "review-queue.json",
+    "watchlist.md",
+    "watchlist.json",
 ]
 
 
@@ -232,6 +234,20 @@ def main() -> int:
                 str(temp_dir / "review-queue.md"),
                 "--json-output",
                 str(temp_dir / "review-queue.json"),
+            ]
+        )
+        _run(
+            [
+                sys.executable,
+                "-m",
+                "invest_thesis_ledger",
+                "watchlist",
+                str(EXAMPLES[0]),
+                str(EXAMPLES[1]),
+                "--output",
+                str(temp_dir / "watchlist.md"),
+                "--json-output",
+                str(temp_dir / "watchlist.json"),
             ]
         )
         _check_fixtures(temp_dir)

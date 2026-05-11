@@ -83,8 +83,19 @@ def validate_ledger(ledger: Mapping[str, Any]) -> Tuple[List[str], List[str]]:
     if errors:
         return errors, warnings
 
-    if ledger.get("ledger_version") not in {"0.1.0", "0.2.0", "0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.7.0"}:
-        warnings.append("ledger.ledger_version is not 0.1.0, 0.2.0, 0.3.0, 0.4.0, 0.5.0, 0.6.0, or 0.7.0")
+    if ledger.get("ledger_version") not in {
+        "0.1.0",
+        "0.2.0",
+        "0.3.0",
+        "0.4.0",
+        "0.5.0",
+        "0.6.0",
+        "0.7.0",
+        "0.8.0",
+    }:
+        warnings.append(
+            "ledger.ledger_version is not 0.1.0, 0.2.0, 0.3.0, 0.4.0, 0.5.0, 0.6.0, 0.7.0, or 0.8.0"
+        )
 
     asset = ledger["asset"]
     _require_fields("ledger.asset", asset, REQUIRED_ASSET, errors)

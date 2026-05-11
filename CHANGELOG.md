@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.0 - 2026-05-12
+
+- Added `watchlist` command for weekly human review lists across two or more ledgers.
+- Added deterministic watchlist Markdown/JSON output ranked by review queue score with ticker, title, priority, next action, nearest open catalyst, latest review date/decision, stale source count, high-risk count, and open position-rule count.
+- Hardened watchlist ranking for duplicate thesis IDs, tied queue rows, same-day review ties, and same-date catalyst ties.
+- Added checked-in watchlist example outputs generated from the Oklo and leveraged ETF examples.
+- Updated README, schema docs, tests, and selfcheck for watchlist coverage.
+
 ## 0.7.0 - 2026-05-12
 
 - Added `scenario-plan` command for deterministic base/bull/bear scenario planning from one ledger.

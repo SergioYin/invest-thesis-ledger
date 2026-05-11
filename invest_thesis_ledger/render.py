@@ -683,15 +683,7 @@ def review_queue_payload(ledgers: Sequence[Mapping[str, Any]]) -> Dict[str, Any]
     """Build deterministic review queue output for multiple ledgers."""
 
     items = [_review_queue_item(ledger) for ledger in ledgers]
-    items.sort(
-        key=lambda item: (
-            -item["score"],
-            _priority_rank(item["priority"]),
-            item["ticker"],
-            item["thesis_id"],
-            item["title"],
-        )
-    )
+    items.sort(key=_review_queue_sort_key)
     return {
         "queue": {
             "ledger_count": len(items),
@@ -752,6 +744,66 @@ def render_review_queue(ledgers: Sequence[Mapping[str, Any]]) -> str:
         else:
             lines.append("- No review triggers detected.")
         lines.append("")
+    return "\n".join(lines) + "\n"
+
+
+def watchlist_payload(ledgers: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
+    """Build deterministic weekly watchlist output from existing report payloads."""
+
+    items = [_watchlist_item(ledger) for ledger in ledgers]
+    items.sort(key=_watchlist_sort_key)
+    for rank, item in enumerate(items, start=1):
+        item["rank"] = rank
+    return {
+        "watchlist": {
+            "ledger_count": len(items),
+            "high_priority_count": sum(1 for item in items if item["priority"] == "high"),
+            "medium_priority_count": sum(1 for item in items if item["priority"] == "medium"),
+            "low_priority_count": sum(1 for item in items if item["priority"] == "low"),
+        },
+        "items": items,
+    }
+
+
+def render_watchlist(ledgers: Sequence[Mapping[str, Any]]) -> str:
+    """Render a deterministic weekly watchlist report."""
+
+    payload = watchlist_payload(ledgers)
+    lines = [
+        "# Watchlist",
+        "",
+        "> This is a research organization tool, not investment advice.",
+        "",
+        f"- Ledgers: {payload['watchlist']['ledger_count']}",
+        f"- High Priority: {payload['watchlist']['high_priority_count']}",
+        f"- Medium Priority: {payload['watchlist']['medium_priority_count']}",
+        f"- Low Priority: {payload['watchlist']['low_priority_count']}",
+        "",
+        "## Weekly Review List",
+        "",
+        "| Rank | Score | Ticker | Title | Priority | Next Action | Nearest Open Catalyst | Latest Review | Stale Sources | High Risks | Open Position Rules |",
+        "| ---: | ---: | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: |",
+    ]
+    for item in payload["items"]:
+        lines.append(
+            "| "
+            + " | ".join(
+                [
+                    str(item["rank"]),
+                    str(item["review_queue_score"]),
+                    _cell(item["ticker"]),
+                    _cell(item["title"]),
+                    _cell(item["priority"]),
+                    _cell(item["next_action"]),
+                    _cell(_watchlist_catalyst_label(item["nearest_open_catalyst"])),
+                    _cell(_watchlist_review_label(item["latest_review"])),
+                    str(item["stale_source_count"]),
+                    str(item["high_risk_count"]),
+                    str(item["open_position_rule_count"]),
+                ]
+            )
+            + " |"
+        )
     return "\n".join(lines) + "\n"
 
 
@@ -1294,6 +1346,105 @@ def _review_queue_item(ledger: Mapping[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _review_queue_sort_key(item: Mapping[str, Any]) -> tuple[Any, ...]:
+    return (
+        -int(item["score"]),
+        _priority_rank(str(item["priority"])),
+        str(item["ticker"]),
+        str(item["thesis_id"]),
+        str(item["title"]),
+        str(item["updated"]),
+        str(item["asset_name"]),
+        str(item["asset_type"]),
+        str(item["next_action"]),
+        json.dumps(item.get("reasons", []), sort_keys=True),
+    )
+
+
+def _watchlist_item(ledger: Mapping[str, Any]) -> Dict[str, Any]:
+    queue_item = _review_queue_item(ledger)
+    evidence = evidence_payload(ledger)
+    exposure = exposure_payload(ledger)
+    latest_review = _latest_review(ledger)
+    open_position_rules = [
+        item for item in exposure["position_rules"] if not _is_closed_status(str(item.get("status", "")))
+    ]
+    return {
+        "rank": 0,
+        "thesis_id": queue_item["thesis_id"],
+        "ticker": queue_item["ticker"],
+        "title": queue_item["title"],
+        "review_queue_score": queue_item["score"],
+        "priority": queue_item["priority"],
+        "next_action": queue_item["next_action"],
+        "nearest_open_catalyst": _nearest_open_catalyst(ledger),
+        "latest_review": {
+            "date": latest_review.get("date", ""),
+            "decision": latest_review.get("decision", ""),
+        },
+        "stale_source_count": evidence["coverage"]["stale_source_count"],
+        "high_risk_count": _high_risk_count(ledger),
+        "open_position_rule_count": len(open_position_rules),
+    }
+
+
+def _watchlist_sort_key(item: Mapping[str, Any]) -> tuple[Any, ...]:
+    return (
+        -int(item["review_queue_score"]),
+        _priority_rank(str(item["priority"])),
+        str(item["ticker"]),
+        str(item["thesis_id"]),
+        str(item["title"]),
+        str(item["latest_review"]["date"]),
+        str(item["latest_review"]["decision"]),
+        json.dumps(item.get("nearest_open_catalyst"), sort_keys=True),
+        int(item["stale_source_count"]),
+        int(item["high_risk_count"]),
+        int(item["open_position_rule_count"]),
+        str(item["next_action"]),
+    )
+
+
+def _latest_review(ledger: Mapping[str, Any]) -> Dict[str, Any]:
+    reviews = history_payload(ledger)["reviews"]
+    return reviews[-1] if reviews else {}
+
+
+def _nearest_open_catalyst(ledger: Mapping[str, Any]) -> Optional[Dict[str, Any]]:
+    catalysts = _review_open_catalysts(ledger)
+    if not catalysts:
+        return None
+    item = catalysts[0]
+    return {
+        "id": item["id"],
+        "title": item["title"],
+        "date": item["date"],
+        "window": item["window"],
+        "status": item["status"],
+    }
+
+
+def _high_risk_count(ledger: Mapping[str, Any]) -> int:
+    return sum(
+        1
+        for risk in ledger.get("risks", [])
+        if isinstance(risk, dict) and str(risk.get("severity", "")).lower() in {"high", "critical", "severe"}
+    )
+
+
+def _watchlist_catalyst_label(catalyst: Optional[Mapping[str, Any]]) -> str:
+    if catalyst is None:
+        return "none"
+    timing = _catalyst_timing(catalyst)
+    return f"{catalyst['id']}: {catalyst['title']}{timing} ({catalyst['status']})"
+
+
+def _watchlist_review_label(review: Mapping[str, Any]) -> str:
+    if not review.get("date"):
+        return "none"
+    return f"{review['date']} - {review.get('decision', '')}"
+
+
 def render_evidence(ledger: Mapping[str, Any]) -> str:
     """Render a Markdown evidence coverage report."""
 
@@ -1561,7 +1712,16 @@ def _review_open_catalysts(ledger: Mapping[str, Any]) -> List[Dict[str, Any]]:
         catalyst_date = _parse_date(catalyst["date"]) if catalyst["date"] else None
         if not catalyst["date"] or updated is None or catalyst_date is None or catalyst_date >= updated:
             items.append(catalyst)
-    items.sort(key=lambda item: (item["date"] == "", item["date"], item["window"], item["id"]))
+    items.sort(
+        key=lambda item: (
+            item["date"] == "",
+            item["date"],
+            item["window"],
+            item["id"],
+            item["title"],
+            item["status"],
+        )
+    )
     return items
 
 
