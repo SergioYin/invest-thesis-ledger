@@ -59,14 +59,18 @@ FIXTURE_OUTPUTS = [
     "demo-bundle/leveraged-etf-discipline-decision-memo.md",
     "demo-bundle/leveraged-etf-discipline-scenario-plan.md",
     "demo-bundle/portfolio-summary.md",
+    "demo-bundle/evidence-audit.md",
     "demo-bundle/watchlist.md",
+    "demo-bundle/action-plan.md",
     "demo-bundle/manifest.json",
     "html-dashboard/index.html",
     "html-dashboard/style.css",
     "html-dashboard/oklo-ai-power.html",
     "html-dashboard/leveraged-etf-discipline.html",
     "html-dashboard/portfolio.html",
+    "html-dashboard/evidence-audit.html",
     "html-dashboard/watchlist.html",
+    "html-dashboard/action-plan.html",
     "html-dashboard/manifest.json",
 ]
 

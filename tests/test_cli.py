@@ -814,6 +814,39 @@ class CliTests(unittest.TestCase):
             self.assertEqual(payload["field_coverage"]["checklist"]["supported_items"], 2)
             self.assertEqual(payload["field_coverage"]["checklist"]["unsupported_items"], 3)
 
+    def test_evidence_audit_stale_sources_are_based_on_each_ledger_updated(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_dir = Path(temp)
+            current_path = temp_dir / "current.json"
+            stale_path = temp_dir / "stale.json"
+            current_data = json.loads(EXAMPLE.read_text())
+            current_data["updated"] = "2025-01-02"
+            current_data["sources"][0]["date"] = "2024-09-01"
+            stale_data = json.loads(ETF_EXAMPLE.read_text())
+            stale_data["updated"] = "2026-12-31"
+            for source in stale_data["sources"]:
+                source["date"] = "2026-12-31"
+            stale_data["sources"][0]["date"] = "2026-01-01"
+            current_path.write_text(json.dumps(current_data), encoding="utf-8")
+            stale_path.write_text(json.dumps(stale_data), encoding="utf-8")
+
+            result = self.run_cli(
+                "evidence-audit",
+                str(current_path),
+                str(stale_path),
+                "--output",
+                str(temp_dir / "audit.md"),
+                "--json-output",
+                str(temp_dir / "audit.json"),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads((temp_dir / "audit.json").read_text())
+            self.assertEqual(payload["audit"]["stale_source_count"], 1)
+            self.assertEqual(
+                [(item["ledger_id"], item["id"]) for item in payload["stale_sources"]],
+                [("leveraged-etf-discipline", "S1")],
+            )
+
     def test_evidence_audit_order_does_not_depend_on_input_order_for_tied_items(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             temp_dir = Path(temp)
@@ -1528,6 +1561,21 @@ class CliTests(unittest.TestCase):
             self.assertNotRegex(generated_guidance, r"\bbuy\b")
             self.assertNotRegex(generated_guidance, r"\bsell\b")
 
+            dashboard_dir = temp_dir / "html-dashboard"
+            dashboard = self.run_cli(
+                "html-dashboard",
+                str(first_path),
+                str(ETF_EXAMPLE),
+                "--output-dir",
+                str(dashboard_dir),
+            )
+            self.assertEqual(dashboard.returncode, 0, dashboard.stderr)
+            dashboard_action = (dashboard_dir / "action-plan.html").read_text().lower()
+            self.assertIn("no market data included", dashboard_action)
+            self.assertNotRegex(dashboard_action, r"\byou should\b")
+            self.assertNotRegex(dashboard_action, r"\bbuy\b")
+            self.assertNotRegex(dashboard_action, r"\bsell\b")
+
     def test_action_plan_source_quality_warnings_are_not_all_blockers(self) -> None:
         data = json.loads(EXAMPLE.read_text())
         data["thesis_id"] = "source-warning-only"
@@ -1561,6 +1609,45 @@ class CliTests(unittest.TestCase):
         self.assertEqual(item["blockers"], [])
         self.assertEqual(item["cadence"], "watch")
 
+    def test_action_plan_and_dashboard_surface_stale_source_blockers(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_dir = Path(temp)
+            first_path = temp_dir / "first.json"
+            data = json.loads(EXAMPLE.read_text())
+            data["updated"] = "2026-12-31"
+            for source in data["sources"]:
+                source["date"] = "2026-12-31"
+            data["sources"][0]["date"] = "2026-01-01"
+            first_path.write_text(json.dumps(data), encoding="utf-8")
+            json_path = temp_dir / "action-plan.json"
+            result = self.run_cli(
+                "action-plan",
+                str(first_path),
+                str(ETF_EXAMPLE),
+                "--output",
+                str(temp_dir / "action-plan.md"),
+                "--json-output",
+                str(json_path),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(json_path.read_text())
+            stale_item = next(item for item in payload["actions"] if item["thesis_id"] == "oklo-ai-power")
+            self.assertIn("SOURCE_STALE", [blocker["code"] for blocker in stale_item["blockers"]])
+            self.assertIn("SOURCE_STALE", [warning["code"] for warning in stale_item["source_quality_warnings"]])
+            self.assertEqual(stale_item["cadence"], "now")
+
+            dashboard_dir = temp_dir / "html-dashboard"
+            dashboard = self.run_cli(
+                "html-dashboard",
+                str(first_path),
+                str(ETF_EXAMPLE),
+                "--output-dir",
+                str(dashboard_dir),
+            )
+            self.assertEqual(dashboard.returncode, 0, dashboard.stderr)
+            self.assertIn("SOURCE_STALE", (dashboard_dir / "action-plan.html").read_text())
+            self.assertIn("Stale sources: 1", (dashboard_dir / "evidence-audit.html").read_text())
+
     def test_demo_bundle_writes_static_markdown_bundle_and_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             output_dir = Path(temp) / "bundle"
@@ -1585,15 +1672,19 @@ class CliTests(unittest.TestCase):
                 "leveraged-etf-discipline-decision-memo.md",
                 "leveraged-etf-discipline-scenario-plan.md",
                 "portfolio-summary.md",
+                "evidence-audit.md",
                 "watchlist.md",
+                "action-plan.md",
                 "manifest.json",
             ]
             self.assertEqual(sorted(path.name for path in output_dir.iterdir()), sorted(expected_files))
             self.assertIn("# Invest Thesis Ledger Demo Bundle", (output_dir / "index.md").read_text())
             self.assertIn("# Portfolio Summary", (output_dir / "portfolio-summary.md").read_text())
+            self.assertIn("# Portfolio Evidence Audit", (output_dir / "evidence-audit.md").read_text())
             self.assertIn("# Watchlist", (output_dir / "watchlist.md").read_text())
+            self.assertIn("# Weekly Action Plan", (output_dir / "action-plan.md").read_text())
             manifest = json.loads((output_dir / "manifest.json").read_text())
-            self.assertEqual(manifest["tool_version"], "1.2.0")
+            self.assertEqual(manifest["tool_version"], "1.3.0")
             self.assertEqual(manifest["ledger_ids"], ["oklo-ai-power", "leveraged-etf-discipline"])
             self.assertEqual(manifest["generated_files"], expected_files)
             index_links = [
@@ -1723,18 +1814,22 @@ class CliTests(unittest.TestCase):
                 "oklo-ai-power.html",
                 "leveraged-etf-discipline.html",
                 "portfolio.html",
+                "evidence-audit.html",
                 "watchlist.html",
+                "action-plan.html",
                 "manifest.json",
             ]
             self.assertEqual(sorted(path.name for path in output_dir.iterdir()), sorted(expected_files))
             self.assertIn("<h1>Dashboard</h1>", (output_dir / "index.html").read_text())
             self.assertIn("<h2>Brief</h2>", (output_dir / "oklo-ai-power.html").read_text())
             self.assertIn("<h1>Portfolio Summary</h1>", (output_dir / "portfolio.html").read_text())
+            self.assertIn("<h1>Portfolio Evidence Audit</h1>", (output_dir / "evidence-audit.html").read_text())
             self.assertIn("<h2>Weekly Review List</h2>", (output_dir / "watchlist.html").read_text())
+            self.assertIn("<h1>Weekly Action Plan</h1>", (output_dir / "action-plan.html").read_text())
             self.assertNotIn("<script", (output_dir / "index.html").read_text().lower())
             self.assertNotIn("@import", (output_dir / "style.css").read_text().lower())
             manifest = json.loads((output_dir / "manifest.json").read_text())
-            self.assertEqual(manifest["tool_version"], "1.2.0")
+            self.assertEqual(manifest["tool_version"], "1.3.0")
             self.assertEqual(manifest["ledger_ids"], ["oklo-ai-power", "leveraged-etf-discipline"])
             self.assertEqual(manifest["generated_files"], expected_files)
             self.assertNotIn("timestamp", manifest)
@@ -1780,6 +1875,7 @@ class CliTests(unittest.TestCase):
             first_data["thesis"] = "Thesis has <b>markup</b> & details."
             first_data["assumptions"][0]["statement"] = "Demand > supply & <unsafe>"
             first_data["risks"][0]["name"] = "Risk <img src=x>"
+            first_data["sources"][0]["date"] = "2025-01-01"
             first_data["sources"][0]["title"] = "Source & <tag>"
             first_path.write_text(json.dumps(first_data), encoding="utf-8")
             second_path.write_text(ETF_EXAMPLE.read_text(), encoding="utf-8")
@@ -1787,13 +1883,19 @@ class CliTests(unittest.TestCase):
             result = self.run_cli("html-dashboard", str(first_path), str(second_path), "--output-dir", str(output_dir))
             self.assertEqual(result.returncode, 0, result.stderr)
             text = (output_dir / "oklo-ai-power.html").read_text()
+            audit_text = (output_dir / "evidence-audit.html").read_text()
+            action_text = (output_dir / "action-plan.html").read_text()
             self.assertIn("&lt;script&gt;alert(&#x27;x&#x27;)&lt;/script&gt; &amp; title", text)
             self.assertIn("Thesis has &lt;b&gt;markup&lt;/b&gt; &amp; details.", text)
             self.assertIn("Demand &gt; supply &amp; &lt;unsafe&gt;", text)
             self.assertIn("Risk &lt;img src=x&gt;", text)
             self.assertIn("Source &amp; &lt;tag&gt;", text)
+            self.assertIn("Risk &lt;img src=x&gt;", action_text)
+            self.assertIn("Source &amp; &lt;tag&gt;", audit_text)
             self.assertNotIn("<script>alert", text)
             self.assertNotIn("<img src=x>", text)
+            self.assertNotIn("<script>alert", audit_text)
+            self.assertNotIn("<script>alert", action_text)
 
     def test_html_dashboard_manifest_is_deterministic(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -1923,7 +2025,7 @@ class CliTests(unittest.TestCase):
             self.assertEqual(second.returncode, 0, second.stderr)
             self.assertEqual(output_a.read_text(), output_b.read_text())
             payload = json.loads(output_a.read_text())
-            self.assertEqual(payload["ledger_version"], "1.2.0")
+            self.assertEqual(payload["ledger_version"], "1.3.0")
             self.assertEqual(payload["thesis_id"], "msft-thesis")
             self.assertEqual(payload["sources"][0]["id"], "S1")
             self.assertEqual(payload["assumptions"][0]["source_ids"], ["S1"])

@@ -2,7 +2,7 @@
 
 > This is a research organization tool, not investment advice.
 
-- Tool Version: 1.2.0
+- Tool Version: 1.3.0
 - Ledgers: 2
 
 ## Input Ledgers
@@ -26,5 +26,7 @@
 - [leveraged-etf-discipline-decision-memo.md](leveraged-etf-discipline-decision-memo.md)
 - [leveraged-etf-discipline-scenario-plan.md](leveraged-etf-discipline-scenario-plan.md)
 - [portfolio-summary.md](portfolio-summary.md)
+- [evidence-audit.md](evidence-audit.md)
 - [watchlist.md](watchlist.md)
+- [action-plan.md](action-plan.md)
 - [manifest.json](manifest.json)

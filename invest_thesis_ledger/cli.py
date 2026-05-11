@@ -568,7 +568,9 @@ def _demo_bundle_files(ledgers: Sequence[dict]) -> list[tuple[str, str]]:
     body_files.extend(
         [
             ("portfolio-summary.md", render_portfolio(ledgers)),
+            ("evidence-audit.md", render_evidence_audit(ledgers)),
             ("watchlist.md", render_watchlist(ledgers)),
+            ("action-plan.md", render_action_plan(ledgers)),
         ]
     )
     filenames = ["index.md"] + [filename for filename, _ in body_files] + ["manifest.json"]
@@ -629,7 +631,9 @@ def _html_dashboard_files(ledgers: Sequence[dict]) -> list[tuple[str, str]]:
     body_files.extend(
         [
             ("portfolio.html", _render_html_portfolio_page(ledgers)),
+            ("evidence-audit.html", _render_html_evidence_audit_page(ledgers)),
             ("watchlist.html", _render_html_watchlist_page(ledgers)),
+            ("action-plan.html", _render_html_action_plan_page(ledgers)),
         ]
     )
     filenames = ["index.html", "style.css"] + [filename for filename, _ in body_files] + ["manifest.json"]
@@ -691,7 +695,7 @@ def _render_html_ledger_page(ledger: dict, ledger_id: str) -> str:
     scenario = scenario_plan_payload(ledger)
     asset = ledger["asset"]
     content = [
-        "<nav><a href=\"index.html\">Index</a> <a href=\"portfolio.html\">Portfolio</a> <a href=\"watchlist.html\">Watchlist</a></nav>",
+        "<nav><a href=\"index.html\">Index</a> <a href=\"portfolio.html\">Portfolio</a> <a href=\"evidence-audit.html\">Evidence Audit</a> <a href=\"watchlist.html\">Watchlist</a> <a href=\"action-plan.html\">Action Plan</a></nav>",
         "<section class=\"summary\">",
         f"<p class=\"eyebrow\">{_h(asset['ticker'])} / {_h(asset['type'])}</p>",
         f"<p>{_h(asset['name'])}</p>",
@@ -819,7 +823,7 @@ def _render_html_ledger_page(ledger: dict, ledger_id: str) -> str:
 def _render_html_portfolio_page(ledgers: Sequence[dict]) -> str:
     payload = portfolio_payload(ledgers)
     content = [
-        "<nav><a href=\"index.html\">Index</a> <a href=\"watchlist.html\">Watchlist</a></nav>",
+        "<nav><a href=\"index.html\">Index</a> <a href=\"evidence-audit.html\">Evidence Audit</a> <a href=\"watchlist.html\">Watchlist</a> <a href=\"action-plan.html\">Action Plan</a></nav>",
         "<section class=\"summary\">",
         f"<p>Assets: {payload['portfolio']['asset_count']}. Thesis count: {payload['portfolio']['thesis_count']}.</p>",
         "</section>",
@@ -875,10 +879,98 @@ def _render_html_portfolio_page(ledgers: Sequence[dict]) -> str:
     return _html_page("Portfolio Summary", "Portfolio Summary", "\n".join(content))
 
 
+def _render_html_evidence_audit_page(ledgers: Sequence[dict]) -> str:
+    payload = evidence_audit_payload(ledgers)
+    audit = payload["audit"]
+    content = [
+        "<nav><a href=\"index.html\">Index</a> <a href=\"portfolio.html\">Portfolio</a> <a href=\"watchlist.html\">Watchlist</a> <a href=\"action-plan.html\">Action Plan</a></nav>",
+        "<section class=\"summary\">",
+        f"<p>Ledgers: {audit['ledger_count']}. Tracked items: {audit['tracked_items']}. "
+        f"Unsupported items: {audit['unsupported_items']}. Unused sources: {audit['unused_source_count']}. "
+        f"Stale sources: {audit['stale_source_count']}.</p>",
+        "</section>",
+        "<section>",
+        "<h2>Ledger Scores</h2>",
+        _html_table(
+            ["Rank", "Score", "Ticker", "Ledger ID", "Updated", "Tracked", "Unsupported", "Unused Sources", "Stale Sources"],
+            [
+                [
+                    str(item["rank"]),
+                    str(item["quality_score"]),
+                    item["ticker"],
+                    item["thesis_id"],
+                    item["updated"],
+                    str(item["coverage"]["tracked_items"]),
+                    str(item["coverage"]["unsupported_items"]),
+                    str(item["coverage"]["unused_source_count"]),
+                    str(item["coverage"]["stale_source_count"]),
+                ]
+                for item in payload["ledgers"]
+            ],
+        ),
+        "</section>",
+        "<section>",
+        "<h2>Field Coverage</h2>",
+        _html_table(
+            ["Field", "Tracked", "Supported", "Unsupported"],
+            [
+                [field, str(coverage["tracked_items"]), str(coverage["supported_items"]), str(coverage["unsupported_items"])]
+                for field, coverage in payload["field_coverage"].items()
+            ],
+        ),
+        "</section>",
+        "<section>",
+        "<h2>Unsupported Items</h2>",
+        _html_table(
+            ["Ledger ID", "Ticker", "Type", "ID"],
+            [
+                [item["ledger_id"], item["ticker"], item["type"], item["id"]]
+                for item in payload["unsupported_items"]
+            ],
+        ),
+        "</section>",
+        "<section>",
+        "<h2>Unused Sources</h2>",
+        _html_table(
+            ["Ledger ID", "Ticker", "Source", "Title", "URL"],
+            [
+                [item["ledger_id"], item["ticker"], item["id"], item["title"], item["url"]]
+                for item in payload["unused_sources"]
+            ],
+        ),
+        "</section>",
+        "<section>",
+        "<h2>Stale Sources</h2>",
+        _html_table(
+            ["Ledger ID", "Ticker", "Source", "Title", "Date", "Age Days", "URL"],
+            [
+                [item["ledger_id"], item["ticker"], item["id"], item["title"], item["date"], str(item["age_days"]), item["url"]]
+                for item in payload["stale_sources"]
+            ],
+        ),
+        "</section>",
+        "<section>",
+        "<h2>Duplicate Source URLs</h2>",
+        _html_table(
+            ["URL", "Ledgers", "Occurrences"],
+            [
+                [
+                    item["url"],
+                    str(item["ledger_count"]),
+                    ", ".join(f"{occurrence['ledger_id']}[{occurrence['source_id']}]" for occurrence in item["occurrences"]),
+                ]
+                for item in payload["duplicate_source_urls"]
+            ],
+        ),
+        "</section>",
+    ]
+    return _html_page("Portfolio Evidence Audit", "Portfolio Evidence Audit", "\n".join(content))
+
+
 def _render_html_watchlist_page(ledgers: Sequence[dict]) -> str:
     payload = watchlist_payload(ledgers)
     content = [
-        "<nav><a href=\"index.html\">Index</a> <a href=\"portfolio.html\">Portfolio</a></nav>",
+        "<nav><a href=\"index.html\">Index</a> <a href=\"portfolio.html\">Portfolio</a> <a href=\"evidence-audit.html\">Evidence Audit</a> <a href=\"action-plan.html\">Action Plan</a></nav>",
         "<section class=\"summary\">",
         f"<p>Ledgers: {payload['watchlist']['ledger_count']}. High priority: {payload['watchlist']['high_priority_count']}. "
         f"Medium priority: {payload['watchlist']['medium_priority_count']}. Low priority: {payload['watchlist']['low_priority_count']}.</p>",
@@ -919,6 +1011,74 @@ def _render_html_watchlist_page(ledgers: Sequence[dict]) -> str:
         "</section>",
     ]
     return _html_page("Watchlist", "Watchlist", "\n".join(content))
+
+
+def _render_html_action_plan_page(ledgers: Sequence[dict]) -> str:
+    payload = action_plan_payload(ledgers)
+    summary = payload["action_plan"]
+    content = [
+        "<nav><a href=\"index.html\">Index</a> <a href=\"portfolio.html\">Portfolio</a> <a href=\"evidence-audit.html\">Evidence Audit</a> <a href=\"watchlist.html\">Watchlist</a></nav>",
+        "<section class=\"summary\">",
+        "<p class=\"notice\">Educational research organization only. Not investment advice. No market data included.</p>",
+        f"<p>Ledgers: {summary['ledger_count']}. Ranked actions: {summary['action_count']}. "
+        f"Now: {summary['now_count']}. This week: {summary['this_week_count']}. Watch: {summary['watch_count']}.</p>",
+        "</section>",
+        "<section>",
+        "<h2>Ranked Actions</h2>",
+        _html_table(
+            ["Rank", "Cadence", "Owner", "Ticker", "Ledger ID", "Priority", "Score", "Action", "Reason Codes", "Source Warnings"],
+            [
+                [
+                    str(item["rank"]),
+                    item["cadence"],
+                    item["owner"],
+                    item["ticker"],
+                    item["thesis_id"],
+                    item["priority"],
+                    str(item["score"]),
+                    item["action"],
+                    ", ".join(item["reason_codes"]) if item["reason_codes"] else "none",
+                    ", ".join(warning["code"] for warning in item["source_quality_warnings"]) if item["source_quality_warnings"] else "none",
+                ]
+                for item in payload["actions"]
+            ],
+        ),
+        "</section>",
+        "<section>",
+        "<h2>Blockers</h2>",
+        _html_table(
+            ["Rank", "Ticker", "Code", "Text"],
+            [
+                [str(item["rank"]), item["ticker"], blocker["code"], blocker["text"]]
+                for item in payload["actions"]
+                for blocker in item["blockers"]
+            ],
+        ),
+        "</section>",
+        "<section>",
+        "<h2>Source-Quality Warnings</h2>",
+        _html_table(
+            ["Rank", "Ticker", "Code", "Text"],
+            [
+                [str(item["rank"]), item["ticker"], warning["code"], warning["text"]]
+                for item in payload["actions"]
+                for warning in item["source_quality_warnings"]
+            ],
+        ),
+        "</section>",
+        "<section>",
+        "<h2>Next Checklist</h2>",
+        _html_table(
+            ["Rank", "Ticker", "ID", "Text", "Source"],
+            [
+                [str(item["rank"]), item["ticker"], checklist_item["id"], checklist_item["text"], checklist_item["source"]]
+                for item in payload["actions"]
+                for checklist_item in item["next_checklist"]
+            ],
+        ),
+        "</section>",
+    ]
+    return _html_page("Weekly Action Plan", "Weekly Action Plan", "\n".join(content))
 
 
 def _html_page(title: str, heading: str, body: str) -> str:
@@ -1073,7 +1233,7 @@ def _starter_ledger(asset: str, name: str, asset_type: str) -> dict:
     clean_name = name.strip()
     clean_type = asset_type.strip()
     return {
-        "ledger_version": "1.2.0",
+        "ledger_version": "1.3.0",
         "thesis_id": f"{slug}-thesis",
         "title": f"{clean_name} Thesis Ledger",
         "asset": {

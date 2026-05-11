@@ -6,9 +6,10 @@ timelines, thesis drift comparisons, catalyst calendars, evidence coverage
 reports, broker/institution matrices, exposure checklists, deterministic
 starter ledger generation, decision memos, scenario plans, portfolio-level
 summaries, portfolio evidence audits, review queues, weekly watchlists, weekly
-action plans, static demo bundles, and no-JS HTML dashboards. v1.2.0 adds the
-`action-plan` workflow while preserving compatibility with v0.1.0 through
-v1.1.0 ledgers.
+action plans, static demo bundles, and no-JS HTML dashboards. v1.3.0 expands
+the static demo bundle and HTML dashboard to include evidence-audit and
+action-plan outputs while preserving compatibility with v0.1.0 through v1.2.0
+ledgers.
 
 This project is for research organization only. It is not investment advice.
 
@@ -166,7 +167,7 @@ input file list.
 
 ## Ledger Format
 
-Ledgers are JSON objects. The v1.2.0 required fields are:
+Ledgers are JSON objects. The v1.3.0 required fields are:
 
 - `ledger_version`
 - `thesis_id`
@@ -203,7 +204,7 @@ ID.
 optional string `tags`; `exposure` combines these risk tags with position rules
 into a checklist.
 
-The formal v1.2.0 schema reference is in `docs/ledger-schema.md`.
+The formal v1.3.0 schema reference is in `docs/ledger-schema.md`.
 
 See:
 
@@ -248,14 +249,18 @@ Checked-in deterministic CLI output fixtures are available under
 - `examples/output/demo-bundle/index.md`
 - `examples/output/demo-bundle/manifest.json`
 - `examples/output/demo-bundle/portfolio-summary.md`
+- `examples/output/demo-bundle/evidence-audit.md`
 - `examples/output/demo-bundle/watchlist.md`
+- `examples/output/demo-bundle/action-plan.md`
 - per-ledger demo bundle artifacts for brief, risk, history, decision memo, and
   scenario plan reports
 - `examples/output/html-dashboard/index.html`
 - `examples/output/html-dashboard/style.css`
 - `examples/output/html-dashboard/manifest.json`
 - `examples/output/html-dashboard/portfolio.html`
+- `examples/output/html-dashboard/evidence-audit.html`
 - `examples/output/html-dashboard/watchlist.html`
+- `examples/output/html-dashboard/action-plan.html`
 - per-ledger HTML dashboard pages
 
 ## Development
@@ -318,16 +323,17 @@ warnings for review.
 `demo-bundle` validates all input ledgers before writing anything, then cleanly
 overwrites the target output directory with static Markdown files: `index.md`,
 per-ledger brief/risk/history/decision memo/scenario plan reports,
-`portfolio-summary.md`, `watchlist.md`, and `manifest.json`. The manifest lists
-generated files, tool version, and input ledger IDs only; it intentionally
-contains no timestamps.
+`portfolio-summary.md`, `evidence-audit.md`, `watchlist.md`, `action-plan.md`,
+and `manifest.json`. The manifest lists generated files, tool version, and
+input ledger IDs only; it intentionally contains no timestamps.
 
 `html-dashboard` validates all input ledgers before writing anything, then
 cleanly overwrites the target output directory with static HTML/CSS files:
 `index.html`, `style.css`, one page per ledger, `portfolio.html`,
-`watchlist.html`, and `manifest.json`. It uses the existing brief, risk,
-history, decision memo, scenario plan, portfolio, and watchlist payloads; all
-HTML is escaped with the Python standard library, with no external CSS,
+`evidence-audit.html`, `watchlist.html`, `action-plan.html`, and
+`manifest.json`. It uses the existing brief, risk, history, decision memo,
+scenario plan, portfolio, evidence audit, watchlist, and action plan payloads;
+all HTML is escaped with the Python standard library, with no external CSS,
 JavaScript, images, or fonts.
 
 `decision-memo` uses the same normalized broker, catalyst, exposure, and

@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.3.0 - 2026-05-12
+
+- Expanded `demo-bundle` output with `evidence-audit.md` and `action-plan.md`.
+- Expanded `html-dashboard` output with `evidence-audit.html` and `action-plan.html`.
+- Reused existing evidence audit and action plan payloads for aggregate static pages without adding JavaScript, external assets, workflow files, market data, or personal advice wording.
+- Kept bundle and dashboard manifests deterministic with local generated file links only.
+- Updated package/schema version, README, schema docs, tests, selfcheck, and checked-in fixtures for v1.3.0.
+
 ## 1.2.0 - 2026-05-12
 
 - Added `action-plan` command for weekly action plans across two or more ledgers.

@@ -5,12 +5,14 @@
     "oklo-ai-power.html",
     "leveraged-etf-discipline.html",
     "portfolio.html",
+    "evidence-audit.html",
     "watchlist.html",
+    "action-plan.html",
     "manifest.json"
   ],
   "ledger_ids": [
     "oklo-ai-power",
     "leveraged-etf-discipline"
   ],
-  "tool_version": "1.2.0"
+  "tool_version": "1.3.0"
 }

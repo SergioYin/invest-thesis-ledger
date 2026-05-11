@@ -1,7 +1,7 @@
-# Ledger Schema v1.2.0
+# Ledger Schema v1.3.0
 
 This document defines the JSON ledger format accepted by `invest-thesis-ledger`
-v1.2.0. Ledgers are research organization records only and are not investment
+v1.3.0. Ledgers are research organization records only and are not investment
 advice.
 
 ## Document Shape
@@ -15,7 +15,7 @@ without breaking the renderer.
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `ledger_version` | string | Schema version. v1.2.0 ledgers should use `"1.2.0"`. v0.1.0 through v1.1.0 remain accepted for compatibility; other values validate with a warning. |
+| `ledger_version` | string | Schema version. v1.3.0 ledgers should use `"1.3.0"`. v0.1.0 through v1.2.0 remain accepted for compatibility; other values validate with a warning. |
 | `thesis_id` | string | Stable machine-readable ledger identifier. |
 | `title` | string | Human-readable thesis title. |
 | `asset` | object | Asset metadata. |
@@ -183,7 +183,7 @@ source, and duplicate source references within one item are invalid.
 
 ## Determinism
 
-For the same input file or ordered input file list, v1.2.0 CLI outputs are
+For the same input file or ordered input file list, v1.3.0 CLI outputs are
 deterministic:
 
 - JSON outputs are serialized with sorted keys and two-space indentation.
@@ -221,7 +221,7 @@ deterministic:
 - `init-template` uses fixed placeholder dates so repeated runs with the same
   arguments produce byte-identical JSON.
 
-## v1.2.0 Reports
+## v1.3.0 Reports
 
 `compare <old.json> <new.json> --output drift.md --json-output drift.json`
 loads and validates both ledgers, then compares:
@@ -292,7 +292,7 @@ Evidence gaps are ordered by review priority: low-confidence assumptions, stale
 sources, unused sources, then unsupported evidence items.
 
 `init-template --asset TICKER --name NAME --type TYPE --output ledger.json`
-writes a deterministic starter ledger with v1.2.0 fields, fixed placeholder
+writes a deterministic starter ledger with v1.3.0 fields, fixed placeholder
 dates, one source-backed assumption, one risk, one review, and a thesis ID
 derived from the ticker.
 
@@ -420,7 +420,9 @@ directory with a static Markdown bundle:
 - one brief, risk report, history report, decision memo, and scenario plan per
   input ledger
 - `portfolio-summary.md`
+- `evidence-audit.md`
 - `watchlist.md`
+- `action-plan.md`
 - `manifest.json`
 
 The manifest is deterministic and contains only `generated_files`,
@@ -438,14 +440,17 @@ output directory with a static no-JS public demo:
 - `style.css`
 - one HTML page per input ledger
 - `portfolio.html`
+- `evidence-audit.html`
 - `watchlist.html`
+- `action-plan.html`
 - `manifest.json`
 
 Per-ledger pages summarize the existing brief, risk, history, decision memo,
-and scenario plan payloads. Portfolio and watchlist pages summarize the existing
-portfolio and watchlist payloads. The manifest is deterministic and contains
-only `generated_files`, `ledger_ids`, and `tool_version`; it does not include
-timestamps. HTML escaping uses only the Python standard library.
+and scenario plan payloads. Portfolio, evidence audit, watchlist, and action
+plan pages summarize the existing aggregate payloads. The manifest is
+deterministic and contains only `generated_files`, `ledger_ids`, and
+`tool_version`; it does not include timestamps. HTML escaping uses only the
+Python standard library.
 
 See `examples/output/` for checked-in CLI output fixtures generated from
 `examples/oklo-ai-power.json`, `examples/leveraged-etf-discipline.json`, and
