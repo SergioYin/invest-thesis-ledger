@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from invest_thesis_ledger.render import decision_memo_payload, review_queue_payload
+from invest_thesis_ledger.render import decision_memo_payload, review_queue_payload, scenario_plan_payload
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -69,6 +69,12 @@ class CliTests(unittest.TestCase):
         self.assertIn("LEDGER", decision_memo.stdout)
         self.assertIn("pre-trade/review decision memo", decision_memo.stdout)
         self.assertIn("write JSON output to PATH", decision_memo.stdout)
+
+        scenario_plan = self.run_cli("scenario-plan", "--help")
+        self.assertEqual(scenario_plan.returncode, 0, scenario_plan.stderr)
+        self.assertIn("LEDGER", scenario_plan.stdout)
+        self.assertIn("base/bull/bear scenario plan", scenario_plan.stdout)
+        self.assertIn("write JSON output to PATH", scenario_plan.stdout)
 
     def test_brief_is_deterministic(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -322,6 +328,130 @@ class CliTests(unittest.TestCase):
             json_path = temp_dir / "decision-memo.json"
             result = self.run_cli(
                 "decision-memo",
+                str(bad_path),
+                "--output",
+                str(md_path),
+                "--json-output",
+                str(json_path),
+            )
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("unknown source missing", result.stderr)
+            self.assertFalse(md_path.exists())
+            self.assertFalse(json_path.exists())
+
+    def test_scenario_plan_writes_base_bull_bear_payload(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            md_path = Path(temp) / "scenario-plan.md"
+            json_path = Path(temp) / "scenario-plan.json"
+            result = self.run_cli(
+                "scenario-plan",
+                str(EXAMPLE),
+                "--output",
+                str(md_path),
+                "--json-output",
+                str(json_path),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            text = md_path.read_text()
+            self.assertIn("# Scenario Plan", text)
+            self.assertIn("## Base Case", text)
+            self.assertIn("## Bull Case", text)
+            self.assertIn("## Bear Case", text)
+            payload = json.loads(json_path.read_text())
+            self.assertEqual(payload["thesis_id"], "oklo-ai-power")
+            self.assertEqual([item["id"] for item in payload["cases"]], ["base", "bull", "bear"])
+            self.assertEqual(payload["scenario_plan"]["case_count"], 3)
+            self.assertEqual(payload["scenario_plan"]["trigger_count"], 3)
+            self.assertEqual(payload["cases"][1]["assumptions"][0]["id"], "A1")
+            self.assertEqual(payload["cases"][2]["assumptions"][0]["id"], "A2")
+            self.assertEqual(payload["cases"][2]["risks"][0]["id"], "R1")
+            self.assertEqual(payload["cases"][0]["position_constraints"][0]["id"], "P1")
+            self.assertEqual(payload["cases"][0]["evidence_gaps"][0]["id"], "ASSUMPTION-A2")
+
+    def test_scenario_plan_order_is_input_order_independent(self) -> None:
+        data = json.loads(EXAMPLE.read_text())
+        forward = scenario_plan_payload(data)
+        data["assumptions"] = list(reversed(data["assumptions"]))
+        data["risks"] = list(reversed(data["risks"]))
+        data["position_rules"] = list(reversed(data["position_rules"]))
+        reverse = scenario_plan_payload(data)
+        self.assertEqual(forward, reverse)
+        self.assertEqual([item["id"] for item in forward["cases"][0]["risk_mitigations"]], ["R1", "R2"])
+        self.assertEqual([item["id"] for item in forward["cases"][0]["position_constraints"]], ["P1", "P2"])
+
+    def test_scenario_plan_infers_trigger_cases_by_whole_terms(self) -> None:
+        data = json.loads(EXAMPLE.read_text())
+        data["catalysts"] = [
+            {"id": "CAT1", "title": "Nuclear licensing status update", "status": "watch", "source_ids": ["S3"]},
+            {"id": "CAT2", "title": "Signed customer contract", "status": "watch", "source_ids": ["S1"]},
+            {"id": "CAT3", "title": "Licensing delay", "status": "watch", "source_ids": ["S3"]},
+        ]
+        payload = scenario_plan_payload(data)
+        cases = {item["id"]: item for item in payload["cases"]}
+        self.assertEqual([(item["id"], item["direction"]) for item in cases["base"]["triggers"]], [("CAT1", "base")])
+        self.assertEqual([(item["id"], item["direction"]) for item in cases["bull"]["triggers"]], [("CAT2", "bull")])
+        self.assertEqual([(item["id"], item["direction"]) for item in cases["bear"]["triggers"]], [("CAT3", "bear")])
+
+    def test_scenario_plan_orders_evidence_gaps_by_review_priority(self) -> None:
+        data = json.loads(EXAMPLE.read_text())
+        data["updated"] = "2027-01-01"
+        data["sources"].append(
+            {
+                "id": "S4",
+                "title": "Unused recent source",
+                "publisher": "Desk",
+                "date": "2026-12-31",
+                "url": "https://example.com/unused",
+            }
+        )
+        data["broker_views"][0]["source_ids"] = []
+        gap_ids = [item["id"] for item in scenario_plan_payload(data)["cases"][0]["evidence_gaps"]]
+        self.assertEqual(gap_ids[:5], ["ASSUMPTION-A2", "STALE-S1", "STALE-S2", "STALE-S3", "UNUSED-S4"])
+        self.assertEqual(gap_ids[-1], "UNSUPPORTED-broker_view-B1")
+
+    def test_scenario_plan_escapes_markdown_inline_values(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_dir = Path(temp)
+            ledger_path = temp_dir / "ledger.json"
+            data = json.loads(EXAMPLE.read_text())
+            data["title"] = "Scenario | Title\nBreak"
+            data["assumptions"][0]["statement"] = "Power | demand\ncontinues"
+            data["catalysts"][0]["title"] = "Signed | agreement\nwith buyer"
+            data["risks"][0]["mitigation"] = "Refresh | licensing\nmilestones"
+            data["position_rules"][0]["rule"] = "Keep | watchlist\nonly"
+            data["sources"][0]["title"] = "Source | title\nbreak"
+            ledger_path.write_text(json.dumps(data), encoding="utf-8")
+
+            md_path = temp_dir / "scenario-plan.md"
+            json_path = temp_dir / "scenario-plan.json"
+            result = self.run_cli(
+                "scenario-plan",
+                str(ledger_path),
+                "--output",
+                str(md_path),
+                "--json-output",
+                str(json_path),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            text = md_path.read_text()
+            self.assertIn("# Scenario Plan: Scenario \\| Title Break", text)
+            self.assertIn("Power \\| demand continues", text)
+            self.assertIn("Signed \\| agreement with buyer", text)
+            self.assertIn("Refresh \\| licensing milestones", text)
+            self.assertIn("Keep \\| watchlist only", text)
+            self.assertIn("[S1] Source \\| title break.", text)
+
+    def test_scenario_plan_validates_before_writing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_dir = Path(temp)
+            bad_path = temp_dir / "bad.json"
+            data = json.loads(EXAMPLE.read_text())
+            data["position_rules"][0]["source_ids"] = ["missing"]
+            bad_path.write_text(json.dumps(data), encoding="utf-8")
+            md_path = temp_dir / "scenario-plan.md"
+            json_path = temp_dir / "scenario-plan.json"
+            result = self.run_cli(
+                "scenario-plan",
                 str(bad_path),
                 "--output",
                 str(md_path),
@@ -773,7 +903,7 @@ class CliTests(unittest.TestCase):
             self.assertEqual(second.returncode, 0, second.stderr)
             self.assertEqual(output_a.read_text(), output_b.read_text())
             payload = json.loads(output_a.read_text())
-            self.assertEqual(payload["ledger_version"], "0.6.0")
+            self.assertEqual(payload["ledger_version"], "0.7.0")
             self.assertEqual(payload["thesis_id"], "msft-thesis")
             self.assertEqual(payload["sources"][0]["id"], "S1")
             self.assertEqual(payload["assumptions"][0]["source_ids"], ["S1"])
@@ -936,6 +1066,18 @@ class CliTests(unittest.TestCase):
                         str(temp_dir / "oklo-ai-power-decision-memo.json"),
                     ],
                     ["oklo-ai-power-decision-memo.md", "oklo-ai-power-decision-memo.json"],
+                ),
+                (
+                    "scenario-plan",
+                    [
+                        "scenario-plan",
+                        str(EXAMPLE),
+                        "--output",
+                        str(temp_dir / "oklo-ai-power-scenario-plan.md"),
+                        "--json-output",
+                        str(temp_dir / "oklo-ai-power-scenario-plan.json"),
+                    ],
+                    ["oklo-ai-power-scenario-plan.md", "oklo-ai-power-scenario-plan.json"],
                 ),
                 (
                     "compare",

@@ -33,6 +33,8 @@ FIXTURE_OUTPUTS = [
     "oklo-ai-power-exposure.json",
     "oklo-ai-power-decision-memo.md",
     "oklo-ai-power-decision-memo.json",
+    "oklo-ai-power-scenario-plan.md",
+    "oklo-ai-power-scenario-plan.json",
     "oklo-ai-power-drift.md",
     "oklo-ai-power-drift.json",
     "portfolio-summary.md",
@@ -148,6 +150,19 @@ def main() -> int:
                     str(temp_dir / f"{stem}-decision-memo.md"),
                     "--json-output",
                     str(temp_dir / f"{stem}-decision-memo.json"),
+                ]
+            )
+            _run(
+                [
+                    sys.executable,
+                    "-m",
+                    "invest_thesis_ledger",
+                    "scenario-plan",
+                    str(ledger),
+                    "--output",
+                    str(temp_dir / f"{stem}-scenario-plan.md"),
+                    "--json-output",
+                    str(temp_dir / f"{stem}-scenario-plan.json"),
                 ]
             )
             _run(

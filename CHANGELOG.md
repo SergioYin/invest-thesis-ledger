@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.0 - 2026-05-12
+
+- Added `scenario-plan` command for deterministic base/bull/bear scenario planning from one ledger.
+- Added structured scenario-plan JSON and Markdown output covering assumptions inferred from confidence, catalyst triggers, risk mitigation actions, position-rule constraints, and evidence gaps.
+- Added checked-in Oklo scenario plan example outputs.
+- Updated README, schema docs, tests, and selfcheck for scenario plan coverage.
+
 ## 0.6.0 - 2026-05-12
 
 - Added `decision-memo` command for deterministic pre-trade/review memos from one ledger.

@@ -4,9 +4,9 @@ A zero-dependency Python package and CLI for maintaining investment thesis
 ledgers as JSON, then rendering deterministic briefs, risk reports, review
 timelines, thesis drift comparisons, catalyst calendars, evidence coverage
 reports, broker/institution matrices, exposure checklists, deterministic
-starter ledger generation, decision memos, portfolio-level summaries, and
-review queues. v0.6.0 adds the decision memo workflow while preserving
-compatibility with v0.1.0, v0.2.0, v0.3.0, v0.4.0, and v0.5.0 ledgers.
+starter ledger generation, decision memos, scenario plans, portfolio-level
+summaries, and review queues. v0.7.0 adds the scenario plan workflow while
+preserving compatibility with v0.1.0 through v0.6.0 ledgers.
 
 This project is for research organization only. It is not investment advice.
 
@@ -101,6 +101,12 @@ Render a pre-trade/review decision memo:
 python -m invest_thesis_ledger decision-memo examples/oklo-ai-power.json --output decision-memo.md --json-output decision-memo.json
 ```
 
+Render a deterministic base/bull/bear scenario plan:
+
+```bash
+python -m invest_thesis_ledger scenario-plan examples/oklo-ai-power.json --output scenario-plan.md --json-output scenario-plan.json
+```
+
 Aggregate two or more ledgers into a portfolio summary:
 
 ```bash
@@ -127,7 +133,7 @@ input file list.
 
 ## Ledger Format
 
-Ledgers are JSON objects. The v0.6.0 required fields are:
+Ledgers are JSON objects. The v0.7.0 required fields are:
 
 - `ledger_version`
 - `thesis_id`
@@ -164,7 +170,7 @@ ID.
 optional string `tags`; `exposure` combines these risk tags with position rules
 into a checklist.
 
-The formal v0.6.0 schema reference is in `docs/ledger-schema.md`.
+The formal v0.7.0 schema reference is in `docs/ledger-schema.md`.
 
 See:
 
@@ -192,6 +198,8 @@ Checked-in deterministic CLI output fixtures are available under
 - `examples/output/oklo-ai-power-exposure.json`
 - `examples/output/oklo-ai-power-decision-memo.md`
 - `examples/output/oklo-ai-power-decision-memo.json`
+- `examples/output/oklo-ai-power-scenario-plan.md`
+- `examples/output/oklo-ai-power-scenario-plan.json`
 - `examples/output/oklo-ai-power-drift.md`
 - `examples/output/oklo-ai-power-drift.json`
 - `examples/output/portfolio-summary.md`
@@ -239,6 +247,18 @@ low priority.
 evidence payloads to produce a deterministic pre-trade/review memo with the
 latest review, high-risk list, open position rules, stale-source summary, and
 questions to answer before action.
+
+`scenario-plan` uses only existing ledger fields to derive base, bull, and bear
+cases from assumption confidence, risk severity/probability, open catalyst
+triggers, mitigation text, position-rule constraints, and evidence gaps.
+Assumptions with high/strong/confirmed/validated confidence map to base and
+bull cases, medium/moderate assumptions map to base and bull cases,
+watch/watchlist/neutral or unrecognized confidence maps to base, and
+low/weak/unproven/unknown confidence maps to bear. Catalyst trigger direction is
+inferred with whole-word terms: positive terms map to bull, negative terms map to
+bear, and unmatched triggers map to base. Evidence gaps are ordered as
+low-confidence assumptions, stale sources, unused sources, then unsupported
+items.
 
 ## License
 

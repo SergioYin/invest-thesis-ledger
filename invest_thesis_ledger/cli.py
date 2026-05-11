@@ -28,8 +28,10 @@ from .render import (
     render_portfolio,
     render_review_queue,
     render_risk,
+    render_scenario_plan,
     risk_payload,
     review_queue_payload,
+    scenario_plan_payload,
     to_json,
 )
 from .schema import load_ledger, validate_ledger, validation_summary
@@ -104,6 +106,15 @@ def build_parser() -> argparse.ArgumentParser:
     _add_ledger_arg(decision_memo)
     _add_output_args(decision_memo)
     decision_memo.set_defaults(func=_cmd_decision_memo)
+
+    scenario_plan = subparsers.add_parser(
+        "scenario-plan",
+        help="render a deterministic base/bull/bear scenario plan",
+        description="render a deterministic base/bull/bear scenario plan.",
+    )
+    _add_ledger_arg(scenario_plan)
+    _add_output_args(scenario_plan)
+    scenario_plan.set_defaults(func=_cmd_scenario_plan)
 
     portfolio = subparsers.add_parser("portfolio", help="aggregate two or more ledgers into a portfolio summary")
     portfolio.add_argument("ledgers", metavar="LEDGER", nargs="+", help="ledger JSON file")
@@ -246,6 +257,16 @@ def _cmd_decision_memo(args: argparse.Namespace) -> int:
     )
 
 
+def _cmd_scenario_plan(args: argparse.Namespace) -> int:
+    return _render_validated(
+        args.ledger,
+        (
+            (args.output, render_scenario_plan),
+            (args.json_output, lambda ledger: to_json(scenario_plan_payload(ledger))),
+        ),
+    )
+
+
 def _cmd_portfolio(args: argparse.Namespace) -> int:
     if len(args.ledgers) < 2:
         sys.stderr.write("error: portfolio requires at least two ledger JSON files\n")
@@ -348,7 +369,7 @@ def _starter_ledger(asset: str, name: str, asset_type: str) -> dict:
     clean_name = name.strip()
     clean_type = asset_type.strip()
     return {
-        "ledger_version": "0.6.0",
+        "ledger_version": "0.7.0",
         "thesis_id": f"{slug}-thesis",
         "title": f"{clean_name} Thesis Ledger",
         "asset": {

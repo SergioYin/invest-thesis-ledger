@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import date
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 
@@ -17,6 +18,33 @@ _REVIEW_REASON_ORDER = {
     "stale_review": 3,
     "open_checklist": 4,
     "open_position_rules": 5,
+}
+_POSITIVE_TRIGGER_TERMS = {
+    "signed",
+    "contract",
+    "customer",
+    "partnership",
+    "raise",
+    "reduces",
+    "clear",
+    "approval",
+    "milestone",
+}
+_NEGATIVE_TRIGGER_TERMS = {
+    "delay",
+    "miss",
+    "failed",
+    "failure",
+    "deny",
+    "denial",
+    "weak",
+    "unclear",
+}
+_EVIDENCE_GAP_ORDER = {
+    "low_confidence_assumption": 0,
+    "stale_source": 1,
+    "unused_source": 2,
+    "unsupported_item": 3,
 }
 
 
@@ -942,6 +970,186 @@ def render_decision_memo(ledger: Mapping[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def scenario_plan_payload(ledger: Mapping[str, Any]) -> Dict[str, Any]:
+    """Build deterministic scenario planning output from existing ledger fields."""
+
+    assumptions = [
+        {
+            "id": str(item["id"]),
+            "statement": str(item["statement"]),
+            "confidence": str(item["confidence"]),
+            "source_ids": list(item["source_ids"]),
+        }
+        for item in ledger.get("assumptions", [])
+        if isinstance(item, dict)
+    ]
+    assumptions.sort(key=lambda item: item["id"])
+    risks = [
+        {
+            "id": str(item["id"]),
+            "name": str(item["name"]),
+            "severity": str(item["severity"]),
+            "probability": str(item["probability"]),
+            "mitigation": str(item["mitigation"]),
+            "tags": list(item.get("tags", [])) if isinstance(item.get("tags", []), list) else [],
+            "source_ids": list(item["source_ids"]),
+        }
+        for item in ledger.get("risks", [])
+        if isinstance(item, dict)
+    ]
+    risks.sort(key=lambda item: item["id"])
+    catalysts = calendar_payload(ledger)["catalysts"]
+    open_catalysts = [item for item in catalysts if not _is_closed_status(str(item.get("status", "")))]
+    position_rules = exposure_payload(ledger)["position_rules"]
+    open_position_rules = [
+        item for item in position_rules if not _is_closed_status(str(item.get("status", "")))
+    ]
+    evidence = evidence_payload(ledger)
+    evidence_gaps = _scenario_evidence_gaps(assumptions, evidence)
+    return {
+        "thesis_id": ledger["thesis_id"],
+        "title": ledger["title"],
+        "updated": ledger["updated"],
+        "asset": dict(ledger["asset"]),
+        "thesis": ledger["thesis"],
+        "scenario_plan": {
+            "case_count": 3,
+            "trigger_count": len(open_catalysts),
+            "position_constraint_count": len(open_position_rules),
+            "risk_mitigation_count": len(risks),
+            "evidence_gap_count": len(evidence_gaps),
+        },
+        "cases": [
+            _scenario_case(
+                "base",
+                "Base Case",
+                "Current thesis remains intact if source-backed assumptions hold and open risks stay controlled.",
+                [item for item in assumptions if _confidence_rank(item["confidence"]) >= 1],
+                risks,
+                [item for item in open_catalysts if _scenario_trigger_direction(item) == "base"],
+                risks,
+                open_position_rules,
+                evidence_gaps,
+            ),
+            _scenario_case(
+                "bull",
+                "Bull Case",
+                "Upside case requires higher-conviction assumptions and positive catalysts becoming source-backed.",
+                [item for item in assumptions if _confidence_rank(item["confidence"]) >= 2],
+                [item for item in risks if _risk_rank(item["severity"], item["probability"]) <= 1],
+                [item for item in open_catalysts if _scenario_trigger_direction(item) == "bull"],
+                risks,
+                open_position_rules,
+                evidence_gaps,
+            ),
+            _scenario_case(
+                "bear",
+                "Bear Case",
+                "Downside case is driven by low-confidence assumptions, severe risks, or unresolved evidence gaps.",
+                [item for item in assumptions if _confidence_rank(item["confidence"]) <= 0],
+                [item for item in risks if _risk_rank(item["severity"], item["probability"]) >= 2],
+                [item for item in open_catalysts if _scenario_trigger_direction(item) == "bear"],
+                risks,
+                open_position_rules,
+                evidence_gaps,
+            ),
+        ],
+        "source_summary": {
+            "coverage": evidence["coverage"],
+            "stale_sources": evidence["stale_sources"],
+            "unused_sources": evidence["unused_sources"],
+        },
+    }
+
+
+def render_scenario_plan(ledger: Mapping[str, Any]) -> str:
+    """Render deterministic scenario planning output."""
+
+    payload = scenario_plan_payload(ledger)
+    asset = payload["asset"]
+    lines = [
+        f"# Scenario Plan: {_inline(payload['title'])}",
+        "",
+        "> This is a research organization tool, not investment advice.",
+        "",
+        "## Asset / Thesis",
+        "",
+        f"- Ledger ID: {_inline(payload['thesis_id'])}",
+        f"- Updated: {_inline(payload['updated'])}",
+        f"- Asset: {_inline(asset['ticker'])} ({_inline(asset['name'])})",
+        f"- Type: {_inline(asset['type'])}",
+        f"- Thesis: {_inline(payload['thesis'])}",
+        "",
+        "## Plan Summary",
+        "",
+    ]
+    summary = payload["scenario_plan"]
+    lines.extend(
+        [
+            f"- Cases: {summary['case_count']}",
+            f"- Open Scenario Triggers: {summary['trigger_count']}",
+            f"- Open Position Constraints: {summary['position_constraint_count']}",
+            f"- Risk Mitigation Actions: {summary['risk_mitigation_count']}",
+            f"- Evidence Gaps: {summary['evidence_gap_count']}",
+        ]
+    )
+    for case in payload["cases"]:
+        lines.extend(["", f"## {case['name']}", "", _inline(case["summary"]), "", "### Assumptions", ""])
+        if case["assumptions"]:
+            for item in case["assumptions"]:
+                lines.append(
+                    f"- {_inline(item['id'])}: {_inline(item['statement'])} "
+                    f"(confidence: {_inline(item['confidence'])}; sources: {_refs(item['source_ids'])})"
+                )
+        else:
+            lines.append("- No assumptions mapped to this case.")
+        lines.extend(["", "### Risk Conditions", ""])
+        if case["risks"]:
+            for item in case["risks"]:
+                lines.append(
+                    f"- {_inline(item['id'])}: {_inline(item['name'])} "
+                    f"(severity: {_inline(item['severity'])}; probability: {_inline(item['probability'])})"
+                )
+        else:
+            lines.append("- No risks mapped to this case.")
+        lines.extend(["", "### Catalyst Triggers", ""])
+        if case["triggers"]:
+            for item in case["triggers"]:
+                timing = _catalyst_timing(item)
+                lines.append(
+                    f"- {_inline(item['id'])}: {_inline(item['title'])}{_inline(timing)} "
+                    f"(direction: {_inline(item['direction'])}; status: {_inline(item['status'])}; "
+                    f"sources: {_refs(item['source_ids'])})"
+                )
+        else:
+            lines.append("- No open catalyst triggers mapped to this case.")
+        lines.extend(["", "### Risk Mitigation Actions", ""])
+        if case["risk_mitigations"]:
+            for item in case["risk_mitigations"]:
+                lines.append(f"- {_inline(item['id'])}: {_inline(item['action'])} (risk: {_inline(item['risk'])})")
+        else:
+            lines.append("- No risk mitigation actions recorded.")
+        lines.extend(["", "### Position-Rule Constraints", ""])
+        if case["position_constraints"]:
+            for item in case["position_constraints"]:
+                lines.append(
+                    f"- [{_checkbox(item['status'])}] {_inline(item['id'])}: {_inline(item['rule'])} "
+                    f"(exposure: {_inline(item['exposure']) if item['exposure'] else 'not specified'}; "
+                    f"tags: {_inline_join(item['tags'])}; sources: {_refs(item['source_ids'])})"
+                )
+        else:
+            lines.append("- No open position-rule constraints recorded.")
+        lines.extend(["", "### Evidence Gaps", ""])
+        if case["evidence_gaps"]:
+            for item in case["evidence_gaps"]:
+                lines.append(f"- {_inline(item['id'])}: {_inline(item['gap'])}")
+        else:
+            lines.append("- No evidence gaps detected.")
+    lines.extend(["", "## Sources", ""])
+    lines.extend(_source_lines(ledger))
+    return "\n".join(lines) + "\n"
+
+
 def evidence_payload(ledger: Mapping[str, Any]) -> Dict[str, Any]:
     """Build structured source coverage and stale-source output."""
 
@@ -1444,6 +1652,128 @@ def _decision_questions(
     else:
         questions.append({"id": "Q6", "question": "What evidence would falsify the action after execution?"})
     return questions
+
+
+def _scenario_case(
+    case_id: str,
+    name: str,
+    summary: str,
+    assumptions: Sequence[Mapping[str, Any]],
+    risks: Sequence[Mapping[str, Any]],
+    triggers: Sequence[Mapping[str, Any]],
+    mitigation_risks: Sequence[Mapping[str, Any]],
+    position_rules: Sequence[Mapping[str, Any]],
+    evidence_gaps: Sequence[Mapping[str, Any]],
+) -> Dict[str, Any]:
+    return {
+        "id": case_id,
+        "name": name,
+        "summary": summary,
+        "assumptions": list(assumptions),
+        "risks": list(risks),
+        "triggers": [_scenario_trigger(item) for item in triggers],
+        "risk_mitigations": [
+            {"id": str(item["id"]), "risk": str(item["name"]), "action": str(item["mitigation"])}
+            for item in mitigation_risks
+        ],
+        "position_constraints": list(position_rules),
+        "evidence_gaps": list(evidence_gaps),
+    }
+
+
+def _scenario_trigger(item: Mapping[str, Any]) -> Dict[str, Any]:
+    trigger = dict(item)
+    trigger["direction"] = _scenario_trigger_direction(item)
+    return trigger
+
+
+def _scenario_trigger_direction(item: Mapping[str, Any]) -> str:
+    text = f"{item.get('title', '')} {item.get('status', '')}".lower()
+    if _contains_trigger_term(text, _NEGATIVE_TRIGGER_TERMS):
+        return "bear"
+    if _contains_trigger_term(text, _POSITIVE_TRIGGER_TERMS):
+        return "bull"
+    return "base"
+
+
+def _scenario_evidence_gaps(
+    assumptions: Sequence[Mapping[str, Any]], evidence: Mapping[str, Any]
+) -> List[Dict[str, str]]:
+    gaps = []
+    for item in assumptions:
+        if _confidence_rank(str(item.get("confidence", ""))) <= 0:
+            gaps.append(
+                {
+                    "id": f"ASSUMPTION-{item['id']}",
+                    "type": "low_confidence_assumption",
+                    "gap": f"Low-confidence assumption needs stronger evidence: {item['statement']}",
+                }
+            )
+    for item in evidence.get("stale_sources", []):
+        gaps.append(
+            {
+                "id": f"STALE-{item['id']}",
+                "type": "stale_source",
+                "gap": f"Refresh stale source {item['id']} dated {item['date']}.",
+            }
+        )
+    for item in evidence.get("items", []):
+        if not item.get("source_ids"):
+            gaps.append(
+                {
+                    "id": f"UNSUPPORTED-{item['type']}-{item['id']}",
+                    "type": "unsupported_item",
+                    "gap": f"Add source support for {item['type']} {item['id']}.",
+                }
+            )
+    for source_id in evidence.get("unused_sources", []):
+        gaps.append(
+            {
+                "id": f"UNUSED-{source_id}",
+                "type": "unused_source",
+                "gap": f"Either connect source {source_id} to a ledger item or remove it.",
+            }
+        )
+    gaps.sort(key=lambda item: (_EVIDENCE_GAP_ORDER.get(item["type"], 99), item["id"]))
+    return gaps
+
+
+def _contains_trigger_term(text: str, terms: set[str]) -> bool:
+    words = set(re.findall(r"[a-z0-9]+", text.lower()))
+    for term in terms:
+        if term in words:
+            return True
+        if f"{term}s" in words or f"{term}ed" in words:
+            return True
+    return False
+
+
+def _confidence_rank(confidence: str) -> int:
+    value = confidence.lower()
+    if value in {"high", "strong", "confirmed", "validated"}:
+        return 3
+    if value in {"medium", "moderate"}:
+        return 2
+    if value in {"watch", "watchlist", "neutral"}:
+        return 1
+    if value in {"low", "weak", "unproven", "unknown"}:
+        return 0
+    return 1
+
+
+def _risk_rank(severity: str, probability: str) -> int:
+    return max(_risk_label_rank(severity), _risk_label_rank(probability))
+
+
+def _risk_label_rank(value: str) -> int:
+    label = value.lower()
+    if label in {"critical", "severe", "high"}:
+        return 3
+    if label in {"medium", "moderate"}:
+        return 2
+    if label in {"low", "minor"}:
+        return 1
+    return 2
 
 
 def _review_sort_key(review: Mapping[str, Any]) -> tuple[str, str, str, tuple[str, ...]]:
