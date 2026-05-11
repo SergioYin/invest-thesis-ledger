@@ -5,9 +5,9 @@ ledgers as JSON, then rendering deterministic briefs, risk reports, review
 timelines, thesis drift comparisons, catalyst calendars, evidence coverage
 reports, broker/institution matrices, exposure checklists, deterministic
 starter ledger generation, decision memos, scenario plans, portfolio-level
-summaries, review queues, weekly watchlists, static demo bundles, and no-JS
-HTML dashboards. v1.0.0 adds the `html-dashboard` workflow while preserving
-compatibility with v0.1.0 through v0.9.0 ledgers.
+summaries, portfolio evidence audits, review queues, weekly watchlists, static
+demo bundles, and no-JS HTML dashboards. v1.1.0 adds the `evidence-audit`
+workflow while preserving compatibility with v0.1.0 through v1.0.0 ledgers.
 
 This project is for research organization only. It is not investment advice.
 
@@ -114,6 +114,12 @@ Aggregate two or more ledgers into a portfolio summary:
 python -m invest_thesis_ledger portfolio examples/oklo-ai-power.json examples/leveraged-etf-discipline.json --output portfolio.md --json-output portfolio.json
 ```
 
+Audit portfolio evidence quality across two or more ledgers:
+
+```bash
+python -m invest_thesis_ledger evidence-audit examples/oklo-ai-power.json examples/leveraged-etf-discipline.json --output audit.md --json-output audit.json
+```
+
 Prioritize two or more ledgers for human review:
 
 ```bash
@@ -152,7 +158,7 @@ input file list.
 
 ## Ledger Format
 
-Ledgers are JSON objects. The v1.0.0 required fields are:
+Ledgers are JSON objects. The v1.1.0 required fields are:
 
 - `ledger_version`
 - `thesis_id`
@@ -189,7 +195,7 @@ ID.
 optional string `tags`; `exposure` combines these risk tags with position rules
 into a checklist.
 
-The formal v1.0.0 schema reference is in `docs/ledger-schema.md`.
+The formal v1.1.0 schema reference is in `docs/ledger-schema.md`.
 
 See:
 
@@ -223,6 +229,8 @@ Checked-in deterministic CLI output fixtures are available under
 - `examples/output/oklo-ai-power-drift.json`
 - `examples/output/portfolio-summary.md`
 - `examples/output/portfolio-summary.json`
+- `examples/output/evidence-audit.md`
+- `examples/output/evidence-audit.json`
 - `examples/output/review-queue.md`
 - `examples/output/review-queue.json`
 - `examples/output/watchlist.md`
@@ -283,6 +291,13 @@ high-risk count, and open position-rule count. Ranking remains deterministic
 when ledgers have duplicate `thesis_id` values or tied scores; watchlist rows
 are derived from each ledger directly and ties include latest-review and nearest
 open-catalyst details.
+
+`evidence-audit` validates all input ledgers before writing anything, then
+aggregates source coverage across assumptions, risks, reviews, catalysts,
+broker views, position rules, and checklist items. It reports unsupported
+items, unused sources, stale sources using the same ledger `updated` logic as
+`evidence`, duplicate source URLs that appear in more than one ledger, and a
+deterministic per-ledger evidence quality score ranked from highest to lowest.
 
 `demo-bundle` validates all input ledgers before writing anything, then cleanly
 overwrites the target output directory with static Markdown files: `index.md`,

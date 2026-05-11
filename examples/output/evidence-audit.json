@@ -1,0 +1,128 @@
+{
+  "audit": {
+    "duplicate_source_url_count": 0,
+    "ledger_count": 2,
+    "source_count": 5,
+    "stale_source_count": 0,
+    "supported_items": 22,
+    "tracked_items": 28,
+    "unsupported_items": 6,
+    "unused_source_count": 0
+  },
+  "duplicate_source_urls": [],
+  "field_coverage": {
+    "assumption": {
+      "supported_items": 4,
+      "tracked_items": 4,
+      "unsupported_items": 0
+    },
+    "broker_view": {
+      "supported_items": 2,
+      "tracked_items": 2,
+      "unsupported_items": 0
+    },
+    "catalyst": {
+      "supported_items": 4,
+      "tracked_items": 5,
+      "unsupported_items": 1
+    },
+    "checklist": {
+      "supported_items": 0,
+      "tracked_items": 5,
+      "unsupported_items": 5
+    },
+    "position_rule": {
+      "supported_items": 4,
+      "tracked_items": 4,
+      "unsupported_items": 0
+    },
+    "review": {
+      "supported_items": 4,
+      "tracked_items": 4,
+      "unsupported_items": 0
+    },
+    "risk": {
+      "supported_items": 4,
+      "tracked_items": 4,
+      "unsupported_items": 0
+    }
+  },
+  "ledgers": [
+    {
+      "asset_name": "Oklo Inc.",
+      "asset_type": "equity",
+      "coverage": {
+        "source_count": 3,
+        "stale_source_count": 0,
+        "supported_items": 13,
+        "tracked_items": 15,
+        "unsupported_items": 2,
+        "unused_source_count": 0
+      },
+      "quality_score": 92,
+      "rank": 1,
+      "thesis_id": "oklo-ai-power",
+      "ticker": "OKLO",
+      "title": "Oklo AI Power Demand Thesis",
+      "updated": "2026-05-12"
+    },
+    {
+      "asset_name": "Generic 2x Equity Index ETF",
+      "asset_type": "fund",
+      "coverage": {
+        "source_count": 2,
+        "stale_source_count": 0,
+        "supported_items": 9,
+        "tracked_items": 13,
+        "unsupported_items": 4,
+        "unused_source_count": 0
+      },
+      "quality_score": 81,
+      "rank": 2,
+      "thesis_id": "leveraged-etf-discipline",
+      "ticker": "LEV2X",
+      "title": "Leveraged ETF Discipline Ledger",
+      "updated": "2026-05-12"
+    }
+  ],
+  "stale_sources": [],
+  "unsupported_items": [
+    {
+      "id": "CAT1",
+      "ledger_id": "leveraged-etf-discipline",
+      "ticker": "LEV2X",
+      "type": "catalyst"
+    },
+    {
+      "id": "C1",
+      "ledger_id": "leveraged-etf-discipline",
+      "ticker": "LEV2X",
+      "type": "checklist"
+    },
+    {
+      "id": "C2",
+      "ledger_id": "leveraged-etf-discipline",
+      "ticker": "LEV2X",
+      "type": "checklist"
+    },
+    {
+      "id": "C3",
+      "ledger_id": "leveraged-etf-discipline",
+      "ticker": "LEV2X",
+      "type": "checklist"
+    },
+    {
+      "id": "C1",
+      "ledger_id": "oklo-ai-power",
+      "ticker": "OKLO",
+      "type": "checklist"
+    },
+    {
+      "id": "C2",
+      "ledger_id": "oklo-ai-power",
+      "ticker": "OKLO",
+      "type": "checklist"
+    }
+  ],
+  "unused_sources": []
+}

@@ -39,6 +39,8 @@ FIXTURE_OUTPUTS = [
     "oklo-ai-power-drift.json",
     "portfolio-summary.md",
     "portfolio-summary.json",
+    "evidence-audit.md",
+    "evidence-audit.json",
     "review-queue.md",
     "review-queue.json",
     "watchlist.md",
@@ -241,6 +243,20 @@ def main() -> int:
                 str(temp_dir / "portfolio-summary.md"),
                 "--json-output",
                 str(temp_dir / "portfolio-summary.json"),
+            ]
+        )
+        _run(
+            [
+                sys.executable,
+                "-m",
+                "invest_thesis_ledger",
+                "evidence-audit",
+                str(EXAMPLES[0]),
+                str(EXAMPLES[1]),
+                "--output",
+                str(temp_dir / "evidence-audit.md"),
+                "--json-output",
+                str(temp_dir / "evidence-audit.json"),
             ]
         )
         _run(

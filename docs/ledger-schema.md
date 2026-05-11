@@ -1,7 +1,7 @@
-# Ledger Schema v1.0.0
+# Ledger Schema v1.1.0
 
 This document defines the JSON ledger format accepted by `invest-thesis-ledger`
-v1.0.0. Ledgers are research organization records only and are not investment
+v1.1.0. Ledgers are research organization records only and are not investment
 advice.
 
 ## Document Shape
@@ -15,7 +15,7 @@ without breaking the renderer.
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `ledger_version` | string | Schema version. v1.0.0 ledgers should use `"1.0.0"`. v0.1.0 through v0.9.0 remain accepted for compatibility; other values validate with a warning. |
+| `ledger_version` | string | Schema version. v1.1.0 ledgers should use `"1.1.0"`. v0.1.0 through v1.0.0 remain accepted for compatibility; other values validate with a warning. |
 | `thesis_id` | string | Stable machine-readable ledger identifier. |
 | `title` | string | Human-readable thesis title. |
 | `asset` | object | Asset metadata. |
@@ -176,10 +176,14 @@ existing source, and duplicate source references within one rule are invalid.
 | `id` | string | Checklist identifier. Defaults to `C<n>` if omitted. |
 | `item` | string | Checklist text. |
 | `status` | string | Status label. `done`, `closed`, `passed`, and `complete` render as checked. |
+| `source_ids` | array | Optional source IDs supporting the checklist item. |
+
+Every checklist `source_ids` entry must be a string that references an existing
+source, and duplicate source references within one item are invalid.
 
 ## Determinism
 
-For the same input file or ordered input file list, v1.0.0 CLI outputs are
+For the same input file or ordered input file list, v1.1.0 CLI outputs are
 deterministic:
 
 - JSON outputs are serialized with sorted keys and two-space indentation.
@@ -213,7 +217,7 @@ deterministic:
 - `init-template` uses fixed placeholder dates so repeated runs with the same
   arguments produce byte-identical JSON.
 
-## v1.0.0 Reports
+## v1.1.0 Reports
 
 `compare <old.json> <new.json> --output drift.md --json-output drift.json`
 loads and validates both ledgers, then compares:
@@ -284,7 +288,7 @@ Evidence gaps are ordered by review priority: low-confidence assumptions, stale
 sources, unused sources, then unsupported evidence items.
 
 `init-template --asset TICKER --name NAME --type TYPE --output ledger.json`
-writes a deterministic starter ledger with v1.0.0 fields, fixed placeholder
+writes a deterministic starter ledger with v1.1.0 fields, fixed placeholder
 dates, one source-backed assumption, one risk, one review, and a thesis ID
 derived from the ticker.
 
@@ -303,6 +307,31 @@ output. It requires at least two ledgers and aggregates:
 - review decision counts
 - stale source warnings using the same deterministic ledger-updated-date logic
   as `evidence`
+
+```bash
+evidence-audit <ledger-a.json> <ledger-b.json> [...] --output audit.md --json-output audit.json
+```
+
+The `evidence-audit` command loads and validates every input ledger before
+writing output. It requires at least two ledgers and aggregates portfolio
+evidence quality across:
+
+- assumptions
+- risks
+- reviews
+- catalysts
+- broker views
+- position rules
+- checklist items, when the field exists
+
+The JSON and Markdown outputs include portfolio totals, field-level coverage,
+unsupported items, unused sources, stale sources using the same deterministic
+ledger `updated` stale-source logic as `evidence`, duplicate source URLs that
+appear in more than one ledger, and per-ledger evidence quality scores. Scores
+are deterministic integers from 0 to 100: up to 60 points from item support, 20
+points from source utilization, and 20 points from source freshness. Ledgers are
+ranked by highest score first, then by unsupported, unused, and stale counts,
+then stable asset and ledger labels.
 
 ```bash
 review-queue <ledger-a.json> <ledger-b.json> [...] --output review-queue.md --json-output review-queue.json

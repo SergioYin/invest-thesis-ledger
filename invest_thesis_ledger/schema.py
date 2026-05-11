@@ -94,9 +94,10 @@ def validate_ledger(ledger: Mapping[str, Any]) -> Tuple[List[str], List[str]]:
         "0.8.0",
         "0.9.0",
         "1.0.0",
+        "1.1.0",
     }:
         warnings.append(
-            "ledger.ledger_version is not 0.1.0, 0.2.0, 0.3.0, 0.4.0, 0.5.0, 0.6.0, 0.7.0, 0.8.0, 0.9.0, or 1.0.0"
+            "ledger.ledger_version is not 0.1.0, 0.2.0, 0.3.0, 0.4.0, 0.5.0, 0.6.0, 0.7.0, 0.8.0, 0.9.0, 1.0.0, or 1.1.0"
         )
 
     asset = ledger["asset"]
@@ -160,6 +161,20 @@ def validate_ledger(ledger: Mapping[str, Any]) -> Tuple[List[str], List[str]]:
                     errors.append(f"{path}.{field} must be a string")
             if "source_ids" in catalyst:
                 _validate_source_refs(path, catalyst["source_ids"], source_id_set, errors)
+
+    if isinstance(ledger.get("checklist"), list):
+        for index, item in enumerate(ledger["checklist"]):
+            path = f"ledger.checklist[{index}]"
+            if isinstance(item, str):
+                continue
+            if not isinstance(item, dict):
+                errors.append(f"{path} must be a string or object")
+                continue
+            for field in ("id", "item", "status"):
+                if field in item and not isinstance(item[field], str):
+                    errors.append(f"{path}.{field} must be a string")
+            if "source_ids" in item:
+                _validate_source_refs(path, item["source_ids"], source_id_set, errors)
 
     if isinstance(ledger.get("broker_views"), list):
         broker_view_ids = []

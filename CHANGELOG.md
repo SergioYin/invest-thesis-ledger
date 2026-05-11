@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.0 - 2026-05-12
+
+- Added `evidence-audit` command for portfolio-level evidence quality audits across two or more ledgers.
+- Added Markdown/JSON audit output for field-level coverage, unsupported items, unused sources, stale sources, duplicate source URLs across ledgers, and deterministic per-ledger evidence quality rankings.
+- Included checklist items in the portfolio evidence audit when present while reusing the existing evidence and stale-source logic.
+- Added checked-in evidence audit example outputs generated from the Oklo and leveraged ETF examples.
+- Updated package/schema version, README, schema docs, tests, selfcheck, and checked-in fixtures for v1.1.0.
+
 ## 1.0.0 - 2026-05-12
 
 - Added `html-dashboard` command for static deterministic no-JS HTML dashboards across two or more ledgers.

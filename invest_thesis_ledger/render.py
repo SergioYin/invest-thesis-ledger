@@ -591,6 +591,244 @@ def portfolio_payload(ledgers: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
     }
 
 
+def evidence_audit_payload(ledgers: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
+    """Build deterministic portfolio-level evidence audit output."""
+
+    field_coverage: Dict[str, Dict[str, int]] = {}
+    ledger_items = []
+    unsupported_items = []
+    unused_sources = []
+    stale_sources = []
+    duplicate_candidates: Dict[str, List[Dict[str, str]]] = {}
+    totals = {
+        "tracked_items": 0,
+        "supported_items": 0,
+        "unsupported_items": 0,
+        "source_count": 0,
+        "unused_source_count": 0,
+        "stale_source_count": 0,
+    }
+
+    for ledger in ledgers:
+        ledger_id = str(ledger["thesis_id"])
+        asset = ledger["asset"]
+        ticker = str(asset["ticker"])
+        evidence = _evidence_payload(ledger, include_checklist=True)
+        coverage = evidence["coverage"]
+        for key in totals:
+            totals[key] += int(coverage[key])
+
+        for item in evidence["items"]:
+            field = str(item["type"])
+            if field not in field_coverage:
+                field_coverage[field] = {"tracked_items": 0, "supported_items": 0, "unsupported_items": 0}
+            field_coverage[field]["tracked_items"] += 1
+            if item["source_ids"]:
+                field_coverage[field]["supported_items"] += 1
+            else:
+                field_coverage[field]["unsupported_items"] += 1
+                unsupported_items.append(
+                    {
+                        "ledger_id": ledger_id,
+                        "ticker": ticker,
+                        "type": field,
+                        "id": str(item["id"]),
+                    }
+                )
+
+        sources = source_lookup(ledger)
+        for source_id in evidence["unused_sources"]:
+            source = sources.get(source_id, {})
+            unused_sources.append(
+                {
+                    "ledger_id": ledger_id,
+                    "ticker": ticker,
+                    "id": str(source_id),
+                    "title": str(source.get("title", "")),
+                    "url": str(source.get("url", "")),
+                }
+            )
+        for source in evidence["stale_sources"]:
+            source_id = str(source["id"])
+            source_record = sources.get(source_id, {})
+            item = dict(source)
+            item["ledger_id"] = ledger_id
+            item["ticker"] = ticker
+            item["url"] = str(source_record.get("url", ""))
+            stale_sources.append(item)
+        for source_id, source in sorted(sources.items()):
+            url = str(source.get("url", "")).strip()
+            if not url:
+                continue
+            duplicate_candidates.setdefault(url, []).append(
+                {
+                    "ledger_id": ledger_id,
+                    "ticker": ticker,
+                    "source_id": str(source_id),
+                    "title": str(source.get("title", "")),
+                }
+            )
+
+        ledger_items.append(
+            {
+                "rank": 0,
+                "thesis_id": ledger_id,
+                "title": ledger["title"],
+                "updated": ledger["updated"],
+                "ticker": ticker,
+                "asset_name": asset["name"],
+                "asset_type": asset["type"],
+                "quality_score": _evidence_quality_score(coverage),
+                "coverage": coverage,
+            }
+        )
+
+    ledger_items.sort(key=_evidence_audit_ledger_sort_key)
+    for index, item in enumerate(ledger_items, start=1):
+        item["rank"] = index
+
+    duplicate_source_urls = []
+    for url, occurrences in duplicate_candidates.items():
+        ledger_ids = {item["ledger_id"] for item in occurrences}
+        if len(ledger_ids) < 2:
+            continue
+        occurrences.sort(key=lambda item: (item["ledger_id"], item["ticker"], item["source_id"], item["title"]))
+        duplicate_source_urls.append(
+            {
+                "url": url,
+                "ledger_count": len(ledger_ids),
+                "occurrence_count": len(occurrences),
+                "occurrences": occurrences,
+            }
+        )
+    duplicate_source_urls.sort(key=lambda item: (item["url"], item["ledger_count"], item["occurrence_count"]))
+    unsupported_items.sort(key=lambda item: (item["ledger_id"], item["ticker"], item["type"], item["id"]))
+    unused_sources.sort(key=lambda item: (item["ledger_id"], item["ticker"], item["id"], item["title"], item["url"]))
+    stale_sources.sort(
+        key=lambda item: (
+            item["ledger_id"],
+            item["ticker"],
+            item["id"],
+            item["date"],
+            item["title"],
+            item["age_days"],
+            item["url"],
+        )
+    )
+
+    return {
+        "audit": {
+            "ledger_count": len(ledgers),
+            "tracked_items": totals["tracked_items"],
+            "supported_items": totals["supported_items"],
+            "unsupported_items": totals["unsupported_items"],
+            "source_count": totals["source_count"],
+            "unused_source_count": totals["unused_source_count"],
+            "stale_source_count": totals["stale_source_count"],
+            "duplicate_source_url_count": len(duplicate_source_urls),
+        },
+        "field_coverage": {field: field_coverage[field] for field in sorted(field_coverage)},
+        "ledgers": ledger_items,
+        "unsupported_items": unsupported_items,
+        "unused_sources": unused_sources,
+        "stale_sources": stale_sources,
+        "duplicate_source_urls": duplicate_source_urls,
+    }
+
+
+def render_evidence_audit(ledgers: Sequence[Mapping[str, Any]]) -> str:
+    """Render a Markdown portfolio evidence audit."""
+
+    payload = evidence_audit_payload(ledgers)
+    lines = [
+        "# Portfolio Evidence Audit",
+        "",
+        "> This is a research organization tool, not investment advice.",
+        "",
+        f"- Ledgers: {payload['audit']['ledger_count']}",
+        f"- Tracked Items: {payload['audit']['tracked_items']}",
+        f"- Supported Items: {payload['audit']['supported_items']}",
+        f"- Unsupported Items: {payload['audit']['unsupported_items']}",
+        f"- Sources: {payload['audit']['source_count']}",
+        f"- Unused Sources: {payload['audit']['unused_source_count']}",
+        f"- Stale Sources: {payload['audit']['stale_source_count']}",
+        f"- Duplicate Source URLs: {payload['audit']['duplicate_source_url_count']}",
+        "",
+        "## Ledger Scores",
+        "",
+        "| Rank | Score | Ticker | Ledger ID | Updated | Tracked | Unsupported | Unused Sources | Stale Sources |",
+        "| ---: | ---: | --- | --- | --- | ---: | ---: | ---: | ---: |",
+    ]
+    for item in payload["ledgers"]:
+        coverage = item["coverage"]
+        lines.append(
+            "| "
+            + " | ".join(
+                [
+                    str(item["rank"]),
+                    str(item["quality_score"]),
+                    _cell(item["ticker"]),
+                    _cell(item["thesis_id"]),
+                    _cell(item["updated"]),
+                    str(coverage["tracked_items"]),
+                    str(coverage["unsupported_items"]),
+                    str(coverage["unused_source_count"]),
+                    str(coverage["stale_source_count"]),
+                ]
+            )
+            + " |"
+        )
+    lines.extend(["", "## Field Coverage", ""])
+    if payload["field_coverage"]:
+        lines.extend(["| Field | Tracked | Supported | Unsupported |", "| --- | ---: | ---: | ---: |"])
+        for field, coverage in payload["field_coverage"].items():
+            lines.append(
+                f"| {_cell(field)} | {coverage['tracked_items']} | {coverage['supported_items']} | {coverage['unsupported_items']} |"
+            )
+    else:
+        lines.append("- No evidence-tracked items recorded.")
+    lines.extend(["", "## Unsupported Items", ""])
+    if payload["unsupported_items"]:
+        lines.extend(["| Ledger ID | Ticker | Type | ID |", "| --- | --- | --- | --- |"])
+        for item in payload["unsupported_items"]:
+            lines.append(
+                f"| {_cell(item['ledger_id'])} | {_cell(item['ticker'])} | {_cell(item['type'])} | {_cell(item['id'])} |"
+            )
+    else:
+        lines.append("- No unsupported items detected.")
+    lines.extend(["", "## Unused Sources", ""])
+    if payload["unused_sources"]:
+        lines.extend(["| Ledger ID | Ticker | Source | Title | URL |", "| --- | --- | --- | --- | --- |"])
+        for item in payload["unused_sources"]:
+            lines.append(
+                f"| {_cell(item['ledger_id'])} | {_cell(item['ticker'])} | {_cell(item['id'])} | {_cell(item['title'])} | {_cell(item['url'])} |"
+            )
+    else:
+        lines.append("- No unused sources detected.")
+    lines.extend(["", "## Stale Sources", ""])
+    if payload["stale_sources"]:
+        lines.extend(["| Ledger ID | Ticker | Source | Title | Date | Age Days | URL |", "| --- | --- | --- | --- | --- | ---: | --- |"])
+        for item in payload["stale_sources"]:
+            lines.append(
+                f"| {_cell(item['ledger_id'])} | {_cell(item['ticker'])} | {_cell(item['id'])} | {_cell(item['title'])} | {_cell(item['date'])} | {item['age_days']} | {_cell(item['url'])} |"
+            )
+    else:
+        lines.append("- No stale sources detected.")
+    lines.extend(["", "## Duplicate Source URLs", ""])
+    if payload["duplicate_source_urls"]:
+        lines.extend(["| URL | Ledgers | Occurrences |", "| --- | --- | --- |"])
+        for item in payload["duplicate_source_urls"]:
+            occurrences = ", ".join(
+                f"{occurrence['ledger_id']}[{occurrence['source_id']}]" for occurrence in item["occurrences"]
+            )
+            lines.append(
+                f"| {_cell(item['url'])} | {item['ledger_count']} | {_cell(occurrences)} |"
+            )
+    else:
+        lines.append("- No duplicate source URLs across ledgers detected.")
+    return "\n".join(lines) + "\n"
+
+
 def render_portfolio(ledgers: Sequence[Mapping[str, Any]]) -> str:
     """Render a Markdown portfolio-level summary."""
 
@@ -1205,6 +1443,10 @@ def render_scenario_plan(ledger: Mapping[str, Any]) -> str:
 def evidence_payload(ledger: Mapping[str, Any]) -> Dict[str, Any]:
     """Build structured source coverage and stale-source output."""
 
+    return _evidence_payload(ledger, include_checklist=False)
+
+
+def _evidence_payload(ledger: Mapping[str, Any], include_checklist: bool) -> Dict[str, Any]:
     sources = source_lookup(ledger)
     source_ids = set(sources)
     usage: Dict[str, List[str]] = {source_id: [] for source_id in source_ids}
@@ -1215,6 +1457,8 @@ def evidence_payload(ledger: Mapping[str, Any]) -> Dict[str, Any]:
     records.extend(_evidence_records("catalyst", calendar_payload(ledger)["catalysts"], source_ids, usage))
     records.extend(_evidence_records("broker_view", broker_matrix_payload(ledger)["broker_views"], source_ids, usage))
     records.extend(_evidence_records("position_rule", exposure_payload(ledger)["position_rules"], source_ids, usage))
+    if include_checklist:
+        records.extend(_evidence_records("checklist", _checklist_evidence_items(ledger), source_ids, usage))
     stale_sources = _stale_sources(ledger)
     unsupported = [item for item in records if not item["source_ids"]]
     return {
@@ -1402,6 +1646,34 @@ def _watchlist_sort_key(item: Mapping[str, Any]) -> tuple[Any, ...]:
         int(item["high_risk_count"]),
         int(item["open_position_rule_count"]),
         str(item["next_action"]),
+    )
+
+
+def _evidence_quality_score(coverage: Mapping[str, Any]) -> int:
+    tracked = int(coverage.get("tracked_items", 0))
+    supported = int(coverage.get("supported_items", 0))
+    source_count = int(coverage.get("source_count", 0))
+    unused = int(coverage.get("unused_source_count", 0))
+    stale = int(coverage.get("stale_source_count", 0))
+    support_points = (supported * 60 // tracked) if tracked else 0
+    used_source_points = ((source_count - unused) * 20 // source_count) if source_count else 0
+    fresh_source_points = ((source_count - stale) * 20 // source_count) if source_count else 0
+    return max(0, min(100, support_points + used_source_points + fresh_source_points))
+
+
+def _evidence_audit_ledger_sort_key(item: Mapping[str, Any]) -> tuple[Any, ...]:
+    coverage = item["coverage"]
+    return (
+        -int(item["quality_score"]),
+        int(coverage["unsupported_items"]),
+        int(coverage["unused_source_count"]),
+        int(coverage["stale_source_count"]),
+        str(item["ticker"]),
+        str(item["thesis_id"]),
+        str(item["title"]),
+        str(item["updated"]),
+        str(item["asset_name"]),
+        str(item["asset_type"]),
     )
 
 
@@ -1656,6 +1928,22 @@ def _normalize_position_rule(item: Any, index: int) -> Dict[str, Any]:
             "source_ids": list(source_ids) if isinstance(source_ids, list) else [],
         }
     return {"id": f"P{index}", "rule": str(item), "status": "open", "exposure": "", "tags": [], "source_ids": []}
+
+
+def _checklist_evidence_items(ledger: Mapping[str, Any]) -> List[Dict[str, Any]]:
+    items = []
+    for index, item in enumerate(ledger.get("checklist", []), start=1):
+        if isinstance(item, dict):
+            source_ids = item.get("source_ids", [])
+            items.append(
+                {
+                    "id": str(item.get("id", f"C{index}")),
+                    "source_ids": list(source_ids) if isinstance(source_ids, list) else [],
+                }
+            )
+        else:
+            items.append({"id": f"C{index}", "source_ids": []})
+    return items
 
 
 def _catalyst_timing(item: Mapping[str, Any]) -> str:

@@ -60,6 +60,12 @@ class CliTests(unittest.TestCase):
         self.assertIn("write Markdown output to PATH", portfolio.stdout)
         self.assertIn("write JSON output to PATH", portfolio.stdout)
 
+        evidence_audit = self.run_cli("evidence-audit", "--help")
+        self.assertEqual(evidence_audit.returncode, 0, evidence_audit.stderr)
+        self.assertIn("LEDGER", evidence_audit.stdout)
+        self.assertIn("audit portfolio evidence quality", evidence_audit.stdout)
+        self.assertIn("write JSON output to PATH", evidence_audit.stdout)
+
         review_queue = self.run_cli("review-queue", "--help")
         self.assertEqual(review_queue.returncode, 0, review_queue.stderr)
         self.assertIn("LEDGER", review_queue.stdout)
@@ -630,6 +636,235 @@ class CliTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("Title \\| with break", md_path.read_text())
 
+    def test_evidence_audit_aggregates_multiple_ledgers(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            md_path = Path(temp) / "audit.md"
+            json_path = Path(temp) / "audit.json"
+            result = self.run_cli(
+                "evidence-audit",
+                str(EXAMPLE),
+                str(ETF_EXAMPLE),
+                "--output",
+                str(md_path),
+                "--json-output",
+                str(json_path),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("# Portfolio Evidence Audit", md_path.read_text())
+            payload = json.loads(json_path.read_text())
+            self.assertEqual(payload["audit"]["ledger_count"], 2)
+            self.assertEqual(payload["audit"]["tracked_items"], 28)
+            self.assertEqual(payload["audit"]["unsupported_items"], 6)
+            self.assertEqual(payload["field_coverage"]["checklist"]["unsupported_items"], 5)
+            self.assertEqual(payload["ledgers"][0]["thesis_id"], "oklo-ai-power")
+            self.assertEqual(payload["ledgers"][0]["quality_score"], 92)
+            self.assertEqual(payload["ledgers"][1]["quality_score"], 81)
+
+    def test_evidence_audit_requires_two_ledgers(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            result = self.run_cli(
+                "evidence-audit",
+                str(EXAMPLE),
+                "--output",
+                str(Path(temp) / "audit.md"),
+                "--json-output",
+                str(Path(temp) / "audit.json"),
+            )
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("requires at least two", result.stderr)
+
+    def test_evidence_audit_validates_all_ledgers_before_writing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_dir = Path(temp)
+            bad_path = temp_dir / "bad.json"
+            data = json.loads(ETF_EXAMPLE.read_text())
+            data["checklist"][0]["source_ids"] = ["missing"]
+            bad_path.write_text(json.dumps(data), encoding="utf-8")
+            md_path = temp_dir / "audit.md"
+            json_path = temp_dir / "audit.json"
+            result = self.run_cli(
+                "evidence-audit",
+                str(EXAMPLE),
+                str(bad_path),
+                "--output",
+                str(md_path),
+                "--json-output",
+                str(json_path),
+            )
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("unknown source missing", result.stderr)
+            self.assertFalse(md_path.exists())
+            self.assertFalse(json_path.exists())
+
+    def test_evidence_audit_reports_duplicate_source_urls(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_dir = Path(temp)
+            dup_path = temp_dir / "dup.json"
+            data = json.loads(ETF_EXAMPLE.read_text())
+            data["sources"][0]["url"] = "https://example.com/oklo-investor-presentation"
+            dup_path.write_text(json.dumps(data), encoding="utf-8")
+            json_path = temp_dir / "audit.json"
+            result = self.run_cli(
+                "evidence-audit",
+                str(EXAMPLE),
+                str(dup_path),
+                "--output",
+                str(temp_dir / "audit.md"),
+                "--json-output",
+                str(json_path),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(json_path.read_text())
+            self.assertEqual(payload["audit"]["duplicate_source_url_count"], 1)
+            duplicate = payload["duplicate_source_urls"][0]
+            self.assertEqual(duplicate["url"], "https://example.com/oklo-investor-presentation")
+            self.assertEqual(duplicate["ledger_count"], 2)
+            self.assertEqual(
+                [(item["ledger_id"], item["source_id"]) for item in duplicate["occurrences"]],
+                [("leveraged-etf-discipline", "S1"), ("oklo-ai-power", "S1")],
+            )
+
+    def test_evidence_audit_ignores_duplicate_source_urls_within_same_ledger_id(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_dir = Path(temp)
+            first_path = temp_dir / "first.json"
+            second_path = temp_dir / "second.json"
+            first_data = json.loads(EXAMPLE.read_text())
+            first_data["sources"][1]["url"] = first_data["sources"][0]["url"]
+            second_data = json.loads(EXAMPLE.read_text())
+            second_data["updated"] = "2026-05-13"
+            first_path.write_text(json.dumps(first_data), encoding="utf-8")
+            second_path.write_text(json.dumps(second_data), encoding="utf-8")
+
+            result = self.run_cli(
+                "evidence-audit",
+                str(first_path),
+                str(second_path),
+                "--output",
+                str(temp_dir / "audit.md"),
+                "--json-output",
+                str(temp_dir / "audit.json"),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads((temp_dir / "audit.json").read_text())
+            self.assertEqual(payload["audit"]["duplicate_source_url_count"], 0)
+            self.assertEqual(payload["duplicate_source_urls"], [])
+
+    def test_evidence_audit_scores_zero_source_ledgers_without_source_points(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_dir = Path(temp)
+            first_path = temp_dir / "first.json"
+            second_path = temp_dir / "second.json"
+            first_data = json.loads(EXAMPLE.read_text())
+            first_data["sources"] = []
+            for field in ("assumptions", "risks", "reviews", "catalysts", "broker_views", "position_rules", "checklist"):
+                for item in first_data.get(field, []):
+                    item["source_ids"] = []
+            second_data = json.loads(ETF_EXAMPLE.read_text())
+            first_path.write_text(json.dumps(first_data), encoding="utf-8")
+            second_path.write_text(json.dumps(second_data), encoding="utf-8")
+
+            result = self.run_cli(
+                "evidence-audit",
+                str(first_path),
+                str(second_path),
+                "--output",
+                str(temp_dir / "audit.md"),
+                "--json-output",
+                str(temp_dir / "audit.json"),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads((temp_dir / "audit.json").read_text())
+            by_id = {item["thesis_id"]: item for item in payload["ledgers"]}
+            self.assertEqual(by_id["oklo-ai-power"]["coverage"]["source_count"], 0)
+            self.assertEqual(by_id["oklo-ai-power"]["quality_score"], 0)
+
+    def test_evidence_audit_counts_checklist_source_support(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_dir = Path(temp)
+            first_path = temp_dir / "first.json"
+            first_data = json.loads(EXAMPLE.read_text())
+            first_data["checklist"][0]["source_ids"] = ["S1"]
+            first_data["checklist"][1]["source_ids"] = ["S2"]
+            first_path.write_text(json.dumps(first_data), encoding="utf-8")
+
+            result = self.run_cli(
+                "evidence-audit",
+                str(first_path),
+                str(ETF_EXAMPLE),
+                "--output",
+                str(temp_dir / "audit.md"),
+                "--json-output",
+                str(temp_dir / "audit.json"),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads((temp_dir / "audit.json").read_text())
+            self.assertEqual(payload["field_coverage"]["checklist"]["supported_items"], 2)
+            self.assertEqual(payload["field_coverage"]["checklist"]["unsupported_items"], 3)
+
+    def test_evidence_audit_order_does_not_depend_on_input_order_for_tied_items(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_dir = Path(temp)
+            first_path = temp_dir / "first.json"
+            second_path = temp_dir / "second.json"
+            first_data = json.loads(EXAMPLE.read_text())
+            second_data = json.loads(EXAMPLE.read_text())
+            second_data["thesis_id"] = "oklo-ai-power-copy"
+            second_data["asset"]["ticker"] = "OKLB"
+            first_path.write_text(json.dumps(first_data), encoding="utf-8")
+            second_path.write_text(json.dumps(second_data), encoding="utf-8")
+
+            forward_md = temp_dir / "forward.md"
+            forward_json = temp_dir / "forward.json"
+            reverse_md = temp_dir / "reverse.md"
+            reverse_json = temp_dir / "reverse.json"
+            forward = self.run_cli(
+                "evidence-audit",
+                str(first_path),
+                str(second_path),
+                "--output",
+                str(forward_md),
+                "--json-output",
+                str(forward_json),
+            )
+            reverse = self.run_cli(
+                "evidence-audit",
+                str(second_path),
+                str(first_path),
+                "--output",
+                str(reverse_md),
+                "--json-output",
+                str(reverse_json),
+            )
+            self.assertEqual(forward.returncode, 0, forward.stderr)
+            self.assertEqual(reverse.returncode, 0, reverse.stderr)
+            self.assertEqual(forward_json.read_text(), reverse_json.read_text())
+            self.assertEqual(forward_md.read_text(), reverse_md.read_text())
+
+    def test_evidence_audit_escapes_markdown(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_dir = Path(temp)
+            stale_path = temp_dir / "stale.json"
+            data = json.loads(EXAMPLE.read_text())
+            data["sources"][0]["date"] = "2025-01-01"
+            data["sources"][0]["title"] = "Audit | title\nbreak"
+            data["checklist"][0]["id"] = "C|1"
+            stale_path.write_text(json.dumps(data), encoding="utf-8")
+            md_path = temp_dir / "audit.md"
+            result = self.run_cli(
+                "evidence-audit",
+                str(stale_path),
+                str(ETF_EXAMPLE),
+                "--output",
+                str(md_path),
+                "--json-output",
+                str(temp_dir / "audit.json"),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            text = md_path.read_text()
+            self.assertIn("Audit \\| title break", text)
+            self.assertIn("C\\|1", text)
+
     def test_review_queue_scores_and_prioritizes_ledgers(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             md_path = Path(temp) / "review-queue.md"
@@ -1119,7 +1354,7 @@ class CliTests(unittest.TestCase):
             self.assertIn("# Portfolio Summary", (output_dir / "portfolio-summary.md").read_text())
             self.assertIn("# Watchlist", (output_dir / "watchlist.md").read_text())
             manifest = json.loads((output_dir / "manifest.json").read_text())
-            self.assertEqual(manifest["tool_version"], "1.0.0")
+            self.assertEqual(manifest["tool_version"], "1.1.0")
             self.assertEqual(manifest["ledger_ids"], ["oklo-ai-power", "leveraged-etf-discipline"])
             self.assertEqual(manifest["generated_files"], expected_files)
             index_links = [
@@ -1260,7 +1495,7 @@ class CliTests(unittest.TestCase):
             self.assertNotIn("<script", (output_dir / "index.html").read_text().lower())
             self.assertNotIn("@import", (output_dir / "style.css").read_text().lower())
             manifest = json.loads((output_dir / "manifest.json").read_text())
-            self.assertEqual(manifest["tool_version"], "1.0.0")
+            self.assertEqual(manifest["tool_version"], "1.1.0")
             self.assertEqual(manifest["ledger_ids"], ["oklo-ai-power", "leveraged-etf-discipline"])
             self.assertEqual(manifest["generated_files"], expected_files)
             self.assertNotIn("timestamp", manifest)
@@ -1449,7 +1684,7 @@ class CliTests(unittest.TestCase):
             self.assertEqual(second.returncode, 0, second.stderr)
             self.assertEqual(output_a.read_text(), output_b.read_text())
             payload = json.loads(output_a.read_text())
-            self.assertEqual(payload["ledger_version"], "1.0.0")
+            self.assertEqual(payload["ledger_version"], "1.1.0")
             self.assertEqual(payload["thesis_id"], "msft-thesis")
             self.assertEqual(payload["sources"][0]["id"], "S1")
             self.assertEqual(payload["assumptions"][0]["source_ids"], ["S1"])
@@ -1650,6 +1885,19 @@ class CliTests(unittest.TestCase):
                         str(temp_dir / "portfolio-summary.json"),
                     ],
                     ["portfolio-summary.md", "portfolio-summary.json"],
+                ),
+                (
+                    "evidence-audit",
+                    [
+                        "evidence-audit",
+                        str(EXAMPLE),
+                        str(ETF_EXAMPLE),
+                        "--output",
+                        str(temp_dir / "evidence-audit.md"),
+                        "--json-output",
+                        str(temp_dir / "evidence-audit.json"),
+                    ],
+                    ["evidence-audit.md", "evidence-audit.json"],
                 ),
                 (
                     "review-queue",

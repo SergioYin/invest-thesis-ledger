@@ -16,6 +16,7 @@ from .render import (
     calendar_payload,
     compare_payload,
     decision_memo_payload,
+    evidence_audit_payload,
     evidence_payload,
     exposure_payload,
     history_payload,
@@ -26,6 +27,7 @@ from .render import (
     render_compare,
     render_decision_memo,
     render_evidence,
+    render_evidence_audit,
     render_exposure,
     render_history,
     render_portfolio,
@@ -125,6 +127,15 @@ def build_parser() -> argparse.ArgumentParser:
     portfolio.add_argument("ledgers", metavar="LEDGER", nargs="+", help="ledger JSON file")
     _add_output_args(portfolio)
     portfolio.set_defaults(func=_cmd_portfolio)
+
+    evidence_audit = subparsers.add_parser(
+        "evidence-audit",
+        help="audit portfolio evidence quality across two or more ledgers",
+        description="audit portfolio evidence quality across two or more ledgers.",
+    )
+    evidence_audit.add_argument("ledgers", metavar="LEDGER", nargs="+", help="ledger JSON file")
+    _add_output_args(evidence_audit)
+    evidence_audit.set_defaults(func=_cmd_evidence_audit)
 
     review_queue = subparsers.add_parser(
         "review-queue",
@@ -322,6 +333,17 @@ def _cmd_portfolio(args: argparse.Namespace) -> int:
 
     _write_text(args.output, render_portfolio(ledgers))
     _write_text(args.json_output, to_json(portfolio_payload(ledgers)))
+    sys.stdout.write(f"wrote: {args.output}, {args.json_output}\n")
+    return 0
+
+
+def _cmd_evidence_audit(args: argparse.Namespace) -> int:
+    ledgers, status = _load_validated_ledgers(args.ledgers, "evidence-audit")
+    if ledgers is None:
+        return status
+
+    _write_text(args.output, render_evidence_audit(ledgers))
+    _write_text(args.json_output, to_json(evidence_audit_payload(ledgers)))
     sys.stdout.write(f"wrote: {args.output}, {args.json_output}\n")
     return 0
 
@@ -1029,7 +1051,7 @@ def _starter_ledger(asset: str, name: str, asset_type: str) -> dict:
     clean_name = name.strip()
     clean_type = asset_type.strip()
     return {
-        "ledger_version": "1.0.0",
+        "ledger_version": "1.1.0",
         "thesis_id": f"{slug}-thesis",
         "title": f"{clean_name} Thesis Ledger",
         "asset": {
