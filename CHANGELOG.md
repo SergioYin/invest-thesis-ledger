@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.6.1 - 2026-05-12
+
+- Hardened `verify-archive` to reject symlink generated or hash-listed files before hashing file bytes.
+- Added manifest/archive-summary consistency checks for ledger IDs and tool versions, archive ledger counts, and duplicate generated file entries.
+- Kept `diff-archive` on the verifier path and report metadata from verified archive metadata.
+- Updated package/schema version, README, schema docs, tests, selfcheck, and checked-in fixtures for v1.6.1.
+
 ## 1.6.0 - 2026-05-12
 
 - Added `diff-archive` command for deterministic Markdown and JSON diffs between two verified portable research archives.

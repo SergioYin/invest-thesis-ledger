@@ -7,8 +7,9 @@ reports, broker/institution matrices, exposure checklists, deterministic
 starter ledger generation, decision memos, scenario plans, portfolio-level
 summaries, portfolio evidence audits, review queues, weekly watchlists, weekly
 action plans, static demo bundles, portable research archives, archive
-verification, archive diffs, and no-JS HTML dashboards. v1.6.0 adds archive
-diffs while preserving compatibility with v0.1.0 through v1.5.0 ledgers.
+verification, archive diffs, and no-JS HTML dashboards. v1.6.1 adds archive
+verification hardening while preserving compatibility with v0.1.0 through
+v1.6.0 ledgers.
 
 This project is for research organization only. It is not investment advice.
 
@@ -185,7 +186,7 @@ input file list.
 
 ## Ledger Format
 
-Ledgers are JSON objects. The v1.6.0 required fields are:
+Ledgers are JSON objects. The v1.6.1 required fields are:
 
 - `ledger_version`
 - `thesis_id`
@@ -222,7 +223,7 @@ ID.
 optional string `tags`; `exposure` combines these risk tags with position rules
 into a checklist.
 
-The formal v1.6.0 schema reference is in `docs/ledger-schema.md`.
+The formal v1.6.1 schema reference is in `docs/ledger-schema.md`.
 
 See:
 
@@ -364,9 +365,10 @@ only. `archive-summary.json` is listed in `generated_files` but excluded from
 `file_hashes` so the summary does not need to hash its own bytes. Archive
 metadata contains no timestamps or absolute paths. `verify-archive` reads
 `manifest.json` and `archive-summary.json`, verifies generated file presence,
-relative archive-local paths, SHA-256 hashes, self-hash exclusion, and the
-absence of workflow or dependency files. It exits 0 for a valid archive, 1 for
-content validation failures, and 2 for unreadable or malformed archive inputs.
+relative archive-local paths, SHA-256 hashes, manifest/summary metadata
+consistency, archive counts, self-hash exclusion, and the absence of symlink,
+workflow, or dependency files. It exits 0 for a valid archive, 1 for content
+validation failures, and 2 for unreadable or malformed archive inputs.
 `diff-archive` first applies the same verification semantics to both archives;
 it exits 2 for unreadable or malformed archive inputs and exits 1 with
 deterministic validation errors for invalid archives. When both archives are

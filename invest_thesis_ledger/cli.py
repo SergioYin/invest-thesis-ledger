@@ -787,6 +787,8 @@ def _verify_archive_dir(archive_dir: Path) -> tuple[list[str], dict]:
     summary = _read_archive_json(archive_dir / "archive-summary.json", "archive-summary.json")
     manifest_files = _require_string_list(manifest, "generated_files", "manifest.json")
     summary_files = _require_string_list(summary, "generated_files", "archive-summary.json")
+    manifest_ledger_ids = _require_string_list(manifest, "ledger_ids", "manifest.json")
+    summary_ledger_ids = _require_string_list(summary, "ledger_ids", "archive-summary.json")
     file_hashes = _require_string_mapping(summary, "file_hashes", "archive-summary.json")
 
     errors: list[str] = []
@@ -795,14 +797,22 @@ def _verify_archive_dir(archive_dir: Path) -> tuple[list[str], dict]:
 
     if manifest.get("archive_format") != "portable-research-archive":
         errors.append("manifest archive_format is not portable-research-archive")
+    for source_name, filenames in (("manifest.json", manifest_files), ("archive-summary.json", summary_files)):
+        duplicate_files = _duplicate_values(filenames)
+        if duplicate_files:
+            errors.append(f"{source_name} generated_files contains duplicate entries: {', '.join(duplicate_files)}")
     if manifest_files != summary_files:
         errors.append("manifest generated_files do not match archive-summary generated_files")
+    if manifest_ledger_ids != summary_ledger_ids:
+        errors.append("manifest ledger_ids do not match archive-summary ledger_ids")
+    if manifest.get("tool_version") != summary.get("tool_version"):
+        errors.append("manifest tool_version does not match archive-summary tool_version")
     if "archive-summary.json" not in manifest_files or "archive-summary.json" not in summary_files:
         errors.append("archive-summary.json is missing from generated_files")
     if "archive-summary.json" in file_hashes:
         errors.append("archive-summary.json must be excluded from file_hashes")
 
-    expected_hash_files = sorted(filename for filename in manifest_files if filename != "archive-summary.json")
+    expected_hash_files = sorted(set(filename for filename in manifest_files if filename != "archive-summary.json"))
     if hash_files != expected_hash_files:
         missing_hashes = sorted(set(expected_hash_files) - set(hash_files))
         extra_hashes = sorted(set(hash_files) - set(expected_hash_files))
@@ -820,14 +830,25 @@ def _verify_archive_dir(archive_dir: Path) -> tuple[list[str], dict]:
             errors.append(f"archive-summary.json file_hashes contains external path: {filename}")
 
     for filename in generated_files:
-        if _is_archive_local_filename(filename) and not (archive_dir / filename).is_file():
+        if not _is_archive_local_filename(filename):
+            continue
+        path = archive_dir / filename
+        if path.is_symlink():
+            errors.append(f"generated file is a symlink: {filename}")
+        elif not path.is_file():
             errors.append(f"missing generated file: {filename}")
+    for filename in sorted(file_hashes):
+        if not _is_archive_local_filename(filename):
+            continue
+        path = archive_dir / filename
+        if path.is_symlink() and filename not in generated_files:
+            errors.append(f"hash-listed file is a symlink: {filename}")
 
     for filename, expected_digest in sorted(file_hashes.items()):
         if not _is_archive_local_filename(filename):
             continue
         path = archive_dir / filename
-        if not path.is_file():
+        if path.is_symlink() or not path.is_file():
             continue
         actual_digest = hashlib.sha256(path.read_bytes()).hexdigest()
         if actual_digest != expected_digest:
@@ -843,19 +864,28 @@ def _verify_archive_dir(archive_dir: Path) -> tuple[list[str], dict]:
             errors.append("archive file_count does not match generated_files")
         if archive_counts.get("hashed_file_count") != len(file_hashes):
             errors.append("archive hashed_file_count does not match file_hashes")
+        if archive_counts.get("ledger_count") != len(summary_ledger_ids):
+            errors.append("archive ledger_count does not match ledger_ids")
+    else:
+        errors.append("archive ledger_count does not match ledger_ids")
 
     validation = {
         "archive_dir": str(archive_dir),
         "archive_summary": summary,
         "file_count": len(generated_files),
+        "generated_files": list(summary_files),
         "hashed_file_count": len(file_hashes),
-        "ledger_count": _summary_ledger_count(summary),
+        "ledger_count": len(summary_ledger_ids),
+        "ledger_ids": list(summary_ledger_ids),
         "manifest": manifest,
+        "tool_version": str(summary.get("tool_version", "")),
     }
     return errors, validation
 
 
 def _read_archive_json(path: Path, label: str) -> dict:
+    if path.is_symlink():
+        raise OSError(f"{label} is a symlink")
     text = path.read_text(encoding="utf-8")
     try:
         payload = json.loads(text)
@@ -910,6 +940,17 @@ def _stable_unique(items: Sequence[str]) -> list[str]:
     return unique
 
 
+def _duplicate_values(items: Sequence[str]) -> list[str]:
+    seen: set[str] = set()
+    duplicates: set[str] = set()
+    for item in items:
+        if item in seen:
+            duplicates.add(item)
+        else:
+            seen.add(item)
+    return sorted(duplicates)
+
+
 def _summary_ledger_count(summary: Mapping[str, object]) -> int:
     archive = summary.get("archive")
     if isinstance(archive, dict) and isinstance(archive.get("ledger_count"), int):
@@ -936,13 +977,11 @@ def _archive_validation_summary(summary: Mapping[str, object], errors: Sequence[
 
 
 def _archive_diff_payload(old_summary: Mapping[str, object], new_summary: Mapping[str, object]) -> dict:
-    old_manifest = _archive_validation_object(old_summary, "manifest")
-    new_manifest = _archive_validation_object(new_summary, "manifest")
     old_archive_summary = _archive_validation_object(old_summary, "archive_summary")
     new_archive_summary = _archive_validation_object(new_summary, "archive_summary")
 
-    old_files = _require_string_list(old_manifest, "generated_files", "old manifest.json")
-    new_files = _require_string_list(new_manifest, "generated_files", "new manifest.json")
+    old_files = _archive_validation_string_list(old_summary, "generated_files")
+    new_files = _archive_validation_string_list(new_summary, "generated_files")
     old_hashes = _require_string_mapping(old_archive_summary, "file_hashes", "old archive-summary.json")
     new_hashes = _require_string_mapping(new_archive_summary, "file_hashes", "new archive-summary.json")
 
@@ -965,12 +1004,12 @@ def _archive_diff_payload(old_summary: Mapping[str, object], new_summary: Mappin
         and old_hashes[filename] == new_hashes[filename]
     )
 
-    old_ledger_ids = _require_string_list(old_manifest, "ledger_ids", "old manifest.json")
-    new_ledger_ids = _require_string_list(new_manifest, "ledger_ids", "new manifest.json")
-    old_tool_version = str(old_manifest.get("tool_version", ""))
-    new_tool_version = str(new_manifest.get("tool_version", ""))
-    old_file_count = _archive_file_count(old_archive_summary, old_files)
-    new_file_count = _archive_file_count(new_archive_summary, new_files)
+    old_ledger_ids = _archive_validation_string_list(old_summary, "ledger_ids")
+    new_ledger_ids = _archive_validation_string_list(new_summary, "ledger_ids")
+    old_tool_version = str(old_summary.get("tool_version", ""))
+    new_tool_version = str(new_summary.get("tool_version", ""))
+    old_file_count = int(old_summary["file_count"])
+    new_file_count = int(new_summary["file_count"])
     changed = bool(
         added_files
         or removed_files
@@ -1000,6 +1039,13 @@ def _archive_validation_object(summary: Mapping[str, object], key: str) -> Mappi
     if not isinstance(value, dict):
         raise ValueError(f"archive validation missing {key}")
     return value
+
+
+def _archive_validation_string_list(summary: Mapping[str, object], key: str) -> list[str]:
+    value = summary.get(key)
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise ValueError(f"archive validation missing {key}")
+    return list(value)
 
 
 def _archive_file_count(summary: Mapping[str, object], generated_files: Sequence[str]) -> int:

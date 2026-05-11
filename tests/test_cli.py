@@ -1706,7 +1706,7 @@ class CliTests(unittest.TestCase):
             self.assertIn("# Watchlist", (output_dir / "watchlist.md").read_text())
             self.assertIn("# Weekly Action Plan", (output_dir / "action-plan.md").read_text())
             manifest = json.loads((output_dir / "manifest.json").read_text())
-            self.assertEqual(manifest["tool_version"], "1.6.0")
+            self.assertEqual(manifest["tool_version"], "1.6.1")
             self.assertEqual(manifest["ledger_ids"], ["oklo-ai-power", "leveraged-etf-discipline"])
             self.assertEqual(manifest["generated_files"], expected_files)
             index_links = [
@@ -1854,11 +1854,11 @@ class CliTests(unittest.TestCase):
             self.assertEqual(sorted(path.name for path in output_dir.iterdir()), sorted(expected_files))
             manifest = json.loads((output_dir / "manifest.json").read_text())
             self.assertEqual(manifest["archive_format"], "portable-research-archive")
-            self.assertEqual(manifest["tool_version"], "1.6.0")
+            self.assertEqual(manifest["tool_version"], "1.6.1")
             self.assertEqual(manifest["ledger_ids"], ["oklo-ai-power", "leveraged-etf-discipline"])
             self.assertEqual(manifest["generated_files"], expected_files)
             summary = json.loads((output_dir / "archive-summary.json").read_text())
-            self.assertEqual(summary["tool_version"], "1.6.0")
+            self.assertEqual(summary["tool_version"], "1.6.1")
             self.assertEqual(summary["ledger_ids"], manifest["ledger_ids"])
             self.assertEqual(summary["archive"]["ledger_count"], 2)
             self.assertEqual(summary["archive"]["file_count"], len(expected_files))
@@ -2021,6 +2021,73 @@ class CliTests(unittest.TestCase):
             result = self.run_cli("verify-archive", str(archive_dir))
             self.assertEqual(result.returncode, 1)
             self.assertIn("missing generated file: watchlist.md", result.stdout)
+
+    def test_verify_archive_rejects_symlink_generated_file_before_hashing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            archive_dir = Path(temp) / "archive"
+            shutil.copytree(ARCHIVE_FIXTURE, archive_dir)
+            watchlist_path = archive_dir / "watchlist.md"
+            watchlist_path.unlink()
+            watchlist_path.symlink_to("portfolio.md")
+            result = self.run_cli("verify-archive", str(archive_dir))
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("generated file is a symlink: watchlist.md", result.stdout)
+            self.assertNotIn("sha256 mismatch: watchlist.md", result.stdout)
+
+    def test_verify_archive_reports_manifest_summary_ledger_ids_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            archive_dir = Path(temp) / "archive"
+            shutil.copytree(ARCHIVE_FIXTURE, archive_dir)
+            summary_path = archive_dir / "archive-summary.json"
+            summary = json.loads(summary_path.read_text())
+            summary["ledger_ids"] = ["leveraged-etf-discipline", "oklo-ai-power"]
+            summary_path.write_text(json.dumps(summary, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+            result = self.run_cli("verify-archive", str(archive_dir))
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("manifest ledger_ids do not match archive-summary ledger_ids", result.stdout)
+
+    def test_verify_archive_reports_manifest_summary_tool_version_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            archive_dir = Path(temp) / "archive"
+            shutil.copytree(ARCHIVE_FIXTURE, archive_dir)
+            summary_path = archive_dir / "archive-summary.json"
+            summary = json.loads(summary_path.read_text())
+            summary["tool_version"] = "9.9.9"
+            summary_path.write_text(json.dumps(summary, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+            result = self.run_cli("verify-archive", str(archive_dir))
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("manifest tool_version does not match archive-summary tool_version", result.stdout)
+
+    def test_verify_archive_reports_archive_ledger_count_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            archive_dir = Path(temp) / "archive"
+            shutil.copytree(ARCHIVE_FIXTURE, archive_dir)
+            summary_path = archive_dir / "archive-summary.json"
+            summary = json.loads(summary_path.read_text())
+            summary["archive"]["ledger_count"] = 3
+            summary_path.write_text(json.dumps(summary, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+            result = self.run_cli("verify-archive", str(archive_dir))
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("archive ledger_count does not match ledger_ids", result.stdout)
+
+    def test_verify_archive_reports_duplicate_generated_files(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            archive_dir = Path(temp) / "archive"
+            shutil.copytree(ARCHIVE_FIXTURE, archive_dir)
+            manifest_path = archive_dir / "manifest.json"
+            summary_path = archive_dir / "archive-summary.json"
+            manifest = json.loads(manifest_path.read_text())
+            summary = json.loads(summary_path.read_text())
+            manifest["generated_files"].append("portfolio.md")
+            summary["generated_files"].append("portfolio.md")
+            summary["archive"]["file_count"] = len(summary["generated_files"])
+            manifest_path.write_text(json.dumps(manifest, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+            summary["file_hashes"]["manifest.json"] = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+            summary_path.write_text(json.dumps(summary, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+            result = self.run_cli("verify-archive", str(archive_dir))
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("manifest.json generated_files contains duplicate entries: portfolio.md", result.stdout)
+            self.assertIn("archive-summary.json generated_files contains duplicate entries: portfolio.md", result.stdout)
 
     def test_verify_archive_reports_malformed_json_as_unreadable_archive(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -2259,7 +2326,7 @@ class CliTests(unittest.TestCase):
             self.assertNotIn("<script", (output_dir / "index.html").read_text().lower())
             self.assertNotIn("@import", (output_dir / "style.css").read_text().lower())
             manifest = json.loads((output_dir / "manifest.json").read_text())
-            self.assertEqual(manifest["tool_version"], "1.6.0")
+            self.assertEqual(manifest["tool_version"], "1.6.1")
             self.assertEqual(manifest["ledger_ids"], ["oklo-ai-power", "leveraged-etf-discipline"])
             self.assertEqual(manifest["generated_files"], expected_files)
             self.assertNotIn("timestamp", manifest)
@@ -2455,7 +2522,7 @@ class CliTests(unittest.TestCase):
             self.assertEqual(second.returncode, 0, second.stderr)
             self.assertEqual(output_a.read_text(), output_b.read_text())
             payload = json.loads(output_a.read_text())
-            self.assertEqual(payload["ledger_version"], "1.6.0")
+            self.assertEqual(payload["ledger_version"], "1.6.1")
             self.assertEqual(payload["thesis_id"], "msft-thesis")
             self.assertEqual(payload["sources"][0]["id"], "S1")
             self.assertEqual(payload["assumptions"][0]["source_ids"], ["S1"])
