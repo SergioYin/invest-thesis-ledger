@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.7.4 - 2026-05-12
+
+- Fixed source reference escaping in Markdown table renderers so source IDs containing `|` are escaped exactly once in broker matrix, portfolio catalyst, and decision memo broker tables.
+- Added regression coverage for `S|1` source IDs in affected table renderers.
+- Updated package/schema version, README, schema docs, tests, and checked-in fixtures for v1.7.4.
+
 ## 1.7.3 - 2026-05-12
 
 - Escaped ledger-controlled Markdown in brief, risk, evidence, history, source references, and source sections so pipes, brackets, and line breaks do not corrupt report structure.

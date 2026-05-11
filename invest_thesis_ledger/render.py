@@ -352,7 +352,7 @@ def render_broker_matrix(ledger: Mapping[str, Any]) -> str:
                         _cell(item["target"]),
                         _cell(item["as_of"]),
                         _cell(item["thesis"]),
-                        _cell(_refs(item["source_ids"])),
+                        _refs(item["source_ids"]),
                     ]
                 )
                 + " |"
@@ -893,7 +893,7 @@ def render_portfolio(ledgers: Sequence[Mapping[str, Any]]) -> str:
                         _cell(item["ticker"]),
                         _cell(item["id"]),
                         _cell(item["title"]),
-                        _cell(_refs(item["source_ids"])),
+                        _refs(item["source_ids"]),
                     ]
                 )
                 + " |"
@@ -1301,7 +1301,7 @@ def render_decision_memo(ledger: Mapping[str, Any]) -> str:
                         _cell(item["target"]),
                         _cell(item["as_of"]),
                         _cell(item["thesis"]),
-                        _cell(_refs(item["source_ids"])),
+                        _refs(item["source_ids"]),
                     ]
                 )
                 + " |"

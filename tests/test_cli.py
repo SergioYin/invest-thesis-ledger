@@ -66,6 +66,18 @@ class CliTests(unittest.TestCase):
                 str(filename),
             )
 
+    def markdown_table_cells(self, row: str) -> list[str]:
+        return [cell.strip() for cell in re.split(r"(?<!\\)\|", row.strip())[1:-1]]
+
+    def ledger_with_pipe_source_id(self, path: Path) -> None:
+        data = json.loads(EXAMPLE.read_text(encoding="utf-8"))
+        data["sources"][0]["id"] = "S|1"
+        for collection in ("assumptions", "catalysts", "broker_views", "risks", "position_rules", "reviews"):
+            for item in data.get(collection, []):
+                if isinstance(item, dict):
+                    item["source_ids"] = ["S|1" if source_id == "S1" else source_id for source_id in item.get("source_ids", [])]
+        path.write_text(json.dumps(data), encoding="utf-8")
+
     def test_validate_example(self) -> None:
         result = self.run_cli("validate", str(EXAMPLE))
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -395,7 +407,7 @@ class CliTests(unittest.TestCase):
             data = json.loads(EXAMPLE.read_text(encoding="utf-8"))
             source_id = "S[1]|A\nB"
             unused_source_id = "S[2]|unused\nid"
-            data["ledger_version"] = "1.7.3"
+            data["ledger_version"] = "1.7.4"
             data["thesis_id"] = "ledger[pipe]|id\nbreak"
             data["title"] = "Title [x] | y\nbreak"
             data["asset"]["name"] = "Asset [name] | line\nbreak"
@@ -667,6 +679,26 @@ class CliTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("warning: ledger.reviews are not sorted by date", result.stderr)
             self.assertIn("# Decision Memo: Title \\| with break", md_path.read_text())
+
+    def test_decision_memo_source_refs_escape_table_pipe_once(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_dir = Path(temp)
+            ledger_path = temp_dir / "ledger.json"
+            self.ledger_with_pipe_source_id(ledger_path)
+            md_path = temp_dir / "decision-memo.md"
+            result = self.run_cli(
+                "decision-memo",
+                str(ledger_path),
+                "--output",
+                str(md_path),
+                "--json-output",
+                str(temp_dir / "decision-memo.json"),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            row = next(line for line in md_path.read_text().splitlines() if line.startswith("| Grid Infrastructure Desk |"))
+            self.assertIn("[S\\|1]", row)
+            self.assertNotIn("[S\\\\|1]", row)
+            self.assertEqual(len(self.markdown_table_cells(row)), 6)
 
     def test_decision_memo_questions_prioritize_stale_evidence_over_closed_catalysts(self) -> None:
         data = json.loads(EXAMPLE.read_text())
@@ -983,6 +1015,27 @@ class CliTests(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("Title \\| with break", md_path.read_text())
+
+    def test_portfolio_source_refs_escape_table_pipe_once(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_dir = Path(temp)
+            ledger_path = temp_dir / "ledger.json"
+            self.ledger_with_pipe_source_id(ledger_path)
+            md_path = temp_dir / "portfolio.md"
+            result = self.run_cli(
+                "portfolio",
+                str(ledger_path),
+                str(ETF_EXAMPLE),
+                "--output",
+                str(md_path),
+                "--json-output",
+                str(temp_dir / "portfolio.json"),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            row = next(line for line in md_path.read_text().splitlines() if "| OKLO | CAT1 |" in line)
+            self.assertIn("[S\\|1]", row)
+            self.assertNotIn("[S\\\\|1]", row)
+            self.assertEqual(len(self.markdown_table_cells(row)), 7)
 
     def test_evidence_audit_aggregates_multiple_ledgers(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -2020,7 +2073,7 @@ class CliTests(unittest.TestCase):
             self.assertIn("# Watchlist", (output_dir / "watchlist.md").read_text())
             self.assertIn("# Weekly Action Plan", (output_dir / "action-plan.md").read_text())
             manifest = json.loads((output_dir / "manifest.json").read_text())
-            self.assertEqual(manifest["tool_version"], "1.7.3")
+            self.assertEqual(manifest["tool_version"], "1.7.4")
             self.assertEqual(manifest["ledger_ids"], ["oklo-ai-power", "leveraged-etf-discipline"])
             self.assertEqual(manifest["generated_files"], expected_files)
             index_links = [
@@ -2168,11 +2221,11 @@ class CliTests(unittest.TestCase):
             self.assertEqual(sorted(path.name for path in output_dir.iterdir()), sorted(expected_files))
             manifest = json.loads((output_dir / "manifest.json").read_text())
             self.assertEqual(manifest["archive_format"], "portable-research-archive")
-            self.assertEqual(manifest["tool_version"], "1.7.3")
+            self.assertEqual(manifest["tool_version"], "1.7.4")
             self.assertEqual(manifest["ledger_ids"], ["oklo-ai-power", "leveraged-etf-discipline"])
             self.assertEqual(manifest["generated_files"], expected_files)
             summary = json.loads((output_dir / "archive-summary.json").read_text())
-            self.assertEqual(summary["tool_version"], "1.7.3")
+            self.assertEqual(summary["tool_version"], "1.7.4")
             self.assertEqual(summary["ledger_ids"], manifest["ledger_ids"])
             self.assertEqual(summary["archive"]["ledger_count"], 2)
             self.assertEqual(summary["archive"]["file_count"], len(expected_files))
@@ -2656,7 +2709,7 @@ class CliTests(unittest.TestCase):
             self.assertNotIn("<script", (output_dir / "index.html").read_text().lower())
             self.assertNotIn("@import", (output_dir / "style.css").read_text().lower())
             manifest = json.loads((output_dir / "manifest.json").read_text())
-            self.assertEqual(manifest["tool_version"], "1.7.3")
+            self.assertEqual(manifest["tool_version"], "1.7.4")
             self.assertEqual(manifest["ledger_ids"], ["oklo-ai-power", "leveraged-etf-discipline"])
             self.assertEqual(manifest["generated_files"], expected_files)
             self.assertNotIn("timestamp", manifest)
@@ -2852,7 +2905,7 @@ class CliTests(unittest.TestCase):
             self.assertEqual(second.returncode, 0, second.stderr)
             self.assertEqual(output_a.read_text(), output_b.read_text())
             payload = json.loads(output_a.read_text())
-            self.assertEqual(payload["ledger_version"], "1.7.3")
+            self.assertEqual(payload["ledger_version"], "1.7.4")
             self.assertEqual(payload["thesis_id"], "msft-thesis")
             self.assertEqual(payload["sources"][0]["id"], "S1")
             self.assertEqual(payload["assumptions"][0]["source_ids"], ["S1"])
@@ -3273,6 +3326,26 @@ class CliTests(unittest.TestCase):
             self.assertIn("Title \\| with break", broker_md.read_text())
             self.assertIn("reg \\| tag", exposure_md.read_text())
             self.assertIn("Keep \\| size small", exposure_md.read_text())
+
+    def test_broker_matrix_source_refs_escape_table_pipe_once(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_dir = Path(temp)
+            ledger_path = temp_dir / "ledger.json"
+            self.ledger_with_pipe_source_id(ledger_path)
+            md_path = temp_dir / "broker.md"
+            result = self.run_cli(
+                "broker-matrix",
+                str(ledger_path),
+                "--output",
+                str(md_path),
+                "--json-output",
+                str(temp_dir / "broker.json"),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            row = next(line for line in md_path.read_text().splitlines() if line.startswith("| B1 |"))
+            self.assertIn("[S\\|1]", row)
+            self.assertNotIn("[S\\\\|1]", row)
+            self.assertEqual(len(self.markdown_table_cells(row)), 7)
 
 
 if __name__ == "__main__":
