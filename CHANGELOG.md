@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.7.6 - 2026-05-12
+
+- Replaced the repo-embedded agent protocol path with `skills/agent/invest-thesis-ledger/SKILL.md`.
+- Removed private/local agent branding, platform-specific chat instructions, local machine paths, and personal user references from the public repository skill.
+- Updated README agent-skill documentation to describe a generic compatible-agent protocol.
+
 ## 1.7.4 - 2026-05-12
 
 - Fixed source reference escaping in Markdown table renderers so source IDs containing `|` are escaped exactly once in broker matrix, portfolio catalyst, and decision memo broker tables.

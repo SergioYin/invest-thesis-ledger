@@ -13,6 +13,16 @@ exit-code-2 reporting and compatibility with v0.1.0 through v1.7.3 ledgers.
 
 This project is for research organization only. It is not investment advice.
 
+## Agent skill
+
+This repository includes a generic agent-facing skill protocol at:
+
+```text
+skills/agent/invest-thesis-ledger/SKILL.md
+```
+
+Use it to teach compatible agents when and how to call this CLI for investment thesis ledgers, risk reports, decision memos, scenario plans, portfolio reviews, archives, and HTML dashboards. The skill is intentionally separate from the README: the README explains the tool to humans, while the skill is an executable protocol for agents.
+
 ## Install
 
 Run directly from a checkout:
