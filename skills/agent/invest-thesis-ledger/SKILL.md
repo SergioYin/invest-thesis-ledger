@@ -22,7 +22,7 @@ This file is an agent-facing operating protocol. The repository contains the exe
 Load this skill when a user asks to:
 
 - organize stock, ETF, IPO, or investment-theme research into a durable thesis record;
-- generate a pre-trade or pre-review decision memo;
+- generate a pre-trade or pre-review decision memo or review-ready decision review pack;
 - produce a risk report;
 - create a base/bull/bear scenario plan;
 - review thesis history or compare thesis drift across snapshots;
@@ -65,6 +65,7 @@ The tool is designed to be stdlib-only at runtime.
 
 4. User is considering a buy, sell, add, reduce, or hold decision
    - Use `decision-memo` plus `risk` and `scenario-plan`.
+   - Use `decision-review-pack` when the artifact must be readable by a cold user, include evidence provenance, or preserve the exact reproduction command.
    - Present the result as a checklist and research summary, not financial advice.
 
 5. User asks for weekly review, watchlist, or next research actions
@@ -100,6 +101,12 @@ Generate a decision memo:
 
 ```bash
 python -m invest_thesis_ledger decision-memo <ledger.json> --output decision-memo.md --json-output decision-memo.json
+```
+
+Generate a review-ready decision review pack:
+
+```bash
+python -m invest_thesis_ledger decision-review-pack <ledger.json> --output decision-review-pack.md --json-output decision-review-pack.json
 ```
 
 Generate a scenario plan:
@@ -138,6 +145,8 @@ When reporting generated artifacts to a user:
 - Keep the summary concise unless the user asks for full generated files.
 - Include generated file paths.
 - Highlight decision-relevant items: thesis, evidence quality, key risks, invalidation conditions, position discipline, and unresolved information gaps.
+- For `decision-review-pack`, mention the review evidence map and command provenance if the user needs reproducibility.
+- When users bring optional portfolio-risk-compass or leveraged-etp-risk-lab outputs, map approved findings into ordinary ledger `sources`, `risks`, `position_rules`, `checklist`, `catalysts`, or `reviews`; do not require those tools or imply the CLI imports their artifacts automatically.
 - Avoid wide tables in chat surfaces that render tables poorly.
 
 ## Safety and Finance Boundaries

@@ -1,0 +1,73 @@
+{
+  "artifact_type": "portfolio-risk-compass-summary",
+  "artifact_version": "example-1",
+  "generated_by": "portfolio-risk-compass",
+  "scope": "generic public example",
+  "as_of": "2026-05-12",
+  "portfolio_context": {
+    "base_currency": "USD",
+    "position_count": 2,
+    "notional_exposure_label": "example-only"
+  },
+  "ledger_links": [
+    {
+      "thesis_id": "oklo-ai-power",
+      "ticker": "OKLO",
+      "risk_flags": [
+        {
+          "code": "THEME_CONCENTRATION",
+          "severity": "medium",
+          "summary": "Portfolio exposure depends on a concentrated AI power-demand theme."
+        },
+        {
+          "code": "CATALYST_CLUSTER",
+          "severity": "medium",
+          "summary": "Several thesis catalysts cluster around regulatory, customer, and financing updates."
+        }
+      ],
+      "suggested_ledger_mapping": {
+        "risks": [
+          "Add or refresh a source-backed concentration risk if the portfolio exposure makes the single-ledger risk material."
+        ],
+        "checklist": [
+          "Add an open review item to compare thesis catalysts with portfolio-level exposure limits."
+        ],
+        "reviews": [
+          "Record whether portfolio concentration changes the next review cadence."
+        ]
+      }
+    },
+    {
+      "thesis_id": "leveraged-etf-discipline",
+      "ticker": "LEV2X",
+      "risk_flags": [
+        {
+          "code": "LEVERAGE_EXPOSURE",
+          "severity": "high",
+          "summary": "Daily-reset exposure can dominate portfolio volatility during stressed conditions."
+        },
+        {
+          "code": "LIQUIDITY_REVIEW",
+          "severity": "medium",
+          "summary": "Position sizing should remain tied to liquidity and exit rules."
+        }
+      ],
+      "suggested_ledger_mapping": {
+        "risks": [
+          "Keep leverage and path-dependence risks explicit and source-backed."
+        ],
+        "position_rules": [
+          "Keep maximum exposure, holding-period, and stop-review rules open until checked before action."
+        ],
+        "checklist": [
+          "Add a portfolio-risk review item before increasing exposure."
+        ]
+      }
+    }
+  ],
+  "decision_review_pack_usage": {
+    "consume": "Translate approved risk flags into ordinary ledger fields, then run decision-review-pack.",
+    "complement": "Keep this artifact beside the packet as portfolio context; the packet remains ledger-native and reproducible."
+  },
+  "non_advice_boundary": "Research organization example only; no buy, sell, or hold recommendation is made."
+}

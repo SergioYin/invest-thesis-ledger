@@ -1,7 +1,7 @@
-# Ledger Schema v1.7.4
+# Ledger Schema v1.8.0
 
 This document defines the JSON ledger format accepted by `invest-thesis-ledger`
-v1.7.4. Ledgers are research organization records only and are not investment
+v1.8.0. Ledgers are research organization records only and are not investment
 advice.
 
 ## Document Shape
@@ -15,7 +15,7 @@ without breaking the renderer.
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `ledger_version` | string | Schema version. v1.7.4 ledgers should use `"1.7.4"`. v0.1.0 through v1.7.3 remain accepted for compatibility; other values validate with a warning. |
+| `ledger_version` | string | Schema version. v1.8.0 ledgers should use `"1.8.0"`. v0.1.0 through v1.7.4 remain accepted for compatibility; other values validate with a warning. |
 | `thesis_id` | string | Stable machine-readable ledger identifier. |
 | `title` | string | Human-readable thesis title. |
 | `asset` | object | Asset metadata. |
@@ -115,7 +115,7 @@ The CLI renders these optional top-level fields when present:
 | Field | Type | Rendered By | Description |
 | --- | --- | --- | --- |
 | `positions` | array | `brief`, `decision-memo` | Position notes or sizing discipline. |
-| `catalysts` | array | `brief`, `calendar`, `decision-memo`, `evidence`, `scenario-plan` | Catalysts or evidence that could change conviction. |
+| `catalysts` | array | `brief`, `calendar`, `decision-review-pack`, `decision-memo`, `evidence`, `scenario-plan` | Catalysts or evidence that could change conviction. |
 | `broker_views` | array | `broker-matrix`, `decision-memo`, `evidence` | Broker, desk, or institution rating/target/thesis views. |
 | `position_rules` | array | `decision-memo`, `exposure`, `evidence`, `scenario-plan` | Position sizing, exposure, and trade discipline rules. |
 | `checklist` | array | `decision-memo`, `risk` | Risk checklist items. |
@@ -183,7 +183,7 @@ source, and duplicate source references within one item are invalid.
 
 ## Determinism
 
-For the same input file or ordered input file list, v1.7.4 CLI outputs are
+For the same input file or ordered input file list, v1.8.0 CLI outputs are
 deterministic:
 
 - JSON outputs are serialized with sorted keys and two-space indentation.
@@ -205,6 +205,8 @@ deterministic:
   checklist, or position-rule type.
 - Decision memos reuse the deterministic broker, catalyst, exposure, evidence,
   and history payload ordering.
+- Decision review packs reuse deterministic review queue, evidence, risk,
+  catalyst, history, and decision memo question ordering.
 - Scenario plans sort assumptions, risks, position constraints, mitigation
   actions, triggers, and evidence gaps by stable IDs or existing normalized
   report ordering.
@@ -229,7 +231,7 @@ deterministic:
 - Paired Markdown/JSON report commands stage both output files before final
   commit and clean up or restore companions on write failure.
 
-## v1.7.4 Reports
+## v1.8.0 Reports
 
 `compare <old.json> <new.json> --output drift.md --json-output drift.json`
 loads and validates both ledgers, then compares:
@@ -275,6 +277,43 @@ memo containing:
 - evidence coverage, stale sources, unused sources, and unsupported items
 - final questions before action
 
+`decision-review-pack <ledger.json> --output review-pack.md --json-output review-pack.json`
+loads and validates one ledger, then renders a review-ready packet containing:
+
+- explicit non-advice boundary and no-market-data flag
+- thesis status, review score, priority, next action, and latest review
+- review drivers from stale sources, high risks, catalysts, stale reviews,
+  checklist items, and position rules
+- review evidence map with every tracked evidence item, support status, and
+  source index copied only from ledger data
+- deterministic evidence freshness, quality score, stale sources, unsupported
+  items, and unused sources
+- high risks, all risks, open catalysts, and all catalysts
+- next review questions derived from the decision memo question logic
+- command provenance with the reproduction command, argv, input ledger, and
+  stable Markdown/JSON artifact filenames
+
+Quickstart from a checkout:
+
+```bash
+python -m invest_thesis_ledger validate examples/oklo-ai-power.json
+python -m invest_thesis_ledger decision-review-pack examples/oklo-ai-power.json --output /tmp/oklo-review-pack.md --json-output /tmp/oklo-review-pack.json
+```
+
+Read `/tmp/oklo-review-pack.md` for the human review packet and
+`/tmp/oklo-review-pack.json` for the structured payload. The generated packet
+organizes ledger evidence only. It does not include market data, does not
+provide personalized investment advice, and does not recommend buying, selling,
+or holding any asset.
+
+Checked-in generated examples:
+
+- [decision review pack Markdown](../examples/output/oklo-ai-power-decision-review-pack.md)
+- [decision review pack JSON](../examples/output/oklo-ai-power-decision-review-pack.json)
+- [demo bundle index](../examples/output/demo-bundle/index.md)
+- [portable archive README](../examples/output/archive/README.md)
+- [HTML dashboard index](../examples/output/html-dashboard/index.html)
+
 `scenario-plan <ledger.json> --output scenario-plan.md --json-output scenario-plan.json`
 loads and validates one ledger, then renders deterministic base, bull, and bear
 scenario cases from existing ledger fields. No new schema fields are required.
@@ -300,7 +339,7 @@ Evidence gaps are ordered by review priority: low-confidence assumptions, stale
 sources, unused sources, then unsupported evidence items.
 
 `init-template --asset TICKER --name NAME --type TYPE --output ledger.json`
-writes a deterministic starter ledger with v1.7.4 fields, fixed placeholder
+writes a deterministic starter ledger with v1.8.0 fields, fixed placeholder
 dates, one source-backed assumption, one risk, one review, and a thesis ID
 derived from the ticker.
 
@@ -517,6 +556,33 @@ deterministic and contains only `generated_files`, `ledger_ids`, and
 `tool_version`; it does not include timestamps. HTML escaping uses only the
 Python standard library.
 
-See `examples/output/` for checked-in CLI output fixtures generated from
-`examples/oklo-ai-power.json`, `examples/leveraged-etf-discipline.json`, and
-the prior/current comparison pair in `examples/oklo-ai-power-prior.json`.
+See [examples/output/](../examples/output/) for checked-in CLI output fixtures
+generated from [examples/oklo-ai-power.json](../examples/oklo-ai-power.json),
+[examples/leveraged-etf-discipline.json](../examples/leveraged-etf-discipline.json),
+and the prior/current comparison pair in
+[examples/oklo-ai-power-prior.json](../examples/oklo-ai-power-prior.json).
+
+## Optional Companion Artifacts
+
+The schema does not define any required dependency on external research tools.
+Outputs from adjacent tools can complement a ledger by being translated into
+existing fields:
+
+- portfolio-level concentration, correlation, liquidity, or exposure findings
+  can become source-backed `risks`, `position_rules`, `checklist` items, or
+  `reviews`;
+- leveraged ETP daily-reset, path-dependence, compounding, liquidity, event, or
+  holding-period findings can become source-backed `risks`, `position_rules`,
+  `checklist` items, or `reviews`;
+- approved companion outputs can be recorded as ordinary `sources` when they
+  are part of the evidence record.
+
+`decision-review-pack` uses those mapped fields through the normal ledger
+schema. Companion artifacts may also be kept beside the generated packet as
+context, but the CLI does not import them automatically, does not require their
+tools to be installed, and does not turn companion findings into advice.
+
+Generic public examples are in [examples/integration/](../examples/integration/):
+
+- [portfolio-risk-compass-summary.json](../examples/integration/portfolio-risk-compass-summary.json)
+- [leveraged-etp-risk-lab-summary.json](../examples/integration/leveraged-etp-risk-lab-summary.json)

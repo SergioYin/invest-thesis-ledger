@@ -1158,6 +1158,201 @@ def render_action_plan(ledgers: Sequence[Mapping[str, Any]]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def decision_review_pack_payload(
+    ledger: Mapping[str, Any], provenance: Optional[Mapping[str, Any]] = None
+) -> Dict[str, Any]:
+    """Build a review-ready thesis packet from existing ledger data."""
+
+    queue_item = _review_queue_item(ledger)
+    latest_review = _latest_review(ledger)
+    evidence = evidence_payload(ledger)
+    risk = risk_payload(ledger)
+    all_risks = sorted(risk["risks"], key=lambda item: str(item["id"]))
+    catalysts = calendar_payload(ledger)["catalysts"]
+    open_catalysts = [item for item in catalysts if not _is_closed_status(str(item.get("status", "")))]
+    high_risks = [
+        item
+        for item in risk["risks"]
+        if str(item.get("severity", "")).lower() in {"high", "critical", "severe"}
+    ]
+    high_risks.sort(key=lambda item: str(item["id"]))
+    questions = decision_memo_payload(ledger)["questions_before_action"]
+    freshness = _decision_review_freshness(evidence)
+    return {
+        "thesis_id": ledger["thesis_id"],
+        "title": ledger["title"],
+        "updated": ledger["updated"],
+        "asset": dict(ledger["asset"]),
+        "non_advice_boundary": {
+            "research_only": True,
+            "includes_market_data": False,
+            "text": "This packet organizes existing ledger data for review. It is not investment advice and does not recommend buying, selling, or holding any asset.",
+        },
+        "thesis_status": {
+            "status": _decision_review_status(queue_item["priority"], latest_review),
+            "review_priority": queue_item["priority"],
+            "review_score": queue_item["score"],
+            "next_action": queue_item["next_action"],
+            "latest_review": {
+                "date": latest_review.get("date", ""),
+                "decision": latest_review.get("decision", ""),
+                "summary": latest_review.get("summary", ""),
+                "drift": latest_review.get("drift", "none recorded") if latest_review else "",
+                "source_ids": list(latest_review.get("source_ids", [])),
+            },
+            "review_reasons": queue_item["reasons"],
+        },
+        "review_evidence": _decision_review_evidence(ledger, evidence),
+        "evidence_freshness": freshness,
+        "risks_and_catalysts": {
+            "high_risks": high_risks,
+            "all_risks": all_risks,
+            "open_catalysts": open_catalysts,
+            "all_catalysts": catalysts,
+        },
+        "next_review_questions": questions,
+        "command_provenance": _decision_review_command_provenance(provenance),
+    }
+
+
+def render_decision_review_pack(
+    ledger: Mapping[str, Any], provenance: Optional[Mapping[str, Any]] = None
+) -> str:
+    """Render a review-ready thesis packet."""
+
+    payload = decision_review_pack_payload(ledger, provenance=provenance)
+    asset = payload["asset"]
+    status = payload["thesis_status"]
+    review_evidence = payload["review_evidence"]
+    freshness = payload["evidence_freshness"]
+    risks_and_catalysts = payload["risks_and_catalysts"]
+    command_provenance = payload["command_provenance"]
+    lines = [
+        f"# Decision Review Pack: {_inline(payload['title'])}",
+        "",
+        f"> {_inline(payload['non_advice_boundary']['text'])}",
+        "",
+        "## Thesis Status",
+        "",
+        f"- Ledger ID: {_inline(payload['thesis_id'])}",
+        f"- Updated: {_inline(payload['updated'])}",
+        f"- Asset: {_inline(asset['ticker'])} ({_inline(asset['name'])})",
+        f"- Type: {_inline(asset['type'])}",
+        f"- Status: {_inline(status['status'])}",
+        f"- Review Priority: {_inline(status['review_priority'])}",
+        f"- Review Score: {status['review_score']}",
+        f"- Next Action: {_inline(status['next_action'])}",
+        "",
+        "### Latest Review",
+        "",
+    ]
+    latest = status["latest_review"]
+    if latest["date"]:
+        lines.extend(
+            [
+                f"- Date: {_inline(latest['date'])}",
+                f"- Decision: {_inline(latest['decision'])}",
+                f"- Summary: {_inline(latest['summary'])}",
+                f"- Drift: {_inline(latest['drift'])}",
+                f"- Sources: {_refs(latest['source_ids'])}",
+            ]
+        )
+    else:
+        lines.append("- No review recorded.")
+    lines.extend(["", "### Review Drivers", ""])
+    if status["review_reasons"]:
+        for reason in status["review_reasons"]:
+            lines.append(
+                f"- {_inline(reason['type'])}: {_inline(reason['text'])} "
+                f"(count: {reason['count']}; score: {reason['score']}; items: {_inline_join(reason['items'])})"
+            )
+    else:
+        lines.append("- No review triggers detected.")
+    lines.extend(["", "## Review Evidence", ""])
+    for note in review_evidence["interpretation_notes"]:
+        lines.append(f"- {_inline(note)}")
+    lines.extend(["", "### Evidence Map", ""])
+    if review_evidence["evidence_items"]:
+        for item in review_evidence["evidence_items"]:
+            lines.append(
+                f"- {_inline(item['type'])} {_inline(item['id'])}: "
+                f"{_inline(item['support_status'])}; sources: {_refs(item['source_ids'])}"
+            )
+    else:
+        lines.append("- No evidence-backed ledger items recorded.")
+    lines.extend(["", "### Source Index", ""])
+    if review_evidence["source_index"]:
+        for item in review_evidence["source_index"]:
+            lines.append(
+                f"- [{_inline(item['id'])}] {_inline(item['title'])}. "
+                f"{_inline(item['publisher'])}, {_inline(item['date'])}. {_inline(item['url'])}"
+            )
+    else:
+        lines.append("- No source records supplied.")
+    lines.extend(["", "## Evidence Freshness", ""])
+    lines.extend(
+        [
+            f"- Status: {_inline(freshness['status'])}",
+            f"- Quality Score: {freshness['quality_score']}",
+            f"- Tracked Items: {freshness['coverage']['tracked_items']}",
+            f"- Supported Items: {freshness['coverage']['supported_items']}",
+            f"- Unsupported Items: {freshness['coverage']['unsupported_items']}",
+            f"- Sources: {freshness['coverage']['source_count']}",
+            f"- Stale Sources: {freshness['coverage']['stale_source_count']}",
+            f"- Unused Sources: {freshness['coverage']['unused_source_count']}",
+        ]
+    )
+    if freshness["stale_sources"]:
+        for item in freshness["stale_sources"]:
+            lines.append(
+                f"- Stale [{_inline(item['id'])}] {_inline(item['title'])} "
+                f"({_inline(item['date'])}): {item['age_days']} days old"
+            )
+    else:
+        lines.append("- No stale sources detected.")
+    if freshness["unsupported_items"]:
+        for item in freshness["unsupported_items"]:
+            lines.append(f"- Unsupported {_inline(item['type'])} {_inline(item['id'])}")
+    lines.extend(["", "## Risks and Catalysts", "", "### High Risks", ""])
+    if risks_and_catalysts["high_risks"]:
+        for item in risks_and_catalysts["high_risks"]:
+            lines.append(
+                f"- {_inline(item['id'])}: {_inline(item['name'])} "
+                f"(severity: {_inline(item['severity'])}; probability: {_inline(item['probability'])}; "
+                f"mitigation: {_inline(item['mitigation'])}; sources: {_refs(item['source_ids'])})"
+            )
+    else:
+        lines.append("- No high-severity risks recorded.")
+    lines.extend(["", "### Open Catalysts", ""])
+    if risks_and_catalysts["open_catalysts"]:
+        for item in risks_and_catalysts["open_catalysts"]:
+            timing = _catalyst_timing(item)
+            lines.append(
+                f"- {_inline(item['id'])}: {_inline(item['title'])}{_inline(timing)} "
+                f"(status: {_inline(item['status'])}; sources: {_refs(item['source_ids'])})"
+            )
+    else:
+        lines.append("- No open catalysts recorded.")
+    lines.extend(["", "## Next Review Questions", ""])
+    for item in payload["next_review_questions"]:
+        lines.append(f"- [ ] {_inline(item['id'])}: {_inline(item['question'])}")
+    lines.extend(["", "## Command Provenance", ""])
+    lines.extend(
+        [
+            f"- Command: {_code_span(command_provenance['command'])}",
+            f"- Workflow: {_inline(command_provenance['workflow'])}",
+            f"- Input Ledger: {_inline(command_provenance['input_ledger'])}",
+            f"- Markdown Output: {_inline(command_provenance['markdown_output'])}",
+            f"- JSON Output: {_inline(command_provenance['json_output'])}",
+        ]
+    )
+    lines.extend(["", "## Boundary", ""])
+    lines.append(f"- {_inline(payload['non_advice_boundary']['text'])}")
+    lines.extend(["", "## Sources", ""])
+    lines.extend(_source_lines(ledger))
+    return "\n".join(lines) + "\n"
+
+
 def decision_memo_payload(ledger: Mapping[str, Any]) -> Dict[str, Any]:
     """Build structured pre-trade/review decision memo output."""
 
@@ -2046,6 +2241,102 @@ def _evidence_quality_score(coverage: Mapping[str, Any]) -> int:
     return max(0, min(100, support_points + used_source_points + fresh_source_points))
 
 
+def _decision_review_freshness(evidence: Mapping[str, Any]) -> Dict[str, Any]:
+    coverage = evidence["coverage"]
+    stale_count = int(coverage["stale_source_count"])
+    unsupported_count = int(coverage["unsupported_items"])
+    quality_score = _evidence_quality_score(coverage)
+    if stale_count or quality_score < 70:
+        status = "refresh-required"
+    elif unsupported_count:
+        status = "partial"
+    else:
+        status = "fresh"
+    return {
+        "status": status,
+        "quality_score": quality_score,
+        "coverage": coverage,
+        "stale_sources": evidence["stale_sources"],
+        "unused_sources": evidence["unused_sources"],
+        "unsupported_items": [item for item in evidence["items"] if not item["source_ids"]],
+    }
+
+
+def _decision_review_evidence(
+    ledger: Mapping[str, Any], evidence: Mapping[str, Any]
+) -> Dict[str, Any]:
+    sources = source_lookup(ledger)
+    evidence_items = []
+    for item in evidence["items"]:
+        source_ids = list(item["source_ids"])
+        evidence_items.append(
+            {
+                "type": item["type"],
+                "id": item["id"],
+                "support_status": "supported" if source_ids else "unsupported",
+                "source_ids": source_ids,
+            }
+        )
+    source_index = [
+        {
+            "id": source_id,
+            "title": sources[source_id]["title"],
+            "publisher": sources[source_id]["publisher"],
+            "date": sources[source_id]["date"],
+            "url": sources[source_id]["url"],
+        }
+        for source_id in sorted(sources)
+    ]
+    return {
+        "interpretation_notes": [
+            "Evidence is copied from ledger source references only; no market data or outside lookup was added.",
+            "Unsupported items are information gaps for a reviewer to resolve before relying on the packet.",
+        ],
+        "evidence_items": evidence_items,
+        "source_index": source_index,
+    }
+
+
+def _decision_review_command_provenance(
+    provenance: Optional[Mapping[str, Any]] = None
+) -> Dict[str, Any]:
+    command = (
+        "python -m invest_thesis_ledger decision-review-pack <ledger.json> "
+        "--output <review-pack.md> --json-output <review-pack.json>"
+    )
+    payload = {
+        "workflow": "single-ledger decision-review-pack",
+        "command": command,
+        "argv": [
+            "python",
+            "-m",
+            "invest_thesis_ledger",
+            "decision-review-pack",
+            "<ledger.json>",
+            "--output",
+            "<review-pack.md>",
+            "--json-output",
+            "<review-pack.json>",
+        ],
+        "input_ledger": "<ledger.json>",
+        "markdown_output": "<review-pack.md>",
+        "json_output": "<review-pack.json>",
+    }
+    if provenance:
+        payload.update({str(key): value for key, value in provenance.items()})
+    return payload
+
+
+def _decision_review_status(priority: str, latest_review: Mapping[str, Any]) -> str:
+    if priority == "high":
+        return "needs-review"
+    if not latest_review.get("date"):
+        return "unreviewed"
+    if priority == "medium":
+        return "watch"
+    return "current"
+
+
 def _evidence_audit_ledger_sort_key(item: Mapping[str, Any]) -> tuple[Any, ...]:
     coverage = item["coverage"]
     return (
@@ -2663,6 +2954,11 @@ def _cell(value: Any) -> str:
 
 def _inline(value: Any) -> str:
     return str(value).replace("|", "\\|").replace("\r", " ").replace("\n", " ")
+
+
+def _code_span(value: Any) -> str:
+    text = _inline(value).replace("`", "\\`")
+    return f"`{text}`"
 
 
 def _inline_join(values: Sequence[Any]) -> str:

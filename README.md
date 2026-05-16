@@ -4,14 +4,20 @@ A zero-dependency Python package and CLI for maintaining investment thesis
 ledgers as JSON, then rendering deterministic briefs, risk reports, review
 timelines, thesis drift comparisons, catalyst calendars, evidence coverage
 reports, broker/institution matrices, exposure checklists, deterministic
-starter ledger generation, decision memos, scenario plans, portfolio-level
-summaries, portfolio evidence audits, review queues, weekly watchlists, weekly
-action plans, static demo bundles, portable research archives, archive
-verification, archive diffs, and no-JS HTML dashboards. v1.7.4 escapes
-ledger-controlled Markdown in core reports while preserving concise
-exit-code-2 reporting and compatibility with v0.1.0 through v1.7.3 ledgers.
+starter ledger generation, decision-review packs, decision memos, scenario
+plans, portfolio-level summaries, portfolio evidence audits, review queues,
+weekly watchlists, weekly action plans, static demo bundles, portable research
+archives, archive verification, archive diffs, and no-JS HTML dashboards.
+v1.8.0 adds review-ready decision-review packets while preserving concise
+exit-code-2 reporting and compatibility with v0.1.0 through v1.7.4 ledgers.
+Optional public integration notes show how decision-review packs can use
+portfolio-risk-compass and leveraged-etp-risk-lab outputs through
+ordinary ledger fields, without adding dependencies.
 
-This project is for research organization only. It is not investment advice.
+This project is for research organization only. It is not investment advice,
+does not provide market data, and does not recommend buying, selling, or
+holding any asset. Review outputs are structured notes for independent human
+review.
 
 ## Agent skill
 
@@ -39,6 +45,31 @@ invest-thesis-ledger --version
 ```
 
 No runtime dependencies are required.
+
+## Cold-User Quickstart
+
+From a fresh checkout, run the checked-in example through validation and the
+review packet renderer:
+
+```bash
+python -m invest_thesis_ledger validate examples/oklo-ai-power.json
+python -m invest_thesis_ledger decision-review-pack examples/oklo-ai-power.json --output /tmp/oklo-review-pack.md --json-output /tmp/oklo-review-pack.json
+```
+
+Open `/tmp/oklo-review-pack.md` first. It is the reviewer-facing packet with
+the thesis status, deterministic review score, evidence map, stale-source
+warnings, high risks, open catalysts, next review questions, exact reproduction
+command, and a non-advice/no-market-data boundary. Open
+`/tmp/oklo-review-pack.json` when you need the same packet as structured data.
+
+Checked-in equivalents are available at
+[examples/output/oklo-ai-power-decision-review-pack.md](examples/output/oklo-ai-power-decision-review-pack.md)
+and
+[examples/output/oklo-ai-power-decision-review-pack.json](examples/output/oklo-ai-power-decision-review-pack.json).
+For multi-ledger review, start with the generated demo bundle index at
+[examples/output/demo-bundle/index.md](examples/output/demo-bundle/index.md) or
+the portable archive index at
+[examples/output/archive/README.md](examples/output/archive/README.md).
 
 ## Commands
 
@@ -112,6 +143,14 @@ Render a pre-trade/review decision memo:
 
 ```bash
 python -m invest_thesis_ledger decision-memo examples/oklo-ai-power.json --output decision-memo.md --json-output decision-memo.json
+```
+
+Render a review-ready decision review pack. The packet is for research
+organization and independent review only; it contains no market data and no
+buy/sell/hold recommendation:
+
+```bash
+python -m invest_thesis_ledger decision-review-pack examples/oklo-ai-power.json --output decision-review-pack.md --json-output decision-review-pack.json
 ```
 
 Render a deterministic base/bull/bear scenario plan:
@@ -199,7 +238,7 @@ concise stderr and does not leave a newly written companion output behind.
 
 ## Ledger Format
 
-Ledgers are JSON objects. The v1.7.4 required fields are:
+Ledgers are JSON objects. The v1.8.0 required fields are:
 
 - `ledger_version`
 - `thesis_id`
@@ -236,72 +275,40 @@ ID.
 optional string `tags`; `exposure` combines these risk tags with position rules
 into a checklist.
 
-The formal v1.7.4 schema reference is in `docs/ledger-schema.md`.
+The formal v1.8.0 schema reference is in `docs/ledger-schema.md`.
 
 See:
 
-- `examples/oklo-ai-power.json`
-- `examples/oklo-ai-power-prior.json`
-- `examples/leveraged-etf-discipline.json`
+- [examples/oklo-ai-power.json](examples/oklo-ai-power.json)
+- [examples/oklo-ai-power-prior.json](examples/oklo-ai-power-prior.json)
+- [examples/leveraged-etf-discipline.json](examples/leveraged-etf-discipline.json)
+- [examples/integration/README.md](examples/integration/README.md)
 
 ## Demo Outputs
 
 Checked-in deterministic CLI output fixtures are available under
-`examples/output/`:
+`examples/output/`. Start with these generated artifact links:
 
-- `examples/output/oklo-ai-power-brief.md`
-- `examples/output/oklo-ai-power-risk.md`
-- `examples/output/oklo-ai-power-risk.json`
-- `examples/output/oklo-ai-power-history.md`
-- `examples/output/oklo-ai-power-history.json`
-- `examples/output/oklo-ai-power-calendar.md`
-- `examples/output/oklo-ai-power-calendar.json`
-- `examples/output/oklo-ai-power-evidence.md`
-- `examples/output/oklo-ai-power-evidence.json`
-- `examples/output/oklo-ai-power-broker.md`
-- `examples/output/oklo-ai-power-broker.json`
-- `examples/output/oklo-ai-power-exposure.md`
-- `examples/output/oklo-ai-power-exposure.json`
-- `examples/output/oklo-ai-power-decision-memo.md`
-- `examples/output/oklo-ai-power-decision-memo.json`
-- `examples/output/oklo-ai-power-scenario-plan.md`
-- `examples/output/oklo-ai-power-scenario-plan.json`
-- `examples/output/oklo-ai-power-drift.md`
-- `examples/output/oklo-ai-power-drift.json`
-- `examples/output/portfolio-summary.md`
-- `examples/output/portfolio-summary.json`
-- `examples/output/evidence-audit.md`
-- `examples/output/evidence-audit.json`
-- `examples/output/review-queue.md`
-- `examples/output/review-queue.json`
-- `examples/output/watchlist.md`
-- `examples/output/watchlist.json`
-- `examples/output/action-plan.md`
-- `examples/output/action-plan.json`
-- `examples/output/demo-bundle/index.md`
-- `examples/output/demo-bundle/manifest.json`
-- `examples/output/demo-bundle/portfolio-summary.md`
-- `examples/output/demo-bundle/evidence-audit.md`
-- `examples/output/demo-bundle/watchlist.md`
-- `examples/output/demo-bundle/action-plan.md`
-- per-ledger demo bundle artifacts for brief, risk, history, decision memo, and
-  scenario plan reports
-- `examples/output/archive/README.md`
-- `examples/output/archive/manifest.json`
-- `examples/output/archive/archive-summary.json`
-- `examples/output/archive/portfolio.md`
-- `examples/output/archive/evidence-audit.md`
-- `examples/output/archive/watchlist.md`
-- `examples/output/archive/action-plan.md`
-- per-ledger archive JSON copies and brief, risk, history, decision, and
-  scenario reports
-- `examples/output/html-dashboard/index.html`
-- `examples/output/html-dashboard/style.css`
-- `examples/output/html-dashboard/manifest.json`
-- `examples/output/html-dashboard/portfolio.html`
-- `examples/output/html-dashboard/evidence-audit.html`
-- `examples/output/html-dashboard/watchlist.html`
-- `examples/output/html-dashboard/action-plan.html`
+- [decision review pack Markdown](examples/output/oklo-ai-power-decision-review-pack.md)
+- [decision review pack JSON](examples/output/oklo-ai-power-decision-review-pack.json)
+- [demo bundle index](examples/output/demo-bundle/index.md)
+- [demo bundle manifest](examples/output/demo-bundle/manifest.json)
+- [portable archive README](examples/output/archive/README.md)
+- [portable archive manifest](examples/output/archive/manifest.json)
+- [portable archive SHA-256 summary](examples/output/archive/archive-summary.json)
+- [HTML dashboard index](examples/output/html-dashboard/index.html)
+- [HTML dashboard manifest](examples/output/html-dashboard/manifest.json)
+
+Additional single-command fixtures include brief, risk, history, calendar,
+evidence, broker matrix, exposure, decision memo, scenario plan, drift,
+portfolio summary, evidence audit, review queue, watchlist, and action plan
+Markdown/JSON outputs:
+
+- [examples/output/](examples/output/)
+- per-ledger demo bundle artifacts for brief, risk, history, decision review
+  pack, decision memo, and scenario plan reports
+- per-ledger archive JSON copies and brief, risk, history, decision review
+  pack, decision, and scenario reports
 - per-ledger HTML dashboard pages
 
 ## Development
@@ -363,7 +370,7 @@ warnings for review.
 
 `demo-bundle` validates all input ledgers before writing anything, then cleanly
 overwrites the target output directory with static Markdown files: `index.md`,
-per-ledger brief/risk/history/decision memo/scenario plan reports,
+per-ledger brief/risk/history/decision review pack/decision memo/scenario plan reports,
 `portfolio-summary.md`, `evidence-audit.md`, `watchlist.md`, `action-plan.md`,
 and `manifest.json`. The manifest lists generated files, tool version, and
 input ledger IDs only; it intentionally contains no timestamps.
@@ -371,7 +378,7 @@ input ledger IDs only; it intentionally contains no timestamps.
 `archive` validates all input ledgers before writing anything, then cleanly
 overwrites the target output directory with a portable research archive:
 `README.md`, `manifest.json`, `archive-summary.json`, deterministic per-ledger
-JSON copies, per-ledger brief/risk/history/decision/scenario reports,
+JSON copies, per-ledger brief/risk/history/decision review pack/decision/scenario reports,
 `portfolio.md`, `evidence-audit.md`, `watchlist.md`, and `action-plan.md`.
 The summary records counts and SHA-256 file hashes using relative filenames
 only. `archive-summary.json` is listed in `generated_files` but excluded from
@@ -402,6 +409,27 @@ JavaScript, images, or fonts.
 evidence payloads to produce a deterministic pre-trade/review memo with the
 latest review, high-risk list, open position rules, stale-source summary, and
 questions to answer before action.
+
+`decision-review-pack` uses existing ledger/demo data to produce Markdown and
+JSON packets for independent review. Each packet includes thesis status, review
+score and drivers, latest review, a review evidence map, deterministic evidence
+freshness, high risks, open catalysts, next review questions, sources, exact
+command provenance using stable artifact filenames, and an explicit non-advice
+boundary. It contains no market data, does not provide personalized advice, and
+does not recommend buying, selling, or holding. A cold-user example is checked
+in as
+[examples/output/oklo-ai-power-decision-review-pack.md](examples/output/oklo-ai-power-decision-review-pack.md)
+with structured output at
+[examples/output/oklo-ai-power-decision-review-pack.json](examples/output/oklo-ai-power-decision-review-pack.json).
+
+Optional companion artifacts from tools such as `portfolio-risk-compass` or
+`leveraged-etp-risk-lab` can be used without any CLI dependency by translating
+approved findings into normal ledger `sources`, `risks`, `position_rules`,
+`checklist`, `catalysts`, or `reviews`. The packet will then use those
+fields through the existing schema. If the external artifact should remain
+separate, keep it beside the packet as portfolio or instrument-specific context;
+the generated packet remains ledger-native and reproducible. See
+`examples/integration/` for generic public examples.
 
 `scenario-plan` uses only existing ledger fields to derive base, bull, and bear
 cases from assumption confidence, risk severity/probability, open catalyst

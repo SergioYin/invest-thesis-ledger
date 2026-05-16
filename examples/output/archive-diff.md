@@ -1,11 +1,11 @@
 # Archive Diff
 
 - Status: unchanged
-- Old Tool Version: 1.7.4
-- New Tool Version: 1.7.4
-- Old File Count: 19
-- New File Count: 19
-- Unchanged Files: 19
+- Old Tool Version: 1.8.0
+- New Tool Version: 1.8.0
+- Old File Count: 21
+- New File Count: 21
+- Unchanged Files: 21
 
 ## Ledger IDs
 

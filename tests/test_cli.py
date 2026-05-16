@@ -14,9 +14,11 @@ from unittest import mock
 from pathlib import Path
 
 from invest_thesis_ledger import cli as cli_module
+from invest_thesis_ledger import __version__
 from invest_thesis_ledger.cli import _write_demo_bundle_dir
 from invest_thesis_ledger.render import (
     action_plan_payload,
+    decision_review_pack_payload,
     decision_memo_payload,
     review_queue_payload,
     scenario_plan_payload,
@@ -84,6 +86,14 @@ class CliTests(unittest.TestCase):
         self.assertIn("ledger: oklo-ai-power", result.stdout)
         self.assertIn("reviews: 2", result.stdout)
         self.assertIn("status: valid", result.stdout)
+
+    def test_package_metadata_versions_match_release_docs(self) -> None:
+        pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+        docs = (ROOT / "docs" / "ledger-schema.md").read_text(encoding="utf-8")
+        changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+        self.assertIn(f'version = "{__version__}"', pyproject)
+        self.assertIn(f"# Ledger Schema v{__version__}", docs)
+        self.assertIn(f"## {__version__} - ", changelog)
 
     def test_command_help_describes_inputs_and_outputs(self) -> None:
         compare = self.run_cli("compare", "--help")
@@ -169,6 +179,12 @@ class CliTests(unittest.TestCase):
         self.assertIn("pre-trade/review decision memo", decision_memo.stdout)
         self.assertIn("write JSON output to PATH", decision_memo.stdout)
 
+        decision_review_pack = self.run_cli("decision-review-pack", "--help")
+        self.assertEqual(decision_review_pack.returncode, 0, decision_review_pack.stderr)
+        self.assertIn("LEDGER", decision_review_pack.stdout)
+        self.assertIn("review-ready thesis packet", decision_review_pack.stdout)
+        self.assertIn("write JSON output to PATH", decision_review_pack.stdout)
+
         scenario_plan = self.run_cli("scenario-plan", "--help")
         self.assertEqual(scenario_plan.returncode, 0, scenario_plan.stderr)
         self.assertIn("LEDGER", scenario_plan.stdout)
@@ -219,6 +235,7 @@ class CliTests(unittest.TestCase):
             ("broker-matrix", [str(EXAMPLE)]),
             ("exposure", [str(EXAMPLE)]),
             ("decision-memo", [str(EXAMPLE)]),
+            ("decision-review-pack", [str(EXAMPLE)]),
             ("scenario-plan", [str(EXAMPLE)]),
             ("compare", [str(PRIOR_EXAMPLE), str(EXAMPLE)]),
             ("portfolio", [str(EXAMPLE), str(ETF_EXAMPLE)]),
@@ -261,6 +278,7 @@ class CliTests(unittest.TestCase):
             ("evidence", [str(EXAMPLE)], True),
             ("broker-matrix", [str(EXAMPLE)], True),
             ("exposure", [str(EXAMPLE)], True),
+            ("decision-review-pack", [str(EXAMPLE)], True),
         )
         for command, positional_args, has_json in commands:
             with self.subTest(command=command), tempfile.TemporaryDirectory() as temp:
@@ -744,6 +762,135 @@ class CliTests(unittest.TestCase):
             self.assertIn("unknown source missing", result.stderr)
             self.assertFalse(md_path.exists())
             self.assertFalse(json_path.exists())
+
+    def test_decision_review_pack_writes_review_ready_packet(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            md_path = Path(temp) / "decision-review-pack.md"
+            json_path = Path(temp) / "decision-review-pack.json"
+            result = self.run_cli(
+                "decision-review-pack",
+                str(EXAMPLE),
+                "--output",
+                str(md_path),
+                "--json-output",
+                str(json_path),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            text = md_path.read_text()
+            self.assertIn("# Decision Review Pack", text)
+            self.assertIn("## Thesis Status", text)
+            self.assertIn("## Evidence Freshness", text)
+            self.assertIn("## Review Evidence", text)
+            self.assertIn("## Command Provenance", text)
+            self.assertIn("## Risks and Catalysts", text)
+            self.assertIn("## Next Review Questions", text)
+            self.assertIn("## Boundary", text)
+            payload = json.loads(json_path.read_text())
+            self.assertEqual(payload["thesis_id"], "oklo-ai-power")
+            self.assertTrue(payload["non_advice_boundary"]["research_only"])
+            self.assertFalse(payload["non_advice_boundary"]["includes_market_data"])
+            self.assertEqual(payload["thesis_status"]["status"], "needs-review")
+            self.assertEqual(payload["thesis_status"]["latest_review"]["date"], "2026-06-30")
+            self.assertEqual(
+                payload["review_evidence"]["interpretation_notes"][0],
+                "Evidence is copied from ledger source references only; no market data or outside lookup was added.",
+            )
+            self.assertEqual(payload["review_evidence"]["evidence_items"][0]["id"], "A1")
+            self.assertEqual(payload["review_evidence"]["source_index"][0]["id"], "S1")
+            self.assertEqual(payload["evidence_freshness"]["status"], "fresh")
+            self.assertEqual(payload["risks_and_catalysts"]["high_risks"][0]["id"], "R1")
+            self.assertEqual(payload["risks_and_catalysts"]["open_catalysts"][0]["id"], "CAT2")
+            self.assertEqual(payload["next_review_questions"][0]["id"], "Q1")
+            self.assertEqual(
+                payload["command_provenance"]["command"],
+                "python -m invest_thesis_ledger decision-review-pack examples/oklo-ai-power.json "
+                "--output decision-review-pack.md --json-output decision-review-pack.json",
+            )
+
+    def test_decision_review_pack_payload_is_input_order_independent(self) -> None:
+        data = json.loads(EXAMPLE.read_text())
+        forward = decision_review_pack_payload(data)
+        data["risks"] = list(reversed(data["risks"]))
+        data["catalysts"] = list(reversed(data["catalysts"]))
+        data["reviews"] = list(reversed(data["reviews"]))
+        reverse = decision_review_pack_payload(data)
+        self.assertEqual(forward, reverse)
+
+    def test_decision_review_pack_escapes_markdown_and_avoids_personal_advice(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_dir = Path(temp)
+            ledger_path = temp_dir / "ledger.json"
+            data = json.loads(EXAMPLE.read_text())
+            data["title"] = "Review | title\nbreak"
+            data["risks"][0]["name"] = "Risk | name\nbreak"
+            data["catalysts"][0]["title"] = "Catalyst | title\nbreak"
+            ledger_path.write_text(json.dumps(data), encoding="utf-8")
+            md_path = temp_dir / "decision-review-pack.md"
+            json_path = temp_dir / "decision-review-pack.json"
+            result = self.run_cli(
+                "decision-review-pack",
+                str(ledger_path),
+                "--output",
+                str(md_path),
+                "--json-output",
+                str(json_path),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            text = md_path.read_text()
+            self.assertIn("# Decision Review Pack: Review \\| title break", text)
+            self.assertIn("Risk \\| name break", text)
+            self.assertIn("Catalyst \\| title break", text)
+            generated = "\n".join(
+                [
+                    json.loads(json_path.read_text())["non_advice_boundary"]["text"],
+                    *[
+                        item["question"]
+                        for item in json.loads(json_path.read_text())["next_review_questions"]
+                    ],
+                ]
+            ).lower()
+            self.assertNotRegex(generated, r"\byou should\b")
+
+    def test_decision_review_pack_validates_before_writing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_dir = Path(temp)
+            bad_path = temp_dir / "bad.json"
+            data = json.loads(EXAMPLE.read_text())
+            data["catalysts"][0]["source_ids"] = ["missing"]
+            bad_path.write_text(json.dumps(data), encoding="utf-8")
+            md_path = temp_dir / "decision-review-pack.md"
+            json_path = temp_dir / "decision-review-pack.json"
+            result = self.run_cli(
+                "decision-review-pack",
+                str(bad_path),
+                "--output",
+                str(md_path),
+                "--json-output",
+                str(json_path),
+            )
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("unknown source missing", result.stderr)
+            self.assertFalse(md_path.exists())
+            self.assertFalse(json_path.exists())
+
+    def test_decision_review_pack_preserves_external_input_path_in_provenance(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_dir = Path(temp)
+            ledger_path = temp_dir / "ledger.json"
+            ledger_path.write_text(EXAMPLE.read_text(), encoding="utf-8")
+            json_path = temp_dir / "decision-review-pack.json"
+            result = self.run_cli(
+                "decision-review-pack",
+                str(ledger_path),
+                "--output",
+                str(temp_dir / "decision-review-pack.md"),
+                "--json-output",
+                str(json_path),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            provenance = json.loads(json_path.read_text())["command_provenance"]
+            self.assertEqual(provenance["input_ledger"], ledger_path.as_posix())
+            self.assertIn(ledger_path.as_posix(), provenance["command"])
 
     def test_scenario_plan_writes_base_bull_bear_payload(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -2053,11 +2200,13 @@ class CliTests(unittest.TestCase):
                 "oklo-ai-power-brief.md",
                 "oklo-ai-power-risk.md",
                 "oklo-ai-power-history.md",
+                "oklo-ai-power-decision-review-pack.md",
                 "oklo-ai-power-decision-memo.md",
                 "oklo-ai-power-scenario-plan.md",
                 "leveraged-etf-discipline-brief.md",
                 "leveraged-etf-discipline-risk.md",
                 "leveraged-etf-discipline-history.md",
+                "leveraged-etf-discipline-decision-review-pack.md",
                 "leveraged-etf-discipline-decision-memo.md",
                 "leveraged-etf-discipline-scenario-plan.md",
                 "portfolio-summary.md",
@@ -2073,7 +2222,7 @@ class CliTests(unittest.TestCase):
             self.assertIn("# Watchlist", (output_dir / "watchlist.md").read_text())
             self.assertIn("# Weekly Action Plan", (output_dir / "action-plan.md").read_text())
             manifest = json.loads((output_dir / "manifest.json").read_text())
-            self.assertEqual(manifest["tool_version"], "1.7.4")
+            self.assertEqual(manifest["tool_version"], "1.8.0")
             self.assertEqual(manifest["ledger_ids"], ["oklo-ai-power", "leveraged-etf-discipline"])
             self.assertEqual(manifest["generated_files"], expected_files)
             index_links = [
@@ -2203,12 +2352,14 @@ class CliTests(unittest.TestCase):
                 "oklo-ai-power-brief.md",
                 "oklo-ai-power-risk.md",
                 "oklo-ai-power-history.md",
+                "oklo-ai-power-decision-review-pack.md",
                 "oklo-ai-power-decision.md",
                 "oklo-ai-power-scenario.md",
                 "leveraged-etf-discipline.json",
                 "leveraged-etf-discipline-brief.md",
                 "leveraged-etf-discipline-risk.md",
                 "leveraged-etf-discipline-history.md",
+                "leveraged-etf-discipline-decision-review-pack.md",
                 "leveraged-etf-discipline-decision.md",
                 "leveraged-etf-discipline-scenario.md",
                 "portfolio.md",
@@ -2221,11 +2372,11 @@ class CliTests(unittest.TestCase):
             self.assertEqual(sorted(path.name for path in output_dir.iterdir()), sorted(expected_files))
             manifest = json.loads((output_dir / "manifest.json").read_text())
             self.assertEqual(manifest["archive_format"], "portable-research-archive")
-            self.assertEqual(manifest["tool_version"], "1.7.4")
+            self.assertEqual(manifest["tool_version"], "1.8.0")
             self.assertEqual(manifest["ledger_ids"], ["oklo-ai-power", "leveraged-etf-discipline"])
             self.assertEqual(manifest["generated_files"], expected_files)
             summary = json.loads((output_dir / "archive-summary.json").read_text())
-            self.assertEqual(summary["tool_version"], "1.7.4")
+            self.assertEqual(summary["tool_version"], "1.8.0")
             self.assertEqual(summary["ledger_ids"], manifest["ledger_ids"])
             self.assertEqual(summary["archive"]["ledger_count"], 2)
             self.assertEqual(summary["archive"]["file_count"], len(expected_files))
@@ -2364,8 +2515,8 @@ class CliTests(unittest.TestCase):
         result = self.run_cli("verify-archive", str(ARCHIVE_FIXTURE))
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("archive validation summary", result.stdout)
-        self.assertIn("generated_files: 19", result.stdout)
-        self.assertIn("hashed_files: 18", result.stdout)
+        self.assertIn("generated_files: 21", result.stdout)
+        self.assertIn("hashed_files: 20", result.stdout)
         self.assertIn("status: valid", result.stdout)
         self.assertEqual(result.stderr, "")
 
@@ -2542,7 +2693,7 @@ class CliTests(unittest.TestCase):
             self.assertEqual(payload["added_files"], [])
             self.assertEqual(payload["removed_files"], [])
             self.assertEqual(payload["changed_files"], [])
-            self.assertEqual(payload["unchanged_count"], 19)
+            self.assertEqual(payload["unchanged_count"], 21)
             self.assertEqual(payload["old_ledger_ids"], ["oklo-ai-power", "leveraged-etf-discipline"])
             self.assertEqual(payload["new_ledger_ids"], payload["old_ledger_ids"])
             self.assertIn("- Status: unchanged", output.read_text())
@@ -2575,7 +2726,7 @@ class CliTests(unittest.TestCase):
             payload = json.loads(json_output.read_text())
             self.assertEqual(payload["status"], "changed")
             self.assertEqual(payload["changed_files"], ["portfolio.md"])
-            self.assertEqual(payload["unchanged_count"], 18)
+            self.assertEqual(payload["unchanged_count"], 20)
             self.assertIn("- portfolio.md", output.read_text())
 
     def test_diff_archive_reports_added_and_removed_files_from_manifest_and_summary(self) -> None:
@@ -2621,8 +2772,8 @@ class CliTests(unittest.TestCase):
             self.assertEqual(payload["added_files"], ["notes.md"])
             self.assertEqual(payload["removed_files"], ["watchlist.md"])
             self.assertEqual(payload["changed_files"], ["manifest.json"])
-            self.assertEqual(payload["old_file_count"], 19)
-            self.assertEqual(payload["new_file_count"], 19)
+            self.assertEqual(payload["old_file_count"], 21)
+            self.assertEqual(payload["new_file_count"], 21)
             markdown = output.read_text()
             self.assertIn("## Added Files\n\n- notes.md", markdown)
             self.assertIn("## Removed Files\n\n- watchlist.md", markdown)
@@ -2709,7 +2860,7 @@ class CliTests(unittest.TestCase):
             self.assertNotIn("<script", (output_dir / "index.html").read_text().lower())
             self.assertNotIn("@import", (output_dir / "style.css").read_text().lower())
             manifest = json.loads((output_dir / "manifest.json").read_text())
-            self.assertEqual(manifest["tool_version"], "1.7.4")
+            self.assertEqual(manifest["tool_version"], "1.8.0")
             self.assertEqual(manifest["ledger_ids"], ["oklo-ai-power", "leveraged-etf-discipline"])
             self.assertEqual(manifest["generated_files"], expected_files)
             self.assertNotIn("timestamp", manifest)
@@ -2905,7 +3056,7 @@ class CliTests(unittest.TestCase):
             self.assertEqual(second.returncode, 0, second.stderr)
             self.assertEqual(output_a.read_text(), output_b.read_text())
             payload = json.loads(output_a.read_text())
-            self.assertEqual(payload["ledger_version"], "1.7.4")
+            self.assertEqual(payload["ledger_version"], "1.8.0")
             self.assertEqual(payload["thesis_id"], "msft-thesis")
             self.assertEqual(payload["sources"][0]["id"], "S1")
             self.assertEqual(payload["assumptions"][0]["source_ids"], ["S1"])
@@ -3056,6 +3207,18 @@ class CliTests(unittest.TestCase):
                         str(temp_dir / "oklo-ai-power-exposure.json"),
                     ],
                     ["oklo-ai-power-exposure.md", "oklo-ai-power-exposure.json"],
+                ),
+                (
+                    "decision-review-pack",
+                    [
+                        "decision-review-pack",
+                        str(EXAMPLE),
+                        "--output",
+                        str(temp_dir / "oklo-ai-power-decision-review-pack.md"),
+                        "--json-output",
+                        str(temp_dir / "oklo-ai-power-decision-review-pack.json"),
+                    ],
+                    ["oklo-ai-power-decision-review-pack.md", "oklo-ai-power-decision-review-pack.json"],
                 ),
                 (
                     "decision-memo",

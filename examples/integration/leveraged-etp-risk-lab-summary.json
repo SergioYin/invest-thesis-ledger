@@ -1,0 +1,57 @@
+{
+  "artifact_type": "leveraged-etp-risk-lab-summary",
+  "artifact_version": "example-1",
+  "generated_by": "leveraged-etp-risk-lab",
+  "scope": "generic public example",
+  "as_of": "2026-05-12",
+  "instrument_profile": {
+    "ticker": "LEV2X",
+    "instrument_type": "leveraged exchange-traded product",
+    "target_daily_exposure": "2x",
+    "reference_asset": "generic equity index"
+  },
+  "risk_findings": [
+    {
+      "code": "DAILY_RESET_PATH_DEPENDENCE",
+      "severity": "high",
+      "summary": "Daily reset mechanics make multi-day outcomes path-dependent."
+    },
+    {
+      "code": "VOLATILITY_DRAG",
+      "severity": "high",
+      "summary": "Choppy markets can erode returns even when the reference asset is range-bound."
+    },
+    {
+      "code": "HOLDING_PERIOD_DISCIPLINE",
+      "severity": "medium",
+      "summary": "The trade record should state the intended holding period before entry."
+    },
+    {
+      "code": "EVENT_RISK",
+      "severity": "medium",
+      "summary": "Macro events and market closures can change gap and rebalance risk."
+    }
+  ],
+  "suggested_ledger_mapping": {
+    "sources": [
+      "Add the approved lab note as a source if it is part of the research record."
+    ],
+    "risks": [
+      "Map daily-reset, volatility-drag, and event-risk findings into source-backed risk records."
+    ],
+    "position_rules": [
+      "Map max size, holding period, stop-review, and event-avoidance rules into source-backed position rules."
+    ],
+    "checklist": [
+      "Keep pre-entry confirmation items open until reviewed."
+    ],
+    "reviews": [
+      "Record whether the lab output changes the latest policy or trade decision."
+    ]
+  },
+  "decision_review_pack_usage": {
+    "consume": "After mapping findings into the ledger, the packet will surface them through high risks, open position rules, checklist gaps, and review evidence.",
+    "complement": "Attach or co-locate this lab artifact with the packet when a reviewer needs leveraged ETP-specific mechanics beyond the ledger summary."
+  },
+  "non_advice_boundary": "Research organization example only; no buy, sell, or hold recommendation is made."
+}

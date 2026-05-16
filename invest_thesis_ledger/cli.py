@@ -20,6 +20,7 @@ from .render import (
     broker_matrix_payload,
     calendar_payload,
     compare_payload,
+    decision_review_pack_payload,
     decision_memo_payload,
     evidence_audit_payload,
     evidence_payload,
@@ -31,6 +32,7 @@ from .render import (
     render_brief,
     render_calendar,
     render_compare,
+    render_decision_review_pack,
     render_decision_memo,
     render_evidence,
     render_evidence_audit,
@@ -119,6 +121,15 @@ def build_parser() -> argparse.ArgumentParser:
     _add_ledger_arg(decision_memo)
     _add_output_args(decision_memo)
     decision_memo.set_defaults(func=_cmd_decision_memo)
+
+    decision_review_pack = subparsers.add_parser(
+        "decision-review-pack",
+        help="render a review-ready thesis packet",
+        description="render a review-ready thesis packet.",
+    )
+    _add_ledger_arg(decision_review_pack)
+    _add_output_args(decision_review_pack)
+    decision_review_pack.set_defaults(func=_cmd_decision_review_pack)
 
     scenario_plan = subparsers.add_parser(
         "scenario-plan",
@@ -339,6 +350,17 @@ def _cmd_decision_memo(args: argparse.Namespace) -> int:
         (
             (args.output, render_decision_memo),
             (args.json_output, lambda ledger: to_json(decision_memo_payload(ledger))),
+        ),
+    )
+
+
+def _cmd_decision_review_pack(args: argparse.Namespace) -> int:
+    provenance = _decision_review_cli_provenance(args)
+    return _render_validated(
+        args.ledger,
+        (
+            (args.output, lambda ledger: render_decision_review_pack(ledger, provenance=provenance)),
+            (args.json_output, lambda ledger: to_json(decision_review_pack_payload(ledger, provenance=provenance))),
         ),
     )
 
@@ -629,6 +651,40 @@ def _load_or_report(path: str) -> Optional[dict]:
     return None
 
 
+def _decision_review_cli_provenance(args: argparse.Namespace) -> Mapping[str, object]:
+    ledger = _portable_cli_path(args.ledger)
+    output = Path(args.output).name
+    json_output = Path(args.json_output).name
+    argv = [
+        "python",
+        "-m",
+        "invest_thesis_ledger",
+        "decision-review-pack",
+        ledger,
+        "--output",
+        output,
+        "--json-output",
+        json_output,
+    ]
+    return {
+        "workflow": "single-ledger decision-review-pack",
+        "command": " ".join(argv),
+        "argv": argv,
+        "input_ledger": ledger,
+        "markdown_output": output,
+        "json_output": json_output,
+    }
+
+
+def _portable_cli_path(path: str) -> str:
+    candidate = Path(path)
+    try:
+        resolved = candidate.resolve()
+        return resolved.relative_to(Path.cwd().resolve()).as_posix()
+    except ValueError:
+        return candidate.as_posix()
+
+
 def _load_validated_ledgers(paths: Sequence[str], command: str) -> tuple[Optional[list[dict]], int]:
     if len(paths) < 2:
         sys.stderr.write(f"error: {command} requires at least two ledger JSON files\n")
@@ -824,6 +880,7 @@ def _demo_bundle_files(ledgers: Sequence[dict]) -> list[tuple[str, str]]:
         ("brief", render_brief),
         ("risk", render_risk),
         ("history", render_history),
+        ("decision-review-pack", render_decision_review_pack),
         ("decision-memo", render_decision_memo),
         ("scenario-plan", render_scenario_plan),
     )
@@ -857,6 +914,7 @@ def _archive_files(ledgers: Sequence[dict]) -> list[tuple[str, str]]:
         ("brief", render_brief),
         ("risk", render_risk),
         ("history", render_history),
+        ("decision-review-pack", render_decision_review_pack),
         ("decision", render_decision_memo),
         ("scenario", render_scenario_plan),
     )

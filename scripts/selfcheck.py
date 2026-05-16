@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import re
 import subprocess
 import sys
 import tempfile
@@ -31,6 +32,8 @@ FIXTURE_OUTPUTS = [
     "oklo-ai-power-broker.json",
     "oklo-ai-power-exposure.md",
     "oklo-ai-power-exposure.json",
+    "oklo-ai-power-decision-review-pack.md",
+    "oklo-ai-power-decision-review-pack.json",
     "oklo-ai-power-decision-memo.md",
     "oklo-ai-power-decision-memo.json",
     "oklo-ai-power-scenario-plan.md",
@@ -51,11 +54,13 @@ FIXTURE_OUTPUTS = [
     "demo-bundle/oklo-ai-power-brief.md",
     "demo-bundle/oklo-ai-power-risk.md",
     "demo-bundle/oklo-ai-power-history.md",
+    "demo-bundle/oklo-ai-power-decision-review-pack.md",
     "demo-bundle/oklo-ai-power-decision-memo.md",
     "demo-bundle/oklo-ai-power-scenario-plan.md",
     "demo-bundle/leveraged-etf-discipline-brief.md",
     "demo-bundle/leveraged-etf-discipline-risk.md",
     "demo-bundle/leveraged-etf-discipline-history.md",
+    "demo-bundle/leveraged-etf-discipline-decision-review-pack.md",
     "demo-bundle/leveraged-etf-discipline-decision-memo.md",
     "demo-bundle/leveraged-etf-discipline-scenario-plan.md",
     "demo-bundle/portfolio-summary.md",
@@ -68,12 +73,14 @@ FIXTURE_OUTPUTS = [
     "archive/oklo-ai-power-brief.md",
     "archive/oklo-ai-power-risk.md",
     "archive/oklo-ai-power-history.md",
+    "archive/oklo-ai-power-decision-review-pack.md",
     "archive/oklo-ai-power-decision.md",
     "archive/oklo-ai-power-scenario.md",
     "archive/leveraged-etf-discipline.json",
     "archive/leveraged-etf-discipline-brief.md",
     "archive/leveraged-etf-discipline-risk.md",
     "archive/leveraged-etf-discipline-history.md",
+    "archive/leveraged-etf-discipline-decision-review-pack.md",
     "archive/leveraged-etf-discipline-decision.md",
     "archive/leveraged-etf-discipline-scenario.md",
     "archive/portfolio.md",
@@ -97,6 +104,7 @@ FIXTURE_OUTPUTS = [
 
 
 def main() -> int:
+    _check_package_metadata()
     with tempfile.TemporaryDirectory(prefix="invest-thesis-ledger-") as temp:
         temp_dir = Path(temp)
         for ledger in EXAMPLES:
@@ -189,6 +197,19 @@ def main() -> int:
                     str(temp_dir / f"{stem}-exposure.md"),
                     "--json-output",
                     str(temp_dir / f"{stem}-exposure.json"),
+                ]
+            )
+            _run(
+                [
+                    sys.executable,
+                    "-m",
+                    "invest_thesis_ledger",
+                    "decision-review-pack",
+                    str(ledger),
+                    "--output",
+                    str(temp_dir / f"{stem}-decision-review-pack.md"),
+                    "--json-output",
+                    str(temp_dir / f"{stem}-decision-review-pack.json"),
                 ]
             )
             _run(
@@ -379,6 +400,7 @@ def main() -> int:
                 str(temp_dir / "html-dashboard"),
             ]
         )
+        _check_decision_review_pack_determinism(temp_dir)
         _check_fixtures(temp_dir)
         _run([sys.executable, "-m", "unittest", "discover", "-s", str(ROOT / "tests")])
     print("selfcheck: ok")
@@ -387,6 +409,59 @@ def main() -> int:
 
 def _run(command: list[str]) -> None:
     subprocess.run(command, cwd=ROOT, check=True)
+
+
+def _check_package_metadata() -> None:
+    init_text = (ROOT / "invest_thesis_ledger" / "__init__.py").read_text(encoding="utf-8")
+    pyproject_text = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    docs_text = (ROOT / "docs" / "ledger-schema.md").read_text(encoding="utf-8")
+    changelog_text = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    init_version = _extract_version(init_text, r'__version__ = "([^"]+)"', "__init__.py")
+    pyproject_version = _extract_version(pyproject_text, r'^version = "([^"]+)"', "pyproject.toml")
+    if init_version != pyproject_version:
+        raise SystemExit(f"selfcheck: package version mismatch: {init_version} != {pyproject_version}")
+    required_markers = [
+        f"# Ledger Schema v{init_version}",
+        f"## {init_version} - ",
+        f'version = "{init_version}"',
+    ]
+    if required_markers[0] not in docs_text:
+        raise SystemExit("selfcheck: docs ledger schema version is not current")
+    if required_markers[1] not in changelog_text:
+        raise SystemExit("selfcheck: changelog does not contain current version")
+    if required_markers[2] not in pyproject_text:
+        raise SystemExit("selfcheck: pyproject version marker missing")
+
+
+def _extract_version(text: str, pattern: str, label: str) -> str:
+    match = re.search(pattern, text, flags=re.MULTILINE)
+    if match is None:
+        raise SystemExit(f"selfcheck: could not read version from {label}")
+    return match.group(1)
+
+
+def _check_decision_review_pack_determinism(temp_dir: Path) -> None:
+    first = temp_dir / "determinism-a"
+    second = temp_dir / "determinism-b"
+    first.mkdir()
+    second.mkdir()
+    for output_dir in (first, second):
+        _run(
+            [
+                sys.executable,
+                "-m",
+                "invest_thesis_ledger",
+                "decision-review-pack",
+                str(EXAMPLES[0]),
+                "--output",
+                str(output_dir / "decision-review-pack.md"),
+                "--json-output",
+                str(output_dir / "decision-review-pack.json"),
+            ]
+        )
+    for filename in ("decision-review-pack.md", "decision-review-pack.json"):
+        if (first / filename).read_text(encoding="utf-8") != (second / filename).read_text(encoding="utf-8"):
+            raise SystemExit(f"selfcheck: nondeterministic decision-review-pack artifact: {filename}")
 
 
 def _check_fixtures(temp_dir: Path) -> None:

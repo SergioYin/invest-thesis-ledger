@@ -2,7 +2,7 @@
 
 > This is a research organization tool, not investment advice.
 
-- Tool Version: 1.7.4
+- Tool Version: 1.8.0
 - Ledgers: 2
 
 ## Input Ledgers
@@ -18,11 +18,13 @@
 - [oklo-ai-power-brief.md](oklo-ai-power-brief.md)
 - [oklo-ai-power-risk.md](oklo-ai-power-risk.md)
 - [oklo-ai-power-history.md](oklo-ai-power-history.md)
+- [oklo-ai-power-decision-review-pack.md](oklo-ai-power-decision-review-pack.md)
 - [oklo-ai-power-decision-memo.md](oklo-ai-power-decision-memo.md)
 - [oklo-ai-power-scenario-plan.md](oklo-ai-power-scenario-plan.md)
 - [leveraged-etf-discipline-brief.md](leveraged-etf-discipline-brief.md)
 - [leveraged-etf-discipline-risk.md](leveraged-etf-discipline-risk.md)
 - [leveraged-etf-discipline-history.md](leveraged-etf-discipline-history.md)
+- [leveraged-etf-discipline-decision-review-pack.md](leveraged-etf-discipline-decision-review-pack.md)
 - [leveraged-etf-discipline-decision-memo.md](leveraged-etf-discipline-decision-memo.md)
 - [leveraged-etf-discipline-scenario-plan.md](leveraged-etf-discipline-scenario-plan.md)
 - [portfolio-summary.md](portfolio-summary.md)

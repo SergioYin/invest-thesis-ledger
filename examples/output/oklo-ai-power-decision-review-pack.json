@@ -1,0 +1,390 @@
+{
+  "asset": {
+    "name": "Oklo Inc.",
+    "ticker": "OKLO",
+    "type": "equity"
+  },
+  "command_provenance": {
+    "argv": [
+      "python",
+      "-m",
+      "invest_thesis_ledger",
+      "decision-review-pack",
+      "examples/oklo-ai-power.json",
+      "--output",
+      "oklo-ai-power-decision-review-pack.md",
+      "--json-output",
+      "oklo-ai-power-decision-review-pack.json"
+    ],
+    "command": "python -m invest_thesis_ledger decision-review-pack examples/oklo-ai-power.json --output oklo-ai-power-decision-review-pack.md --json-output oklo-ai-power-decision-review-pack.json",
+    "input_ledger": "examples/oklo-ai-power.json",
+    "json_output": "oklo-ai-power-decision-review-pack.json",
+    "markdown_output": "oklo-ai-power-decision-review-pack.md",
+    "workflow": "single-ledger decision-review-pack"
+  },
+  "evidence_freshness": {
+    "coverage": {
+      "source_count": 3,
+      "stale_source_count": 0,
+      "supported_items": 13,
+      "tracked_items": 13,
+      "unsupported_items": 0,
+      "unused_source_count": 0
+    },
+    "quality_score": 100,
+    "stale_sources": [],
+    "status": "fresh",
+    "unsupported_items": [],
+    "unused_sources": []
+  },
+  "next_review_questions": [
+    {
+      "id": "Q1",
+      "question": "Does the latest review decision still support the contemplated action?"
+    },
+    {
+      "id": "Q2",
+      "question": "Are all high-severity risks understood with current mitigation evidence?"
+    },
+    {
+      "id": "Q3",
+      "question": "Have open catalysts been checked for new source-backed status changes?"
+    },
+    {
+      "id": "Q4",
+      "question": "Do open position rules permit the proposed exposure?"
+    },
+    {
+      "id": "Q5",
+      "question": "Are stale, unused, or unsupported evidence gaps acceptable before action?"
+    },
+    {
+      "id": "Q6",
+      "question": "What evidence would falsify the action after execution?"
+    }
+  ],
+  "non_advice_boundary": {
+    "includes_market_data": false,
+    "research_only": true,
+    "text": "This packet organizes existing ledger data for review. It is not investment advice and does not recommend buying, selling, or holding any asset."
+  },
+  "review_evidence": {
+    "evidence_items": [
+      {
+        "id": "A1",
+        "source_ids": [
+          "S2"
+        ],
+        "support_status": "supported",
+        "type": "assumption"
+      },
+      {
+        "id": "A2",
+        "source_ids": [
+          "S1",
+          "S3"
+        ],
+        "support_status": "supported",
+        "type": "assumption"
+      },
+      {
+        "id": "B1",
+        "source_ids": [
+          "S1",
+          "S2"
+        ],
+        "support_status": "supported",
+        "type": "broker_view"
+      },
+      {
+        "id": "B2",
+        "source_ids": [
+          "S3"
+        ],
+        "support_status": "supported",
+        "type": "broker_view"
+      },
+      {
+        "id": "CAT1",
+        "source_ids": [
+          "S1",
+          "S2"
+        ],
+        "support_status": "supported",
+        "type": "catalyst"
+      },
+      {
+        "id": "CAT2",
+        "source_ids": [
+          "S3"
+        ],
+        "support_status": "supported",
+        "type": "catalyst"
+      },
+      {
+        "id": "CAT3",
+        "source_ids": [
+          "S1"
+        ],
+        "support_status": "supported",
+        "type": "catalyst"
+      },
+      {
+        "id": "P1",
+        "source_ids": [
+          "S3"
+        ],
+        "support_status": "supported",
+        "type": "position_rule"
+      },
+      {
+        "id": "P2",
+        "source_ids": [
+          "S1",
+          "S2"
+        ],
+        "support_status": "supported",
+        "type": "position_rule"
+      },
+      {
+        "id": "REV1:2026-05-12",
+        "source_ids": [
+          "S1",
+          "S2",
+          "S3"
+        ],
+        "support_status": "supported",
+        "type": "review"
+      },
+      {
+        "id": "REV2:2026-06-30",
+        "source_ids": [
+          "S1",
+          "S3"
+        ],
+        "support_status": "supported",
+        "type": "review"
+      },
+      {
+        "id": "R1",
+        "source_ids": [
+          "S3"
+        ],
+        "support_status": "supported",
+        "type": "risk"
+      },
+      {
+        "id": "R2",
+        "source_ids": [
+          "S1",
+          "S2"
+        ],
+        "support_status": "supported",
+        "type": "risk"
+      }
+    ],
+    "interpretation_notes": [
+      "Evidence is copied from ledger source references only; no market data or outside lookup was added.",
+      "Unsupported items are information gaps for a reviewer to resolve before relying on the packet."
+    ],
+    "source_index": [
+      {
+        "date": "2026-05-01",
+        "id": "S1",
+        "publisher": "Oklo",
+        "title": "Company investor presentation",
+        "url": "https://example.com/oklo-investor-presentation"
+      },
+      {
+        "date": "2026-04-20",
+        "id": "S2",
+        "publisher": "Grid Research Desk",
+        "title": "Electricity demand outlook",
+        "url": "https://example.com/electricity-demand-outlook"
+      },
+      {
+        "date": "2026-04-28",
+        "id": "S3",
+        "publisher": "Regulatory Monitor",
+        "title": "Nuclear licensing status note",
+        "url": "https://example.com/nuclear-licensing-status"
+      }
+    ]
+  },
+  "risks_and_catalysts": {
+    "all_catalysts": [
+      {
+        "date": "2026-08-15",
+        "id": "CAT2",
+        "source_ids": [
+          "S3"
+        ],
+        "status": "watch",
+        "title": "Material licensing update with a clear review timeline.",
+        "window": ""
+      },
+      {
+        "date": "",
+        "id": "CAT1",
+        "source_ids": [
+          "S1",
+          "S2"
+        ],
+        "status": "watch",
+        "title": "Signed commercial power purchase agreement with credible counterparty.",
+        "window": "2026-H2"
+      },
+      {
+        "date": "",
+        "id": "CAT3",
+        "source_ids": [
+          "S1"
+        ],
+        "status": "watch",
+        "title": "Capital raise or partnership that reduces funding risk.",
+        "window": "next financing update"
+      }
+    ],
+    "all_risks": [
+      {
+        "id": "R1",
+        "mitigation": "Require dated regulatory milestones before increasing conviction.",
+        "name": "Licensing delay",
+        "probability": "medium",
+        "severity": "high",
+        "source_ids": [
+          "S3"
+        ],
+        "tags": [
+          "regulatory",
+          "timeline"
+        ]
+      },
+      {
+        "id": "R2",
+        "mitigation": "Separate power-demand narrative from contracted revenue evidence.",
+        "name": "Narrative valuation",
+        "probability": "high",
+        "severity": "medium",
+        "source_ids": [
+          "S1",
+          "S2"
+        ],
+        "tags": [
+          "valuation",
+          "narrative"
+        ]
+      }
+    ],
+    "high_risks": [
+      {
+        "id": "R1",
+        "mitigation": "Require dated regulatory milestones before increasing conviction.",
+        "name": "Licensing delay",
+        "probability": "medium",
+        "severity": "high",
+        "source_ids": [
+          "S3"
+        ],
+        "tags": [
+          "regulatory",
+          "timeline"
+        ]
+      }
+    ],
+    "open_catalysts": [
+      {
+        "date": "2026-08-15",
+        "id": "CAT2",
+        "source_ids": [
+          "S3"
+        ],
+        "status": "watch",
+        "title": "Material licensing update with a clear review timeline.",
+        "window": ""
+      },
+      {
+        "date": "",
+        "id": "CAT1",
+        "source_ids": [
+          "S1",
+          "S2"
+        ],
+        "status": "watch",
+        "title": "Signed commercial power purchase agreement with credible counterparty.",
+        "window": "2026-H2"
+      },
+      {
+        "date": "",
+        "id": "CAT3",
+        "source_ids": [
+          "S1"
+        ],
+        "status": "watch",
+        "title": "Capital raise or partnership that reduces funding risk.",
+        "window": "next financing update"
+      }
+    ]
+  },
+  "thesis_id": "oklo-ai-power",
+  "thesis_status": {
+    "latest_review": {
+      "date": "2026-06-30",
+      "decision": "watch",
+      "drift": "Catalyst tracking added so future reviews separate power-demand validation from Oklo-specific execution evidence.",
+      "source_ids": [
+        "S1",
+        "S3"
+      ],
+      "summary": "Maintain watchlist status until catalysts move from narrative support to dated, source-backed milestones."
+    },
+    "next_action": "Review high-severity risks and update mitigation evidence.",
+    "review_priority": "high",
+    "review_reasons": [
+      {
+        "count": 1,
+        "items": [
+          "R1"
+        ],
+        "score": 3,
+        "text": "1 high-severity risk(s) need human review.",
+        "type": "high_severity_risks"
+      },
+      {
+        "count": 3,
+        "items": [
+          "CAT2",
+          "CAT1",
+          "CAT3"
+        ],
+        "score": 3,
+        "text": "3 upcoming or open catalyst(s) remain unresolved.",
+        "type": "upcoming_open_catalysts"
+      },
+      {
+        "count": 2,
+        "items": [
+          "C1",
+          "C2"
+        ],
+        "score": 2,
+        "text": "2 checklist item(s) remain open.",
+        "type": "open_checklist"
+      },
+      {
+        "count": 2,
+        "items": [
+          "P1",
+          "P2"
+        ],
+        "score": 2,
+        "text": "2 position rule(s) remain open.",
+        "type": "open_position_rules"
+      }
+    ],
+    "review_score": 10,
+    "status": "needs-review"
+  },
+  "title": "Oklo AI Power Demand Thesis",
+  "updated": "2026-05-12"
+}
