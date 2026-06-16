@@ -1436,7 +1436,6 @@ def _render_html_dashboard_index(
     links = "".join(f"<li><a href=\"{_ha(filename)}\">{_h(filename)}</a></li>" for filename in generated_files)
     content = [
         "<section class=\"summary\">",
-        "<p class=\"notice\">Research organization only. Not investment advice.</p>",
         f"<p>Tool version {_h(__version__)}. Ledgers: {len(ledgers)}.</p>",
         "</section>",
         "<section>",
@@ -1785,7 +1784,6 @@ def _render_html_action_plan_page(ledgers: Sequence[dict]) -> str:
     content = [
         "<nav><a href=\"index.html\">Index</a> <a href=\"portfolio.html\">Portfolio</a> <a href=\"evidence-audit.html\">Evidence Audit</a> <a href=\"watchlist.html\">Watchlist</a></nav>",
         "<section class=\"summary\">",
-        "<p class=\"notice\">Educational research organization only. Not investment advice. No market data included.</p>",
         f"<p>Ledgers: {summary['ledger_count']}. Ranked actions: {summary['action_count']}. "
         f"Now: {summary['now_count']}. This week: {summary['this_week_count']}. Watch: {summary['watch_count']}.</p>",
         "</section>",
@@ -1861,6 +1859,7 @@ def _html_page(title: str, heading: str, body: str) -> str:
             "<body>",
             "<main>",
             f"<h1>{_h(heading)}</h1>",
+            "<p class=\"notice\">Research organization only. Not investment advice. No market data included.</p>",
             body,
             "</main>",
             "</body>",

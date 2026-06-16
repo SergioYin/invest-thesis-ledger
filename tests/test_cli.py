@@ -2878,6 +2878,10 @@ class CliTests(unittest.TestCase):
             self.assertIn("<h1>Portfolio Evidence Audit</h1>", (output_dir / "evidence-audit.html").read_text())
             self.assertIn("<h2>Weekly Review List</h2>", (output_dir / "watchlist.html").read_text())
             self.assertIn("<h1>Weekly Action Plan</h1>", (output_dir / "action-plan.html").read_text())
+            for filename in expected_files:
+                if filename.endswith(".html"):
+                    text = (output_dir / filename).read_text()
+                    self.assertIn("Research organization only. Not investment advice. No market data included.", text)
             self.assertNotIn("<script", (output_dir / "index.html").read_text().lower())
             self.assertNotIn("@import", (output_dir / "style.css").read_text().lower())
             manifest = json.loads((output_dir / "manifest.json").read_text())

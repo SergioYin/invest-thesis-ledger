@@ -327,10 +327,10 @@ Run tests directly:
 python -m unittest discover -s tests
 ```
 
-If `pytest` is available, the tests are also compatible with:
+If `pytest` is available, run it through Python module execution:
 
 ```bash
-pytest
+python -m pytest
 ```
 
 ## Notes
