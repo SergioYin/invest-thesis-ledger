@@ -95,6 +95,27 @@ class CliTests(unittest.TestCase):
         self.assertIn(f"# Ledger Schema v{__version__}", docs)
         self.assertIn(f"## {__version__} - ", changelog)
 
+    def test_integration_walkthrough_links_and_public_boundary(self) -> None:
+        readme_path = ROOT / "examples" / "integration" / "README.md"
+        text = readme_path.read_text(encoding="utf-8")
+        for target in re.findall(r"\[[^\]]+\]\(([^)]+)\)", text):
+            if "://" in target or target.startswith("#"):
+                continue
+            resolved = (readme_path.parent / target).resolve()
+            self.assertTrue(resolved.is_relative_to(ROOT.resolve()), target)
+            self.assertTrue(resolved.exists(), target)
+
+        section = text.split("## Decision Review Pack Walkthrough", 1)[1].split("## Portfolio Risk Compass", 1)[0]
+        self.assertIn("python -m invest_thesis_ledger validate examples/oklo-ai-power.json", section)
+        self.assertIn("python -m invest_thesis_ledger decision-review-pack examples/oklo-ai-power.json", section)
+        self.assertIn("python -m invest_thesis_ledger demo-bundle examples/oklo-ai-power.json", section)
+        self.assertIn("python -m invest_thesis_ledger archive examples/oklo-ai-power.json", section)
+        self.assertIn("python -m invest_thesis_ledger verify-archive /tmp/invest-thesis-archive", section)
+        self.assertNotRegex(section, r"/home/|/Users/|[A-Za-z]:\\")
+        self.assertNotRegex(section.lower(), r"\b(secret|password|api[_ -]?key|private key)\b")
+        self.assertNotRegex(section.lower(), r"\b(buy|sell|hold) recommendation\b")
+        self.assertIn("not investment advice", text.lower())
+
     def test_command_help_describes_inputs_and_outputs(self) -> None:
         compare = self.run_cli("compare", "--help")
         self.assertEqual(compare.returncode, 0, compare.stderr)

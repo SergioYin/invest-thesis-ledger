@@ -10,6 +10,55 @@ companion artifacts that a reviewer can use to update ordinary ledger fields:
 After those fields are updated, `decision-review-pack` will include the new
 evidence through the existing ledger schema.
 
+## Decision Review Pack Walkthrough
+
+Start with the checked-in public example ledger and validate it:
+
+```bash
+python -m invest_thesis_ledger validate examples/oklo-ai-power.json
+```
+
+Render the single-ledger review packet to temporary paths:
+
+```bash
+python -m invest_thesis_ledger decision-review-pack examples/oklo-ai-power.json --output /tmp/oklo-review-pack.md --json-output /tmp/oklo-review-pack.json
+```
+
+Artifacts:
+
+- `/tmp/oklo-review-pack.md`: reviewer-facing Markdown packet
+- `/tmp/oklo-review-pack.json`: structured packet payload
+- [checked-in Markdown fixture](../output/oklo-ai-power-decision-review-pack.md)
+- [checked-in JSON fixture](../output/oklo-ai-power-decision-review-pack.json)
+
+For a public multi-ledger demo bundle:
+
+```bash
+python -m invest_thesis_ledger demo-bundle examples/oklo-ai-power.json examples/leveraged-etf-discipline.json --output-dir /tmp/invest-thesis-demo-bundle
+```
+
+Review `/tmp/invest-thesis-demo-bundle/index.md` first. The checked-in
+equivalent is [examples/output/demo-bundle/index.md](../output/demo-bundle/index.md),
+with per-ledger packet files listed in the bundle manifest.
+
+For a portable archive with verification metadata:
+
+```bash
+python -m invest_thesis_ledger archive examples/oklo-ai-power.json examples/leveraged-etf-discipline.json --output-dir /tmp/invest-thesis-archive
+python -m invest_thesis_ledger verify-archive /tmp/invest-thesis-archive
+```
+
+Review `/tmp/invest-thesis-archive/README.md`,
+`/tmp/invest-thesis-archive/manifest.json`, and
+`/tmp/invest-thesis-archive/archive-summary.json`. Checked-in equivalents are
+[examples/output/archive/README.md](../output/archive/README.md),
+[examples/output/archive/manifest.json](../output/archive/manifest.json), and
+[examples/output/archive/archive-summary.json](../output/archive/archive-summary.json).
+
+These outputs are deterministic research organization artifacts. They use
+ledger fields and generated file metadata only; they do not add market data,
+private paths, secrets, or buy/sell/hold recommendations.
+
 ## Portfolio Risk Compass
 
 [portfolio-risk-compass-summary.json](portfolio-risk-compass-summary.json) is a

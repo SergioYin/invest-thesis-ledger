@@ -6,6 +6,7 @@
 - Packets include thesis status, review score and drivers, review evidence, evidence freshness, risks/catalysts, next review questions, sources, command provenance, and an explicit non-advice/no-market-data boundary.
 - Added decision review pack artifacts to demo bundles and portable archives without adding workflows or dependencies.
 - Added optional generic integration notes and companion artifacts showing how decision-review-pack can consume or complement portfolio-risk-compass and leveraged-etp-risk-lab outputs through ordinary ledger fields without dependencies.
+- Added a public decision-review-pack walkthrough that validates the example ledger, renders single-ledger packets, builds the demo bundle, and verifies the portable archive.
 - Strengthened selfcheck/package audits and fixture tests for deterministic decision-review-pack artifacts.
 - Updated package/schema version, README, schema docs, tests, selfcheck, and checked-in fixtures for v1.8.0.
 

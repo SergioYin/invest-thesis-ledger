@@ -13,6 +13,8 @@ exit-code-2 reporting and compatibility with v0.1.0 through v1.7.4 ledgers.
 Optional public integration notes show how decision-review packs can use
 portfolio-risk-compass and leveraged-etp-risk-lab outputs through
 ordinary ledger fields, without adding dependencies.
+For the public decision-review-pack walkthrough, start with
+[examples/integration/README.md](examples/integration/README.md).
 
 This project is for research organization only. It is not investment advice,
 does not provide market data, and does not recommend buying, selling, or
