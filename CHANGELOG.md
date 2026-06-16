@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Added a deterministic public fixture hygiene guard to selfcheck for review dates after `ledger.updated`, missing not-investment-advice notices, and direct buy/sell/hold recommendation wording.
+- Updated the Oklo and leveraged ETF public fixtures so `ledger.updated` matches each latest review date.
+- Added regression coverage and README guidance for the fixture hygiene rules without adding dependencies, live data, broker APIs, secrets, or local paths.
+
 ## 1.8.0 - 2026-05-16
 
 - Added `decision-review-pack` for deterministic Markdown and JSON review-ready packets.

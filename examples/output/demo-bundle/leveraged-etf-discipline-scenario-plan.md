@@ -5,7 +5,7 @@
 ## Asset / Thesis
 
 - Ledger ID: leveraged-etf-discipline
-- Updated: 2026-05-12
+- Updated: 2026-05-19
 - Asset: LEV2X (Generic 2x Equity Index ETF)
 - Type: fund
 - Thesis: Leveraged ETFs can express short-term tactical views, but path dependency, volatility drag, and position sizing rules must dominate the decision process.

@@ -15,8 +15,8 @@
 
 | Rank | Score | Ticker | Ledger ID | Updated | Tracked | Unsupported | Unused Sources | Stale Sources |
 | ---: | ---: | --- | --- | --- | ---: | ---: | ---: | ---: |
-| 1 | 92 | OKLO | oklo-ai-power | 2026-05-12 | 15 | 2 | 0 | 0 |
-| 2 | 81 | LEV2X | leveraged-etf-discipline | 2026-05-12 | 13 | 4 | 0 | 0 |
+| 1 | 92 | OKLO | oklo-ai-power | 2026-06-30 | 15 | 2 | 0 | 0 |
+| 2 | 81 | LEV2X | leveraged-etf-discipline | 2026-05-19 | 13 | 4 | 0 | 0 |
 
 ## Field Coverage
 

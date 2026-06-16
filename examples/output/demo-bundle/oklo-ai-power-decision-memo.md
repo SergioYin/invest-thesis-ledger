@@ -5,7 +5,7 @@
 ## Asset / Thesis Snapshot
 
 - Ledger ID: oklo-ai-power
-- Updated: 2026-05-12
+- Updated: 2026-06-30
 - Asset: OKLO (Oklo Inc.)
 - Type: equity
 - Thesis: Advanced nuclear developers may benefit if AI data center demand increases the value of firm, clean power, but commercialization timing and regulatory execution remain the core constraints.

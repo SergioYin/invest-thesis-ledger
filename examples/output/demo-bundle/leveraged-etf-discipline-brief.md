@@ -8,7 +8,7 @@
 - Type: fund
 - Ticker: LEV2X
 - Ledger ID: leveraged-etf-discipline
-- Updated: 2026-05-12
+- Updated: 2026-05-19
 
 ## Thesis
 

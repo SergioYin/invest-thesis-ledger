@@ -3,7 +3,7 @@
 > This is a research organization tool, not investment advice.
 
 - Ledger ID: oklo-ai-power
-- Updated: 2026-05-12
+- Updated: 2026-06-30
 
 ## Coverage
 

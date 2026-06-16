@@ -1270,6 +1270,8 @@ def _render_archive_diff(payload: Mapping[str, object]) -> str:
     lines = [
         "# Archive Diff",
         "",
+        "> This is a research organization tool, not investment advice.",
+        "",
         f"- Status: {payload['status']}",
         f"- Old Tool Version: {payload['old_tool_version']}",
         f"- New Tool Version: {payload['new_tool_version']}",

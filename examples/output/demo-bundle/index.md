@@ -9,8 +9,8 @@
 
 | Ticker | Title | Ledger ID | Updated |
 | --- | --- | --- | --- |
-| OKLO | Oklo AI Power Demand Thesis | oklo-ai-power | 2026-05-12 |
-| LEV2X | Leveraged ETF Discipline Ledger | leveraged-etf-discipline | 2026-05-12 |
+| OKLO | Oklo AI Power Demand Thesis | oklo-ai-power | 2026-06-30 |
+| LEV2X | Leveraged ETF Discipline Ledger | leveraged-etf-discipline | 2026-05-19 |
 
 ## Bundle Files
 

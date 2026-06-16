@@ -4,7 +4,7 @@
 
 - Ledger ID: leveraged-etf-discipline
 - Created: 2026-05-12
-- Updated: 2026-05-12
+- Updated: 2026-05-19
 
 ## Timeline
 

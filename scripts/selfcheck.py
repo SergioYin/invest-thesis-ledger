@@ -11,6 +11,10 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+from invest_thesis_ledger.hygiene import public_fixture_hygiene_issues
+
 EXAMPLES = [
     ROOT / "examples" / "oklo-ai-power.json",
     ROOT / "examples" / "leveraged-etf-discipline.json",
@@ -105,6 +109,7 @@ FIXTURE_OUTPUTS = [
 
 def main() -> int:
     _check_package_metadata()
+    _check_public_fixture_hygiene()
     with tempfile.TemporaryDirectory(prefix="invest-thesis-ledger-") as temp:
         temp_dir = Path(temp)
         for ledger in EXAMPLES:
@@ -431,6 +436,12 @@ def _check_package_metadata() -> None:
         raise SystemExit("selfcheck: changelog does not contain current version")
     if required_markers[2] not in pyproject_text:
         raise SystemExit("selfcheck: pyproject version marker missing")
+
+
+def _check_public_fixture_hygiene() -> None:
+    issues = public_fixture_hygiene_issues(ROOT)
+    if issues:
+        raise SystemExit("selfcheck: public fixture hygiene failed:\n" + "\n".join(issues))
 
 
 def _extract_version(text: str, pattern: str, label: str) -> str:

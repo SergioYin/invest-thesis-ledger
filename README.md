@@ -48,6 +48,17 @@ invest-thesis-ledger --version
 
 No runtime dependencies are required.
 
+## Public Fixture Hygiene
+
+Public fixtures are checked by `python scripts/selfcheck.py`. The deterministic
+hygiene guard fails when a ledger review date is after that ledger's `updated`
+date, when generated public Markdown/HTML lacks a not-investment-advice notice,
+or when generated public text contains direct buy/sell/hold recommendation
+wording. Neutral "does not recommend" notices are allowed, but they do not
+waive direct personal action wording on the same line. The guard uses only
+checked-in fixture content and ledger dates; it does not read live data, broker
+APIs, local paths, secrets, or the current date.
+
 ## Cold-User Quickstart
 
 From a fresh checkout, run the checked-in example through validation and the

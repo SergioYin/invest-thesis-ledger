@@ -11,8 +11,8 @@
 
 | Priority | Score | Ticker | Ledger ID | Updated | Next Action |
 | --- | ---: | --- | --- | --- | --- |
-| high | 13 | LEV2X | leveraged-etf-discipline | 2026-05-12 | Review high-severity risks and update mitigation evidence. |
-| high | 10 | OKLO | oklo-ai-power | 2026-05-12 | Review high-severity risks and update mitigation evidence. |
+| high | 13 | LEV2X | leveraged-etf-discipline | 2026-05-19 | Review high-severity risks and update mitigation evidence. |
+| high | 10 | OKLO | oklo-ai-power | 2026-06-30 | Review high-severity risks and update mitigation evidence. |
 
 ## Reasons
 

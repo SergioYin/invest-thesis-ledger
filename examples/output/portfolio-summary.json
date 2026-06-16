@@ -6,7 +6,7 @@
       "ticker": "LEV2X",
       "title": "Leveraged ETF Discipline Ledger",
       "type": "fund",
-      "updated": "2026-05-12"
+      "updated": "2026-05-19"
     },
     {
       "name": "Oklo Inc.",
@@ -14,7 +14,7 @@
       "ticker": "OKLO",
       "title": "Oklo AI Power Demand Thesis",
       "type": "equity",
-      "updated": "2026-05-12"
+      "updated": "2026-06-30"
     }
   ],
   "broker_rating_counts": {

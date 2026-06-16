@@ -16,6 +16,7 @@ from pathlib import Path
 from invest_thesis_ledger import cli as cli_module
 from invest_thesis_ledger import __version__
 from invest_thesis_ledger.cli import _write_demo_bundle_dir
+from invest_thesis_ledger.hygiene import public_fixture_hygiene_issues
 from invest_thesis_ledger.render import (
     action_plan_payload,
     decision_review_pack_payload,
@@ -115,6 +116,56 @@ class CliTests(unittest.TestCase):
         self.assertNotRegex(section.lower(), r"\b(secret|password|api[_ -]?key|private key)\b")
         self.assertNotRegex(section.lower(), r"\b(buy|sell|hold) recommendation\b")
         self.assertIn("not investment advice", text.lower())
+
+    def test_public_fixture_hygiene_rejects_future_dated_reviews(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            examples_dir = root / "examples"
+            examples_dir.mkdir()
+            data = json.loads(EXAMPLE.read_text(encoding="utf-8"))
+            data["updated"] = "2026-05-12"
+            data["reviews"] = [
+                {
+                    "date": "2026-06-30",
+                    "decision": "watch",
+                    "summary": "Future review.",
+                    "source_ids": ["S1"],
+                }
+            ]
+            (examples_dir / "ledger.json").write_text(json.dumps(data), encoding="utf-8")
+
+            issues = public_fixture_hygiene_issues(root)
+
+            self.assertEqual(
+                issues,
+                ["examples/ledger.json: reviews[0].date 2026-06-30 is after ledger.updated 2026-05-12"],
+            )
+
+    def test_public_fixture_hygiene_rejects_advice_wording_and_missing_notice(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            output_dir = root / "examples" / "output"
+            output_dir.mkdir(parents=True)
+            (output_dir / "bad.md").write_text("# Bad\n\nYou should buy this asset.\n", encoding="utf-8")
+            (output_dir / "mixed.md").write_text(
+                "# Mixed\n\nNot investment advice. You should sell this asset. This does not recommend selling.\n",
+                encoding="utf-8",
+            )
+            (output_dir / "neutral.md").write_text(
+                "# Neutral\n\nNot investment advice. This does not recommend buying, selling, or holding any asset.\n",
+                encoding="utf-8",
+            )
+
+            issues = public_fixture_hygiene_issues(root)
+
+            self.assertEqual(
+                issues,
+                [
+                    "examples/output/bad.md: missing not-investment-advice notice",
+                    "examples/output/bad.md:3: contains buy/sell/hold recommendation wording",
+                    "examples/output/mixed.md:3: contains buy/sell/hold recommendation wording",
+                ],
+            )
 
     def test_command_help_describes_inputs_and_outputs(self) -> None:
         compare = self.run_cli("compare", "--help")

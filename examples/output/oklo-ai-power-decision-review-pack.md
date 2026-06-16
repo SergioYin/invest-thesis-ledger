@@ -5,7 +5,7 @@
 ## Thesis Status
 
 - Ledger ID: oklo-ai-power
-- Updated: 2026-05-12
+- Updated: 2026-06-30
 - Asset: OKLO (Oklo Inc.)
 - Type: equity
 - Status: needs-review

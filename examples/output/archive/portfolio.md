@@ -9,8 +9,8 @@
 
 | Ticker | Name | Type | Ledger ID | Updated |
 | --- | --- | --- | --- | --- |
-| LEV2X | Generic 2x Equity Index ETF | fund | leveraged-etf-discipline | 2026-05-12 |
-| OKLO | Oklo Inc. | equity | oklo-ai-power | 2026-05-12 |
+| LEV2X | Generic 2x Equity Index ETF | fund | leveraged-etf-discipline | 2026-05-19 |
+| OKLO | Oklo Inc. | equity | oklo-ai-power | 2026-06-30 |
 
 ## Risk Severity Counts
 

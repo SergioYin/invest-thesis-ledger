@@ -3,7 +3,7 @@
 > This is a research organization tool, not investment advice.
 
 - Ledger ID: leveraged-etf-discipline
-- Updated: 2026-05-12
+- Updated: 2026-05-19
 
 ## Risks
 

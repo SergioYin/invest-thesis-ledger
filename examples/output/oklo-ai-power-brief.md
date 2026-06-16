@@ -8,7 +8,7 @@
 - Type: equity
 - Ticker: OKLO
 - Ledger ID: oklo-ai-power
-- Updated: 2026-05-12
+- Updated: 2026-06-30
 
 ## Thesis
 

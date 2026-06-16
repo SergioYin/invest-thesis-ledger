@@ -1,5 +1,7 @@
 # Archive Diff
 
+> This is a research organization tool, not investment advice.
+
 - Status: unchanged
 - Old Tool Version: 1.8.0
 - New Tool Version: 1.8.0

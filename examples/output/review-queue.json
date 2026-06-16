@@ -52,7 +52,7 @@
       "thesis_id": "leveraged-etf-discipline",
       "ticker": "LEV2X",
       "title": "Leveraged ETF Discipline Ledger",
-      "updated": "2026-05-12"
+      "updated": "2026-05-19"
     },
     {
       "asset_name": "Oklo Inc.",
@@ -105,7 +105,7 @@
       "thesis_id": "oklo-ai-power",
       "ticker": "OKLO",
       "title": "Oklo AI Power Demand Thesis",
-      "updated": "2026-05-12"
+      "updated": "2026-06-30"
     }
   ],
   "queue": {

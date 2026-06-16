@@ -5,7 +5,7 @@
 ## Thesis Status
 
 - Ledger ID: leveraged-etf-discipline
-- Updated: 2026-05-12
+- Updated: 2026-05-19
 - Asset: LEV2X (Generic 2x Equity Index ETF)
 - Type: fund
 - Status: needs-review
