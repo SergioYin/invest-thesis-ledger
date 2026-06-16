@@ -8,6 +8,7 @@ import hashlib
 import html
 import json
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -15,6 +16,7 @@ from pathlib import Path
 from typing import Callable, Mapping, Optional, Sequence
 
 from . import __version__
+from .hygiene import public_fixture_hygiene_issues
 from .render import (
     action_plan_payload,
     broker_matrix_payload,
@@ -225,6 +227,14 @@ def build_parser() -> argparse.ArgumentParser:
     html_dashboard.add_argument("ledgers", metavar="LEDGER", nargs="+", help="ledger JSON file")
     html_dashboard.add_argument("--output-dir", required=True, metavar="DIR", help="write static HTML dashboard to DIR")
     html_dashboard.set_defaults(func=_cmd_html_dashboard)
+
+    quickstart_receipt = subparsers.add_parser(
+        "quickstart-receipt",
+        help="write a deterministic cold-reviewer quickstart receipt",
+        description="write a deterministic cold-reviewer quickstart receipt.",
+    )
+    _add_output_args(quickstart_receipt)
+    quickstart_receipt.set_defaults(func=_cmd_quickstart_receipt)
 
     init_template = subparsers.add_parser("init-template", help="create a deterministic starter ledger")
     init_template.add_argument("--asset", required=True, metavar="TICKER", help="asset ticker or symbol")
@@ -612,6 +622,27 @@ def _cmd_html_dashboard(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_quickstart_receipt(args: argparse.Namespace) -> int:
+    try:
+        payload = _quickstart_receipt_payload()
+    except OSError as exc:
+        sys.stderr.write(f"error: cannot build quickstart receipt: {exc}\n")
+        return 2
+    except ValueError as exc:
+        sys.stderr.write(f"error: cannot build quickstart receipt: {exc}\n")
+        return 1
+    status = _write_text_outputs(
+        (
+            (args.output, _render_quickstart_receipt(payload)),
+            (args.json_output, to_json(payload)),
+        )
+    )
+    if status:
+        return status
+    sys.stdout.write(f"wrote: {args.output}, {args.json_output}\n")
+    return 0
+
+
 def _cmd_init_template(args: argparse.Namespace) -> int:
     ledger = _starter_ledger(args.asset, args.name, args.type)
     status = _write_text_outputs(((args.output, to_json(ledger)),))
@@ -674,6 +705,239 @@ def _decision_review_cli_provenance(args: argparse.Namespace) -> Mapping[str, ob
         "markdown_output": output,
         "json_output": json_output,
     }
+
+
+def _quickstart_receipt_payload() -> dict:
+    root = Path(__file__).resolve().parents[1]
+    oklo_path = root / "examples" / "oklo-ai-power.json"
+    etf_path = root / "examples" / "leveraged-etf-discipline.json"
+    oklo = load_ledger(str(oklo_path))
+    etf = load_ledger(str(etf_path))
+    ledgers = [oklo, etf]
+    for ledger in ledgers:
+        errors, warnings = validate_ledger(ledger)
+        if errors:
+            raise ValueError(validation_summary(ledger, errors, warnings))
+
+    quickstart_commands = [
+        "python -m invest_thesis_ledger validate examples/oklo-ai-power.json",
+        "python -m invest_thesis_ledger decision-review-pack examples/oklo-ai-power.json "
+        "--output examples/output/oklo-ai-power-decision-review-pack.md "
+        "--json-output examples/output/oklo-ai-power-decision-review-pack.json",
+        "python -m invest_thesis_ledger review-queue examples/oklo-ai-power.json "
+        "examples/leveraged-etf-discipline.json --output examples/output/review-queue.md "
+        "--json-output examples/output/review-queue.json",
+        "python -m invest_thesis_ledger html-dashboard examples/oklo-ai-power.json "
+        "examples/leveraged-etf-discipline.json --output-dir examples/output/html-dashboard",
+        "python -m invest_thesis_ledger quickstart-receipt "
+        "--output examples/output/quickstart-receipt.md "
+        "--json-output examples/output/quickstart-receipt.json",
+    ]
+    artifacts = _quickstart_receipt_artifacts(ledgers)
+    fixture_inputs = [
+        _quickstart_input(root, oklo_path),
+        _quickstart_input(root, etf_path),
+    ]
+    boundaries = {
+        "no_live_market_data": True,
+        "no_broker_connection": True,
+        "no_account_data": True,
+        "no_orders": True,
+        "no_trading_execution": True,
+        "not_investment_advice": True,
+        "text": (
+            "This receipt is for deterministic research organization only. It uses checked-in fixture ledgers "
+            "and generated local artifacts, does not fetch live market data, does not connect to broker or "
+            "account systems, does not place orders or execute trades, and is not investment advice."
+        ),
+    }
+    hygiene_issues = public_fixture_hygiene_issues(root)
+    receipt_text_for_static_checks = _quickstart_receipt_static_text(
+        quickstart_commands,
+        fixture_inputs,
+        artifacts,
+        boundaries,
+    )
+    return {
+        "receipt": {
+            "workflow": "cold-reviewer quickstart receipt",
+            "tool_version": __version__,
+            "deterministic": True,
+            "zero_dependencies": True,
+        },
+        "quickstart_commands": quickstart_commands,
+        "fixture_inputs": fixture_inputs,
+        "generated_artifacts": artifacts,
+        "hygiene_checks": {
+            "public_fixture_hygiene": _check_result(not hygiene_issues, hygiene_issues),
+            "stale_review_date": _check_result(
+                not any("is after ledger.updated" in issue for issue in hygiene_issues),
+                [issue for issue in hygiene_issues if "is after ledger.updated" in issue],
+            ),
+            "not_investment_advice_notice": _check_result(
+                not any("missing not-investment-advice notice" in issue for issue in hygiene_issues),
+                [issue for issue in hygiene_issues if "missing not-investment-advice notice" in issue],
+            ),
+            "advice_wording": _check_result(
+                not any("recommendation wording" in issue for issue in hygiene_issues),
+                [issue for issue in hygiene_issues if "recommendation wording" in issue],
+            ),
+            "portable_paths": _check_result(not _has_private_path(receipt_text_for_static_checks), []),
+            "secret_terms": _check_result(not _has_secret_term(receipt_text_for_static_checks), []),
+        },
+        "boundaries": boundaries,
+    }
+
+
+def _quickstart_receipt_artifacts(ledgers: Sequence[dict]) -> list[dict]:
+    oklo = ledgers[0]
+    review_provenance = {
+        "workflow": "single-ledger decision-review-pack",
+        "command": (
+            "python -m invest_thesis_ledger decision-review-pack examples/oklo-ai-power.json "
+            "--output oklo-ai-power-decision-review-pack.md "
+            "--json-output oklo-ai-power-decision-review-pack.json"
+        ),
+        "argv": [
+            "python",
+            "-m",
+            "invest_thesis_ledger",
+            "decision-review-pack",
+            "examples/oklo-ai-power.json",
+            "--output",
+            "oklo-ai-power-decision-review-pack.md",
+            "--json-output",
+            "oklo-ai-power-decision-review-pack.json",
+        ],
+        "input_ledger": "examples/oklo-ai-power.json",
+        "markdown_output": "oklo-ai-power-decision-review-pack.md",
+        "json_output": "oklo-ai-power-decision-review-pack.json",
+    }
+    generated = [
+        (
+            "examples/output/oklo-ai-power-decision-review-pack.md",
+            render_decision_review_pack(oklo, provenance=review_provenance),
+            "review",
+        ),
+        (
+            "examples/output/oklo-ai-power-decision-review-pack.json",
+            to_json(decision_review_pack_payload(oklo, provenance=review_provenance)),
+            "review",
+        ),
+        ("examples/output/review-queue.md", render_review_queue(ledgers), "review"),
+        ("examples/output/review-queue.json", to_json(review_queue_payload(ledgers)), "review"),
+    ]
+    generated.extend(
+        (f"examples/output/html-dashboard/{filename}", text, "dashboard")
+        for filename, text in _html_dashboard_files(ledgers)
+    )
+    return [
+        {
+            "path": path,
+            "kind": kind,
+            "bytes": len(text.encode("utf-8")),
+            "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+        }
+        for path, text, kind in sorted(generated, key=lambda item: item[0])
+    ]
+
+
+def _quickstart_input(root: Path, path: Path) -> dict:
+    text = path.read_text(encoding="utf-8")
+    return {
+        "path": path.relative_to(root).as_posix(),
+        "bytes": len(text.encode("utf-8")),
+        "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+    }
+
+
+def _quickstart_receipt_static_text(
+    commands: Sequence[str],
+    fixture_inputs: Sequence[Mapping[str, object]],
+    artifacts: Sequence[Mapping[str, object]],
+    boundaries: Mapping[str, object],
+) -> str:
+    fields = list(commands)
+    for item in fixture_inputs:
+        fields.extend(str(item[key]) for key in ("path", "sha256"))
+    for item in artifacts:
+        fields.extend(str(item[key]) for key in ("path", "sha256"))
+    fields.append(str(boundaries["text"]))
+    return "\n".join(fields)
+
+
+def _check_result(passed: bool, issues: Sequence[str]) -> dict:
+    return {"status": "pass" if passed else "fail", "issues": list(issues)}
+
+
+def _has_private_path(text: str) -> bool:
+    return bool(re.search(r"/home/|/Users/|[A-Za-z]:\\", text))
+
+
+def _has_secret_term(text: str) -> bool:
+    return bool(re.search(r"\b(secret|password|api[_ -]?key|private key)\b", text, re.IGNORECASE))
+
+
+def _render_quickstart_receipt(payload: Mapping[str, object]) -> str:
+    receipt = payload["receipt"]
+    assert isinstance(receipt, Mapping)
+    lines = [
+        "# Cold-Reviewer Quickstart Receipt",
+        "",
+        "> This is a research organization tool, not investment advice.",
+        "",
+        f"- Workflow: {_receipt_inline(receipt['workflow'])}",
+        f"- Tool version: {_receipt_inline(receipt['tool_version'])}",
+        f"- Deterministic: {_receipt_bool(receipt['deterministic'])}",
+        f"- Zero dependencies: {_receipt_bool(receipt['zero_dependencies'])}",
+        "",
+        "## Exact Quickstart Commands",
+        "",
+    ]
+    for command in payload["quickstart_commands"]:
+        lines.append(f"- `{command}`")
+    lines.extend(["", "## Static Fixture Inputs", ""])
+    for item in payload["fixture_inputs"]:
+        lines.append(
+            f"- `{item['path']}` ({item['bytes']} bytes; sha256 `{item['sha256']}`)"
+        )
+    lines.extend(["", "## Generated Dashboard and Review Outputs", ""])
+    lines.extend(["| Path | Kind | Bytes | SHA-256 |", "| --- | --- | ---: | --- |"])
+    for item in payload["generated_artifacts"]:
+        lines.append(
+            f"| `{item['path']}` | {_receipt_inline(item['kind'])} | {item['bytes']} | `{item['sha256']}` |"
+        )
+    lines.extend(["", "## Hygiene Checks", ""])
+    for name, result in payload["hygiene_checks"].items():
+        lines.append(f"- {_receipt_inline(name)}: {_receipt_inline(result['status'])}")
+        for issue in result["issues"]:
+            lines.append(f"  - {_receipt_inline(issue)}")
+    boundaries = payload["boundaries"]
+    assert isinstance(boundaries, Mapping)
+    lines.extend(
+        [
+            "",
+            "## Boundaries",
+            "",
+            f"- No live market data: {_receipt_bool(boundaries['no_live_market_data'])}",
+            f"- No broker connection: {_receipt_bool(boundaries['no_broker_connection'])}",
+            f"- No account data: {_receipt_bool(boundaries['no_account_data'])}",
+            f"- No orders: {_receipt_bool(boundaries['no_orders'])}",
+            f"- No trading execution: {_receipt_bool(boundaries['no_trading_execution'])}",
+            f"- Not investment advice: {_receipt_bool(boundaries['not_investment_advice'])}",
+            "",
+            _receipt_inline(boundaries["text"]),
+        ]
+    )
+    return "\n".join(lines) + "\n"
+
+
+def _receipt_bool(value: object) -> str:
+    return "yes" if value is True else "no"
+
+
+def _receipt_inline(value: object) -> str:
+    return str(value).replace("\n", " ").replace("|", "\\|").replace("[", "\\[").replace("]", "\\]")
 
 
 def _portable_cli_path(path: str) -> str:

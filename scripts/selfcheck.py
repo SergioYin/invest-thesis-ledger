@@ -54,6 +54,8 @@ FIXTURE_OUTPUTS = [
     "watchlist.json",
     "action-plan.md",
     "action-plan.json",
+    "quickstart-receipt.md",
+    "quickstart-receipt.json",
     "demo-bundle/index.md",
     "demo-bundle/oklo-ai-power-brief.md",
     "demo-bundle/oklo-ai-power-risk.md",
@@ -352,6 +354,18 @@ def main() -> int:
                 str(temp_dir / "action-plan.md"),
                 "--json-output",
                 str(temp_dir / "action-plan.json"),
+            ]
+        )
+        _run(
+            [
+                sys.executable,
+                "-m",
+                "invest_thesis_ledger",
+                "quickstart-receipt",
+                "--output",
+                str(temp_dir / "quickstart-receipt.md"),
+                "--json-output",
+                str(temp_dir / "quickstart-receipt.json"),
             ]
         )
         _run(

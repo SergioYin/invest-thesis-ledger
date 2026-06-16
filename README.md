@@ -83,6 +83,14 @@ For multi-ledger review, start with the generated demo bundle index at
 [examples/output/demo-bundle/index.md](examples/output/demo-bundle/index.md) or
 the portable archive index at
 [examples/output/archive/README.md](examples/output/archive/README.md).
+For a cold-reviewer receipt with exact reproduction commands, static fixture
+inputs, generated review/dashboard hashes, stale-date and non-advice hygiene
+checks, and explicit no-live-data/no-broker/no-account/no-order boundaries,
+run:
+
+```bash
+python -m invest_thesis_ledger quickstart-receipt --output quickstart-receipt.md --json-output quickstart-receipt.json
+```
 
 ## Commands
 
@@ -234,6 +242,12 @@ Write a static deterministic no-JS HTML dashboard:
 python -m invest_thesis_ledger html-dashboard examples/oklo-ai-power.json examples/leveraged-etf-discipline.json --output-dir html-dashboard
 ```
 
+Write a deterministic cold-reviewer quickstart receipt:
+
+```bash
+python -m invest_thesis_ledger quickstart-receipt --output quickstart-receipt.md --json-output quickstart-receipt.json
+```
+
 Create a deterministic starter ledger:
 
 ```bash
@@ -311,6 +325,8 @@ Checked-in deterministic CLI output fixtures are available under
 - [portable archive SHA-256 summary](examples/output/archive/archive-summary.json)
 - [HTML dashboard index](examples/output/html-dashboard/index.html)
 - [HTML dashboard manifest](examples/output/html-dashboard/manifest.json)
+- [quickstart receipt Markdown](examples/output/quickstart-receipt.md)
+- [quickstart receipt JSON](examples/output/quickstart-receipt.json)
 
 Additional single-command fixtures include brief, risk, history, calendar,
 evidence, broker matrix, exposure, decision memo, scenario plan, drift,
