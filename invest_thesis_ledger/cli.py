@@ -51,6 +51,7 @@ from .render import (
     to_json,
     watchlist_payload,
 )
+from .review_walkthrough import decision_review_walkthrough_payload, render_decision_review_walkthrough
 from .schema import load_ledger, validate_ledger, validation_summary
 
 
@@ -235,6 +236,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_output_args(quickstart_receipt)
     quickstart_receipt.set_defaults(func=_cmd_quickstart_receipt)
+
+    review_walkthrough = subparsers.add_parser(
+        "decision-review-walkthrough",
+        help="write a deterministic decision review walkthrough from demo fixtures",
+        description="write a deterministic decision review walkthrough from demo fixtures.",
+    )
+    _add_output_args(review_walkthrough)
+    review_walkthrough.set_defaults(func=_cmd_decision_review_walkthrough)
 
     init_template = subparsers.add_parser("init-template", help="create a deterministic starter ledger")
     init_template.add_argument("--asset", required=True, metavar="TICKER", help="asset ticker or symbol")
@@ -634,6 +643,27 @@ def _cmd_quickstart_receipt(args: argparse.Namespace) -> int:
     status = _write_text_outputs(
         (
             (args.output, _render_quickstart_receipt(payload)),
+            (args.json_output, to_json(payload)),
+        )
+    )
+    if status:
+        return status
+    sys.stdout.write(f"wrote: {args.output}, {args.json_output}\n")
+    return 0
+
+
+def _cmd_decision_review_walkthrough(args: argparse.Namespace) -> int:
+    try:
+        payload = decision_review_walkthrough_payload()
+    except OSError as exc:
+        sys.stderr.write(f"error: cannot build decision review walkthrough: {exc}\n")
+        return 2
+    except ValueError as exc:
+        sys.stderr.write(f"error: cannot build decision review walkthrough: {exc}\n")
+        return 1
+    status = _write_text_outputs(
+        (
+            (args.output, render_decision_review_walkthrough(payload)),
             (args.json_output, to_json(payload)),
         )
     )

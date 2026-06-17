@@ -31,6 +31,20 @@ Artifacts:
 - [checked-in Markdown fixture](../output/oklo-ai-power-decision-review-pack.md)
 - [checked-in JSON fixture](../output/oklo-ai-power-decision-review-pack.json)
 
+Render the checked-in public walkthrough when you need one artifact that shows
+validation, evidence output, review packet output, review queue output, fixture
+hashes, generated artifact hashes, stale-date hygiene, public hygiene checks,
+and explicit non-advice/no-live-data/no-broker boundaries:
+
+```bash
+python -m invest_thesis_ledger decision-review-walkthrough --output /tmp/decision-review-walkthrough.md --json-output /tmp/decision-review-walkthrough.json
+```
+
+Checked-in equivalents are
+[examples/output/decision-review-walkthrough.md](../output/decision-review-walkthrough.md)
+and
+[examples/output/decision-review-walkthrough.json](../output/decision-review-walkthrough.json).
+
 For a public multi-ledger demo bundle:
 
 ```bash
@@ -95,6 +109,8 @@ The checked-in review packet examples generated from ordinary ledger fields are:
 
 - [Oklo decision review pack Markdown](../output/oklo-ai-power-decision-review-pack.md)
 - [Oklo decision review pack JSON](../output/oklo-ai-power-decision-review-pack.json)
+- [Decision review walkthrough Markdown](../output/decision-review-walkthrough.md)
+- [Decision review walkthrough JSON](../output/decision-review-walkthrough.json)
 - [Demo bundle index with per-ledger packets](../output/demo-bundle/index.md)
 - [Portable archive README with per-ledger packets](../output/archive/README.md)
 

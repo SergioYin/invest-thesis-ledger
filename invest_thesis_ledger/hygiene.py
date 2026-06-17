@@ -6,7 +6,7 @@ import json
 import re
 from datetime import date
 from pathlib import Path
-from typing import Any, Iterable, Mapping
+from typing import Any, Iterable, Mapping, Optional, Union
 
 
 PUBLIC_TEXT_NOTICE = "not investment advice"
@@ -32,7 +32,7 @@ NEUTRAL_RECOMMENDATION_CONTEXTS = (
 )
 
 
-def public_fixture_hygiene_issues(root: str | Path) -> list[str]:
+def public_fixture_hygiene_issues(root: Union[str, Path]) -> list[str]:
     """Return deterministic public fixture hygiene issues under *root*."""
 
     root_path = Path(root)
@@ -87,7 +87,7 @@ def _review_date_issues(root: Path, path: Path, ledger: Mapping[str, Any]) -> li
     return issues
 
 
-def _parse_iso_date(value: str) -> date | None:
+def _parse_iso_date(value: str) -> Optional[date]:
     try:
         return date.fromisoformat(value)
     except ValueError:

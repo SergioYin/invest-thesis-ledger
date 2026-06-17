@@ -232,6 +232,12 @@ class CliTests(unittest.TestCase):
         self.assertIn("write Markdown output to PATH", quickstart_receipt.stdout)
         self.assertIn("write JSON output to PATH", quickstart_receipt.stdout)
 
+        review_walkthrough = self.run_cli("decision-review-walkthrough", "--help")
+        self.assertEqual(review_walkthrough.returncode, 0, review_walkthrough.stderr)
+        self.assertIn("decision review walkthrough", review_walkthrough.stdout)
+        self.assertIn("write Markdown output to PATH", review_walkthrough.stdout)
+        self.assertIn("write JSON output to PATH", review_walkthrough.stdout)
+
         archive = self.run_cli("archive", "--help")
         self.assertEqual(archive.returncode, 0, archive.stderr)
         self.assertIn("LEDGER", archive.stdout)
@@ -323,6 +329,7 @@ class CliTests(unittest.TestCase):
             ("action-plan", [str(EXAMPLE), str(ETF_EXAMPLE)]),
             ("diff-archive", [str(ARCHIVE_FIXTURE), str(ARCHIVE_FIXTURE)]),
             ("quickstart-receipt", []),
+            ("decision-review-walkthrough", []),
         )
         for command, positional_args in commands:
             with self.subTest(command=command), tempfile.TemporaryDirectory() as temp:
@@ -1012,6 +1019,52 @@ class CliTests(unittest.TestCase):
             self.assertEqual(
                 by_path["examples/output/html-dashboard/index.html"]["sha256"],
                 hashlib.sha256((OUTPUT / "html-dashboard" / "index.html").read_bytes()).hexdigest(),
+            )
+
+    def test_decision_review_walkthrough_writes_fixture_backed_evidence_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_dir = Path(temp)
+            md_path = temp_dir / "decision-review-walkthrough.md"
+            json_path = temp_dir / "decision-review-walkthrough.json"
+            result = self.run_cli(
+                "decision-review-walkthrough",
+                "--output",
+                str(md_path),
+                "--json-output",
+                str(json_path),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            text = md_path.read_text(encoding="utf-8")
+            self.assertIn("# Decision Review Walkthrough", text)
+            self.assertIn("python -m invest_thesis_ledger evidence examples/oklo-ai-power.json", text)
+            self.assertIn("examples/output/oklo-ai-power-decision-review-pack.md", text)
+            self.assertIn("No live market data: yes", text)
+            self.assertIn("No broker connection: yes", text)
+            self.assertIn("Not investment advice: yes", text)
+            self.assertNotRegex(text, r"/home/|/Users/|[A-Za-z]:\\")
+            self.assertNotRegex(text.lower(), r"\b(secret|password|api[_ -]?key|private key)\b")
+            self.assertNotRegex(text.lower(), r"\b(buy|sell|hold) recommendation\b")
+
+            payload = json.loads(json_path.read_text(encoding="utf-8"))
+            self.assertTrue(payload["walkthrough"]["deterministic"])
+            self.assertTrue(payload["walkthrough"]["zero_dependencies"])
+            self.assertEqual(payload["stale_date_hygiene"], {"status": "pass", "issues": []})
+            self.assertEqual(payload["hygiene_checks"]["portable_paths"], {"status": "pass", "issues": []})
+            self.assertTrue(payload["boundaries"]["no_live_market_data"])
+            self.assertTrue(payload["boundaries"]["no_broker_connection"])
+            by_input = {item["path"]: item for item in payload["fixture_inputs"]}
+            self.assertEqual(
+                by_input["examples/oklo-ai-power.json"]["sha256"],
+                hashlib.sha256(EXAMPLE.read_bytes()).hexdigest(),
+            )
+            by_artifact = {item["path"]: item for item in payload["generated_artifacts"]}
+            self.assertEqual(
+                by_artifact["examples/output/oklo-ai-power-evidence.md"]["sha256"],
+                hashlib.sha256((OUTPUT / "oklo-ai-power-evidence.md").read_bytes()).hexdigest(),
+            )
+            self.assertEqual(
+                by_artifact["examples/output/oklo-ai-power-decision-review-pack.md"]["sha256"],
+                hashlib.sha256((OUTPUT / "oklo-ai-power-decision-review-pack.md").read_bytes()).hexdigest(),
             )
 
     def test_scenario_plan_writes_base_bull_bear_payload(self) -> None:
@@ -3458,6 +3511,17 @@ class CliTests(unittest.TestCase):
                         str(temp_dir / "quickstart-receipt.json"),
                     ],
                     ["quickstart-receipt.md", "quickstart-receipt.json"],
+                ),
+                (
+                    "decision-review-walkthrough",
+                    [
+                        "decision-review-walkthrough",
+                        "--output",
+                        str(temp_dir / "decision-review-walkthrough.md"),
+                        "--json-output",
+                        str(temp_dir / "decision-review-walkthrough.json"),
+                    ],
+                    ["decision-review-walkthrough.md", "decision-review-walkthrough.json"],
                 ),
             ]
             for label, args, filenames in commands:

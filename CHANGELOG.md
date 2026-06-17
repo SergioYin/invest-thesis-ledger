@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added `decision-review-walkthrough` checked-in Markdown and JSON example outputs with fixture hashes, generated artifact hashes, stale-date hygiene, public hygiene results, and explicit no-live-data/no-broker/no-account/no-order/non-advice boundaries.
+- Updated README, schema docs, integration links, tests, and selfcheck fixture coverage for the decision review walkthrough increment.
 - Added `quickstart-receipt` to emit deterministic Markdown and JSON cold-reviewer receipts with exact commands, static fixture hashes, generated review/dashboard artifact hashes, hygiene results, and explicit no-live-data/no-broker/no-account/no-order/non-advice boundaries.
 - Added a deterministic public fixture hygiene guard to selfcheck for review dates after `ledger.updated`, missing not-investment-advice notices, and direct buy/sell/hold recommendation wording.
 - Updated the Oklo and leveraged ETF public fixtures so `ledger.updated` matches each latest review date.

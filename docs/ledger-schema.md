@@ -310,9 +310,18 @@ Checked-in generated examples:
 
 - [decision review pack Markdown](../examples/output/oklo-ai-power-decision-review-pack.md)
 - [decision review pack JSON](../examples/output/oklo-ai-power-decision-review-pack.json)
+- [decision review walkthrough Markdown](../examples/output/decision-review-walkthrough.md)
+- [decision review walkthrough JSON](../examples/output/decision-review-walkthrough.json)
 - [demo bundle index](../examples/output/demo-bundle/index.md)
 - [portable archive README](../examples/output/archive/README.md)
 - [HTML dashboard index](../examples/output/html-dashboard/index.html)
+
+`decision-review-walkthrough --output walkthrough.md --json-output walkthrough.json`
+uses checked-in demo fixtures to render a bounded public walkthrough of
+validation, evidence output, decision review packet output, review queue output,
+generated artifact hashes, stale-date hygiene, public fixture hygiene, and
+explicit no-live-data/no-broker/no-account/no-order/non-advice boundaries. It
+does not add ledger fields or schema requirements.
 
 `scenario-plan <ledger.json> --output scenario-plan.md --json-output scenario-plan.json`
 loads and validates one ledger, then renders deterministic base, bull, and bear

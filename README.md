@@ -13,7 +13,7 @@ exit-code-2 reporting and compatibility with v0.1.0 through v1.7.4 ledgers.
 Optional public integration notes show how decision-review packs can use
 portfolio-risk-compass and leveraged-etp-risk-lab outputs through
 ordinary ledger fields, without adding dependencies.
-For the public decision-review-pack walkthrough, start with
+For the public decision-review walkthrough, start with
 [examples/integration/README.md](examples/integration/README.md).
 
 This project is for research organization only. It is not investment advice,
@@ -90,6 +90,14 @@ run:
 
 ```bash
 python -m invest_thesis_ledger quickstart-receipt --output quickstart-receipt.md --json-output quickstart-receipt.json
+```
+
+For a deterministic walkthrough that ties validation, evidence, review packet,
+review queue, artifact hashes, stale-date hygiene, public hygiene checks, and
+non-advice boundaries together from checked-in demo fixtures, run:
+
+```bash
+python -m invest_thesis_ledger decision-review-walkthrough --output decision-review-walkthrough.md --json-output decision-review-walkthrough.json
 ```
 
 ## Commands
@@ -248,6 +256,12 @@ Write a deterministic cold-reviewer quickstart receipt:
 python -m invest_thesis_ledger quickstart-receipt --output quickstart-receipt.md --json-output quickstart-receipt.json
 ```
 
+Write a deterministic decision review walkthrough from checked-in demo fixtures:
+
+```bash
+python -m invest_thesis_ledger decision-review-walkthrough --output decision-review-walkthrough.md --json-output decision-review-walkthrough.json
+```
+
 Create a deterministic starter ledger:
 
 ```bash
@@ -327,6 +341,8 @@ Checked-in deterministic CLI output fixtures are available under
 - [HTML dashboard manifest](examples/output/html-dashboard/manifest.json)
 - [quickstart receipt Markdown](examples/output/quickstart-receipt.md)
 - [quickstart receipt JSON](examples/output/quickstart-receipt.json)
+- [decision review walkthrough Markdown](examples/output/decision-review-walkthrough.md)
+- [decision review walkthrough JSON](examples/output/decision-review-walkthrough.json)
 
 Additional single-command fixtures include brief, risk, history, calendar,
 evidence, broker matrix, exposure, decision memo, scenario plan, drift,
@@ -459,6 +475,16 @@ fields through the existing schema. If the external artifact should remain
 separate, keep it beside the packet as portfolio or instrument-specific context;
 the generated packet remains ledger-native and reproducible. See
 `examples/integration/` for generic public examples.
+
+`decision-review-walkthrough` emits Markdown and JSON that document a bounded
+public review flow from checked-in fixtures: validation, evidence output,
+single-ledger decision review packet, multi-ledger review queue, generated
+artifact hashes, stale-date hygiene, public fixture hygiene, portable-path and
+secret-term checks, and explicit no-live-data/no-broker/no-account/no-order
+boundaries. It uses deterministic local renderers only and is checked in as
+[examples/output/decision-review-walkthrough.md](examples/output/decision-review-walkthrough.md)
+with structured output at
+[examples/output/decision-review-walkthrough.json](examples/output/decision-review-walkthrough.json).
 
 `scenario-plan` uses only existing ledger fields to derive base, bull, and bear
 cases from assumption confidence, risk severity/probability, open catalyst
