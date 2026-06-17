@@ -238,6 +238,12 @@ class CliTests(unittest.TestCase):
         self.assertIn("write Markdown output to PATH", review_walkthrough.stdout)
         self.assertIn("write JSON output to PATH", review_walkthrough.stdout)
 
+        evidence_path = self.run_cli("evidence-path-receipt", "--help")
+        self.assertEqual(evidence_path.returncode, 0, evidence_path.stderr)
+        self.assertIn("evidence path walkthrough receipt", evidence_path.stdout)
+        self.assertIn("write Markdown output to PATH", evidence_path.stdout)
+        self.assertIn("write JSON output to PATH", evidence_path.stdout)
+
         archive = self.run_cli("archive", "--help")
         self.assertEqual(archive.returncode, 0, archive.stderr)
         self.assertIn("LEDGER", archive.stdout)
@@ -330,6 +336,7 @@ class CliTests(unittest.TestCase):
             ("diff-archive", [str(ARCHIVE_FIXTURE), str(ARCHIVE_FIXTURE)]),
             ("quickstart-receipt", []),
             ("decision-review-walkthrough", []),
+            ("evidence-path-receipt", []),
         )
         for command, positional_args in commands:
             with self.subTest(command=command), tempfile.TemporaryDirectory() as temp:
@@ -1066,6 +1073,59 @@ class CliTests(unittest.TestCase):
                 by_artifact["examples/output/oklo-ai-power-decision-review-pack.md"]["sha256"],
                 hashlib.sha256((OUTPUT / "oklo-ai-power-decision-review-pack.md").read_bytes()).hexdigest(),
             )
+
+    def test_evidence_path_receipt_connects_receipts_dashboard_and_review_hashes(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_dir = Path(temp)
+            md_path = temp_dir / "evidence-path-receipt.md"
+            json_path = temp_dir / "evidence-path-receipt.json"
+            result = self.run_cli(
+                "evidence-path-receipt",
+                "--output",
+                str(md_path),
+                "--json-output",
+                str(json_path),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            text = md_path.read_text(encoding="utf-8")
+            self.assertIn("# Evidence Path Walkthrough Receipt", text)
+            self.assertIn("examples/oklo-ai-power.json", text)
+            self.assertIn("examples/output/quickstart-receipt.md", text)
+            self.assertIn("examples/output/decision-review-walkthrough.md", text)
+            self.assertIn("examples/output/html-dashboard/index.html", text)
+            self.assertIn("No live market data: yes", text)
+            self.assertIn("No broker connection: yes", text)
+            self.assertIn("Not investment advice: yes", text)
+            self.assertNotRegex(text, r"/home/|/Users/|[A-Za-z]:\\")
+            self.assertNotRegex(text.lower(), r"\b(secret|password|api[_ -]?key|private key)\b")
+            self.assertNotRegex(text.lower(), r"\b(buy|sell|hold) recommendation\b")
+
+            payload = json.loads(json_path.read_text(encoding="utf-8"))
+            self.assertTrue(payload["receipt"]["deterministic"])
+            self.assertTrue(payload["receipt"]["zero_dependencies"])
+            self.assertEqual(payload["hygiene_checks"]["portable_paths"], {"status": "pass", "issues": []})
+            self.assertTrue(payload["boundaries"]["no_live_market_data"])
+            self.assertTrue(payload["boundaries"]["no_broker_connection"])
+            self.assertTrue(payload["boundaries"]["not_investment_advice"])
+            steps = [item["step"] for item in payload["evidence_path"]]
+            self.assertEqual(
+                steps,
+                [
+                    "ledger_fixtures",
+                    "quickstart_receipt",
+                    "decision_review_walkthrough",
+                    "review_artifacts",
+                    "dashboard_artifacts",
+                ],
+            )
+            by_path = {item["path"]: item for item in payload["generated_artifacts"]}
+            self.assertEqual(
+                by_path["examples/output/quickstart-receipt.md"]["sha256"],
+                hashlib.sha256((OUTPUT / "quickstart-receipt.md").read_bytes()).hexdigest(),
+            )
+            self.assertTrue(by_path["examples/output/quickstart-receipt.md"]["matches_checked_in"])
+            self.assertTrue(by_path["examples/output/decision-review-walkthrough.md"]["matches_checked_in"])
+            self.assertTrue(by_path["examples/output/html-dashboard/index.html"]["matches_checked_in"])
 
     def test_scenario_plan_writes_base_bull_bear_payload(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -2397,7 +2457,7 @@ class CliTests(unittest.TestCase):
             self.assertIn("# Watchlist", (output_dir / "watchlist.md").read_text())
             self.assertIn("# Weekly Action Plan", (output_dir / "action-plan.md").read_text())
             manifest = json.loads((output_dir / "manifest.json").read_text())
-            self.assertEqual(manifest["tool_version"], "1.8.0")
+            self.assertEqual(manifest["tool_version"], "1.9.1")
             self.assertEqual(manifest["ledger_ids"], ["oklo-ai-power", "leveraged-etf-discipline"])
             self.assertEqual(manifest["generated_files"], expected_files)
             index_links = [
@@ -2547,11 +2607,11 @@ class CliTests(unittest.TestCase):
             self.assertEqual(sorted(path.name for path in output_dir.iterdir()), sorted(expected_files))
             manifest = json.loads((output_dir / "manifest.json").read_text())
             self.assertEqual(manifest["archive_format"], "portable-research-archive")
-            self.assertEqual(manifest["tool_version"], "1.8.0")
+            self.assertEqual(manifest["tool_version"], "1.9.1")
             self.assertEqual(manifest["ledger_ids"], ["oklo-ai-power", "leveraged-etf-discipline"])
             self.assertEqual(manifest["generated_files"], expected_files)
             summary = json.loads((output_dir / "archive-summary.json").read_text())
-            self.assertEqual(summary["tool_version"], "1.8.0")
+            self.assertEqual(summary["tool_version"], "1.9.1")
             self.assertEqual(summary["ledger_ids"], manifest["ledger_ids"])
             self.assertEqual(summary["archive"]["ledger_count"], 2)
             self.assertEqual(summary["archive"]["file_count"], len(expected_files))
@@ -3039,7 +3099,7 @@ class CliTests(unittest.TestCase):
             self.assertNotIn("<script", (output_dir / "index.html").read_text().lower())
             self.assertNotIn("@import", (output_dir / "style.css").read_text().lower())
             manifest = json.loads((output_dir / "manifest.json").read_text())
-            self.assertEqual(manifest["tool_version"], "1.8.0")
+            self.assertEqual(manifest["tool_version"], "1.9.1")
             self.assertEqual(manifest["ledger_ids"], ["oklo-ai-power", "leveraged-etf-discipline"])
             self.assertEqual(manifest["generated_files"], expected_files)
             self.assertNotIn("timestamp", manifest)
@@ -3235,7 +3295,7 @@ class CliTests(unittest.TestCase):
             self.assertEqual(second.returncode, 0, second.stderr)
             self.assertEqual(output_a.read_text(), output_b.read_text())
             payload = json.loads(output_a.read_text())
-            self.assertEqual(payload["ledger_version"], "1.8.0")
+            self.assertEqual(payload["ledger_version"], "1.9.1")
             self.assertEqual(payload["thesis_id"], "msft-thesis")
             self.assertEqual(payload["sources"][0]["id"], "S1")
             self.assertEqual(payload["assumptions"][0]["source_ids"], ["S1"])

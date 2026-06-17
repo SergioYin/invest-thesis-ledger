@@ -5,7 +5,7 @@
     "ledger_count": 2
   },
   "file_hashes": {
-    "README.md": "1b0750ea08587bc26e529bac70b70155ca1cfedde930f00c04b23d7173a7c423",
+    "README.md": "2038bc4a93f34101a682c9227323500df680dd048c024dd321402f53039e6835",
     "action-plan.md": "7570d817d6b0a19d883af501e4558ddf8a99becb3e79e7d8b0b92c328c9303b4",
     "evidence-audit.md": "4985dad98c14ff55a7cc536e9030b64296819d34f2a745ecae5feb650ab89fc6",
     "leveraged-etf-discipline-brief.md": "aaec692afb7f356fc3ae989c6db7f506225e0f694e21c33b6a82d67696fde6b8",
@@ -15,7 +15,7 @@
     "leveraged-etf-discipline-risk.md": "ffcf59d0c73a766a5d5a97306d25bd9f8a2c946e7e0567b104151352040b1048",
     "leveraged-etf-discipline-scenario.md": "4272f6ec72d92046fbe79697a25db6d38825c602c75a04b7db2fd5c8842d7fdc",
     "leveraged-etf-discipline.json": "c919962933bb3f6c020ed2b630de948285b904715a76da7f82ec5653c83fd7da",
-    "manifest.json": "bddfd7ad968817a60420fb3982162cd536d2d2c401380bb19a867c5233277f9a",
+    "manifest.json": "a1410ada5cfce6d43ed12b47394e054031a6e347f598d147726fe689c708ee5f",
     "oklo-ai-power-brief.md": "e85053db31889a9479988cb41d09239b1f1cadbf51faf380c34befd5a06d7d71",
     "oklo-ai-power-decision-review-pack.md": "f71dfbcefa140e0f84d54a68f1db82240ea860276d45dce59f6d3afab040f1e4",
     "oklo-ai-power-decision.md": "300bb875804a4844ed7d4d4b6f8f4dfe5493f9e1801916b6c89862cc03ca5b11",
@@ -53,5 +53,5 @@
     "oklo-ai-power",
     "leveraged-etf-discipline"
   ],
-  "tool_version": "1.8.0"
+  "tool_version": "1.9.1"
 }

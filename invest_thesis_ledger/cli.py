@@ -245,6 +245,14 @@ def build_parser() -> argparse.ArgumentParser:
     _add_output_args(review_walkthrough)
     review_walkthrough.set_defaults(func=_cmd_decision_review_walkthrough)
 
+    evidence_path = subparsers.add_parser(
+        "evidence-path-receipt",
+        help="write a deterministic evidence path walkthrough receipt",
+        description="write a deterministic evidence path walkthrough receipt.",
+    )
+    _add_output_args(evidence_path)
+    evidence_path.set_defaults(func=_cmd_evidence_path_receipt)
+
     init_template = subparsers.add_parser("init-template", help="create a deterministic starter ledger")
     init_template.add_argument("--asset", required=True, metavar="TICKER", help="asset ticker or symbol")
     init_template.add_argument("--name", required=True, metavar="NAME", help="asset or issuer name")
@@ -673,6 +681,27 @@ def _cmd_decision_review_walkthrough(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_evidence_path_receipt(args: argparse.Namespace) -> int:
+    try:
+        payload = _evidence_path_receipt_payload()
+    except OSError as exc:
+        sys.stderr.write(f"error: cannot build evidence path receipt: {exc}\n")
+        return 2
+    except ValueError as exc:
+        sys.stderr.write(f"error: cannot build evidence path receipt: {exc}\n")
+        return 1
+    status = _write_text_outputs(
+        (
+            (args.output, _render_evidence_path_receipt(payload)),
+            (args.json_output, to_json(payload)),
+        )
+    )
+    if status:
+        return status
+    sys.stdout.write(f"wrote: {args.output}, {args.json_output}\n")
+    return 0
+
+
 def _cmd_init_template(args: argparse.Namespace) -> int:
     ledger = _starter_ledger(args.asset, args.name, args.type)
     status = _write_text_outputs(((args.output, to_json(ledger)),))
@@ -819,6 +848,206 @@ def _quickstart_receipt_payload() -> dict:
     }
 
 
+def _evidence_path_receipt_payload() -> dict:
+    root = Path(__file__).resolve().parents[1]
+    oklo_path = root / "examples" / "oklo-ai-power.json"
+    etf_path = root / "examples" / "leveraged-etf-discipline.json"
+    ledgers = [load_ledger(str(oklo_path)), load_ledger(str(etf_path))]
+    for ledger in ledgers:
+        errors, warnings = validate_ledger(ledger)
+        if errors:
+            raise ValueError(validation_summary(ledger, errors, warnings))
+
+    quickstart_payload = _quickstart_receipt_payload()
+    walkthrough_payload = decision_review_walkthrough_payload(root)
+    boundaries = {
+        "no_live_market_data": True,
+        "no_broker_connection": True,
+        "no_account_data": True,
+        "no_orders": True,
+        "no_trading_execution": True,
+        "not_investment_advice": True,
+        "text": (
+            "This evidence path receipt connects only checked-in fixture ledgers, deterministic generated "
+            "receipts, local review/dashboard artifacts, and SHA-256 hashes. It does not fetch live market "
+            "data, connect to broker or account systems, place orders, execute trades, or provide "
+            "investment advice."
+        ),
+    }
+    route = [
+        {
+            "step": "ledger_fixtures",
+            "reviewer_action": "start from checked-in thesis ledgers",
+            "paths": ["examples/oklo-ai-power.json", "examples/leveraged-etf-discipline.json"],
+        },
+        {
+            "step": "quickstart_receipt",
+            "reviewer_action": "confirm fixture, review packet, queue, dashboard, hash, and boundary receipt",
+            "paths": ["examples/output/quickstart-receipt.md", "examples/output/quickstart-receipt.json"],
+        },
+        {
+            "step": "decision_review_walkthrough",
+            "reviewer_action": "follow validation, evidence, review packet, and review queue reproduction steps",
+            "paths": [
+                "examples/output/decision-review-walkthrough.md",
+                "examples/output/decision-review-walkthrough.json",
+            ],
+        },
+        {
+            "step": "review_artifacts",
+            "reviewer_action": "inspect evidence, decision review pack, and review queue artifacts",
+            "paths": [
+                "examples/output/oklo-ai-power-evidence.md",
+                "examples/output/oklo-ai-power-decision-review-pack.md",
+                "examples/output/review-queue.md",
+            ],
+        },
+        {
+            "step": "dashboard_artifacts",
+            "reviewer_action": "open static no-JS dashboard index and manifest",
+            "paths": [
+                "examples/output/html-dashboard/index.html",
+                "examples/output/html-dashboard/manifest.json",
+            ],
+        },
+    ]
+    artifacts = _evidence_path_artifacts(root, ledgers, quickstart_payload, walkthrough_payload)
+    hygiene_issues = public_fixture_hygiene_issues(root)
+    static_text = _evidence_path_static_text(route, artifacts, boundaries)
+    return {
+        "receipt": {
+            "workflow": "bounded evidence path walkthrough receipt",
+            "tool_version": __version__,
+            "deterministic": True,
+            "zero_dependencies": True,
+            "fixture_source": "checked-in demo ledgers",
+        },
+        "evidence_path": route,
+        "fixture_inputs": [_quickstart_input(root, oklo_path), _quickstart_input(root, etf_path)],
+        "linked_receipts": [
+            "examples/output/quickstart-receipt.md",
+            "examples/output/quickstart-receipt.json",
+            "examples/output/decision-review-walkthrough.md",
+            "examples/output/decision-review-walkthrough.json",
+        ],
+        "generated_artifacts": artifacts,
+        "hygiene_checks": {
+            "public_fixture_hygiene": _check_result(not hygiene_issues, hygiene_issues),
+            "not_investment_advice_notice": _check_result(
+                not any("missing not-investment-advice notice" in issue for issue in hygiene_issues),
+                [issue for issue in hygiene_issues if "missing not-investment-advice notice" in issue],
+            ),
+            "advice_wording": _check_result(
+                not any("recommendation wording" in issue for issue in hygiene_issues),
+                [issue for issue in hygiene_issues if "recommendation wording" in issue],
+            ),
+            "portable_paths": _check_result(not _has_private_path(static_text), []),
+            "secret_terms": _check_result(not _has_secret_term(static_text), []),
+        },
+        "boundaries": boundaries,
+    }
+
+
+def _evidence_path_artifacts(
+    root: Path,
+    ledgers: Sequence[dict],
+    quickstart_payload: Mapping[str, object],
+    walkthrough_payload: Mapping[str, object],
+) -> list[dict]:
+    generated = [
+        (
+            "examples/output/quickstart-receipt.md",
+            _render_quickstart_receipt(quickstart_payload),
+            "receipt",
+        ),
+        ("examples/output/quickstart-receipt.json", to_json(quickstart_payload), "receipt"),
+        (
+            "examples/output/decision-review-walkthrough.md",
+            render_decision_review_walkthrough(walkthrough_payload),
+            "walkthrough",
+        ),
+        ("examples/output/decision-review-walkthrough.json", to_json(walkthrough_payload), "walkthrough"),
+        ("examples/output/oklo-ai-power-evidence.md", render_evidence(ledgers[0]), "evidence"),
+        ("examples/output/oklo-ai-power-evidence.json", to_json(evidence_payload(ledgers[0])), "evidence"),
+        (
+            "examples/output/oklo-ai-power-decision-review-pack.md",
+            render_decision_review_pack(ledgers[0], provenance=_fixture_review_provenance()),
+            "review",
+        ),
+        (
+            "examples/output/oklo-ai-power-decision-review-pack.json",
+            to_json(decision_review_pack_payload(ledgers[0], provenance=_fixture_review_provenance())),
+            "review",
+        ),
+        ("examples/output/review-queue.md", render_review_queue(ledgers), "review"),
+        ("examples/output/review-queue.json", to_json(review_queue_payload(ledgers)), "review"),
+    ]
+    generated.extend(
+        (f"examples/output/html-dashboard/{filename}", text, "dashboard")
+        for filename, text in _html_dashboard_files(ledgers)
+    )
+    return [
+        _evidence_path_artifact(root, path, text, kind)
+        for path, text, kind in sorted(generated, key=lambda item: item[0])
+    ]
+
+
+def _fixture_review_provenance() -> Mapping[str, object]:
+    return {
+        "workflow": "single-ledger decision-review-pack",
+        "command": (
+            "python -m invest_thesis_ledger decision-review-pack examples/oklo-ai-power.json "
+            "--output oklo-ai-power-decision-review-pack.md "
+            "--json-output oklo-ai-power-decision-review-pack.json"
+        ),
+        "argv": [
+            "python",
+            "-m",
+            "invest_thesis_ledger",
+            "decision-review-pack",
+            "examples/oklo-ai-power.json",
+            "--output",
+            "oklo-ai-power-decision-review-pack.md",
+            "--json-output",
+            "oklo-ai-power-decision-review-pack.json",
+        ],
+        "input_ledger": "examples/oklo-ai-power.json",
+        "markdown_output": "oklo-ai-power-decision-review-pack.md",
+        "json_output": "oklo-ai-power-decision-review-pack.json",
+    }
+
+
+def _evidence_path_artifact(root: Path, path: str, text: str, kind: str) -> dict:
+    encoded = text.encode("utf-8")
+    checked_in = root / path
+    generated_sha = hashlib.sha256(encoded).hexdigest()
+    item = {
+        "path": path,
+        "kind": kind,
+        "bytes": len(encoded),
+        "sha256": generated_sha,
+    }
+    if checked_in.exists():
+        checked_in_sha = hashlib.sha256(checked_in.read_bytes()).hexdigest()
+        item["checked_in_sha256"] = checked_in_sha
+        item["matches_checked_in"] = generated_sha == checked_in_sha
+    return item
+
+
+def _evidence_path_static_text(
+    route: Sequence[Mapping[str, object]],
+    artifacts: Sequence[Mapping[str, object]],
+    boundaries: Mapping[str, object],
+) -> str:
+    fields = []
+    for step in route:
+        fields.extend(str(path) for path in step["paths"])
+    for artifact in artifacts:
+        fields.extend(str(artifact[key]) for key in ("path", "sha256"))
+    fields.append(str(boundaries["text"]))
+    return "\n".join(fields)
+
+
 def _quickstart_receipt_artifacts(ledgers: Sequence[dict]) -> list[dict]:
     oklo = ledgers[0]
     review_provenance = {
@@ -962,12 +1191,89 @@ def _render_quickstart_receipt(payload: Mapping[str, object]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _render_evidence_path_receipt(payload: Mapping[str, object]) -> str:
+    receipt = payload["receipt"]
+    assert isinstance(receipt, Mapping)
+    lines = [
+        "# Evidence Path Walkthrough Receipt",
+        "",
+        "> This is a research organization tool, not investment advice.",
+        "",
+        f"- Workflow: {_receipt_inline(receipt['workflow'])}",
+        f"- Tool version: {_receipt_inline(receipt['tool_version'])}",
+        f"- Deterministic: {_receipt_bool(receipt['deterministic'])}",
+        f"- Zero dependencies: {_receipt_bool(receipt['zero_dependencies'])}",
+        f"- Fixture source: {_receipt_inline(receipt['fixture_source'])}",
+        "",
+        "## Reviewer Path",
+        "",
+    ]
+    for item in payload["evidence_path"]:
+        lines.append(f"### {_receipt_inline(item['step'])}")
+        lines.append("")
+        lines.append(f"- Action: {_receipt_inline(item['reviewer_action'])}")
+        lines.append(f"- Paths: {_receipt_join(item['paths'])}")
+        lines.append("")
+    lines.extend(["## Fixture Inputs", ""])
+    for item in payload["fixture_inputs"]:
+        lines.append(
+            f"- `{item['path']}` ({item['bytes']} bytes; sha256 `{item['sha256']}`)"
+        )
+    lines.extend(["", "## Linked Receipts", ""])
+    for path in payload["linked_receipts"]:
+        lines.append(f"- `{path}`")
+    lines.extend(["", "## Generated Artifact Hashes", ""])
+    lines.extend(
+        [
+            "| Path | Kind | Bytes | SHA-256 | Checked-In Match |",
+            "| --- | --- | ---: | --- | --- |",
+        ]
+    )
+    for item in payload["generated_artifacts"]:
+        match = "n/a"
+        if "matches_checked_in" in item:
+            match = _receipt_bool(item["matches_checked_in"])
+        lines.append(
+            f"| `{item['path']}` | {_receipt_inline(item['kind'])} | {item['bytes']} | "
+            f"`{item['sha256']}` | {match} |"
+        )
+    lines.extend(["", "## Hygiene Checks", ""])
+    for name, result in payload["hygiene_checks"].items():
+        lines.append(f"- {_receipt_inline(name)}: {_receipt_inline(result['status'])}")
+        for issue in result["issues"]:
+            lines.append(f"  - {_receipt_inline(issue)}")
+    boundaries = payload["boundaries"]
+    assert isinstance(boundaries, Mapping)
+    lines.extend(
+        [
+            "",
+            "## Boundaries",
+            "",
+            f"- No live market data: {_receipt_bool(boundaries['no_live_market_data'])}",
+            f"- No broker connection: {_receipt_bool(boundaries['no_broker_connection'])}",
+            f"- No account data: {_receipt_bool(boundaries['no_account_data'])}",
+            f"- No orders: {_receipt_bool(boundaries['no_orders'])}",
+            f"- No trading execution: {_receipt_bool(boundaries['no_trading_execution'])}",
+            f"- Not investment advice: {_receipt_bool(boundaries['not_investment_advice'])}",
+            "",
+            _receipt_inline(boundaries["text"]),
+        ]
+    )
+    return "\n".join(lines) + "\n"
+
+
 def _receipt_bool(value: object) -> str:
     return "yes" if value is True else "no"
 
 
 def _receipt_inline(value: object) -> str:
     return str(value).replace("\n", " ").replace("|", "\\|").replace("[", "\\[").replace("]", "\\]")
+
+
+def _receipt_join(values: object) -> str:
+    if isinstance(values, Sequence) and not isinstance(values, (str, bytes)):
+        return ", ".join(f"`{_receipt_inline(value)}`" for value in values)
+    return _receipt_inline(values)
 
 
 def _portable_cli_path(path: str) -> str:

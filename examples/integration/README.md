@@ -45,6 +45,19 @@ Checked-in equivalents are
 and
 [examples/output/decision-review-walkthrough.json](../output/decision-review-walkthrough.json).
 
+Render the bounded evidence path receipt when a reviewer needs the fixture,
+quickstart receipt, walkthrough, review/dashboard artifact, hash, and boundary
+trail in one place:
+
+```bash
+python -m invest_thesis_ledger evidence-path-receipt --output /tmp/evidence-path-receipt.md --json-output /tmp/evidence-path-receipt.json
+```
+
+Checked-in equivalents are
+[examples/output/evidence-path-receipt.md](../output/evidence-path-receipt.md)
+and
+[examples/output/evidence-path-receipt.json](../output/evidence-path-receipt.json).
+
 For a public multi-ledger demo bundle:
 
 ```bash
@@ -111,6 +124,8 @@ The checked-in review packet examples generated from ordinary ledger fields are:
 - [Oklo decision review pack JSON](../output/oklo-ai-power-decision-review-pack.json)
 - [Decision review walkthrough Markdown](../output/decision-review-walkthrough.md)
 - [Decision review walkthrough JSON](../output/decision-review-walkthrough.json)
+- [Evidence path receipt Markdown](../output/evidence-path-receipt.md)
+- [Evidence path receipt JSON](../output/evidence-path-receipt.json)
 - [Demo bundle index with per-ledger packets](../output/demo-bundle/index.md)
 - [Portable archive README with per-ledger packets](../output/archive/README.md)
 

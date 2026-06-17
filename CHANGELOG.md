@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- No changes yet.
+
+## 1.9.1 - 2026-06-18
+
+- Added `evidence-path-receipt` checked-in Markdown and JSON outputs that connect fixture ledgers, quickstart receipt, decision review walkthrough, review artifacts, no-JS dashboard artifacts, SHA-256 hashes, fixture match status, public hygiene checks, and explicit no-live-data/no-broker/no-account/no-order/non-advice boundaries.
+- Updated package/schema version, README, schema docs, integration links, tests, selfcheck, and checked-in fixtures for v1.9.1.
+
+## 1.9.0 - 2026-06-18
+
 - Added `decision-review-walkthrough` checked-in Markdown and JSON example outputs with fixture hashes, generated artifact hashes, stale-date hygiene, public hygiene results, and explicit no-live-data/no-broker/no-account/no-order/non-advice boundaries.
 - Updated README, schema docs, integration links, tests, and selfcheck fixture coverage for the decision review walkthrough increment.
 - Added `quickstart-receipt` to emit deterministic Markdown and JSON cold-reviewer receipts with exact commands, static fixture hashes, generated review/dashboard artifact hashes, hygiene results, and explicit no-live-data/no-broker/no-account/no-order/non-advice boundaries.
