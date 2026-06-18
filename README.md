@@ -8,8 +8,9 @@ starter ledger generation, decision-review packs, decision memos, scenario
 plans, portfolio-level summaries, portfolio evidence audits, review queues,
 weekly watchlists, weekly action plans, static demo bundles, portable research
 archives, archive verification, archive diffs, and no-JS HTML dashboards.
-v1.9.1 adds evidence-path receipts while preserving concise exit-code-2
-reporting and compatibility with v0.1.0 through v1.8.0 ledgers.
+v1.9.2 adds deterministic visual walkthrough screenshot guides while preserving
+concise exit-code-2 reporting and compatibility with v0.1.0 through v1.9.1
+ledgers.
 Optional public integration notes show how decision-review packs can use
 portfolio-risk-compass and leveraged-etp-risk-lab outputs through
 ordinary ledger fields, without adding dependencies.
@@ -106,6 +107,14 @@ hashes, and no-live-data/no-broker/no-advice boundaries, run:
 
 ```bash
 python -m invest_thesis_ledger evidence-path-receipt --output evidence-path-receipt.md --json-output evidence-path-receipt.json
+```
+
+For a local visual screenshot guide that connects the static dashboard,
+decision review pack, and evidence path route with deterministic SVG assets and
+hashes, run:
+
+```bash
+python -m invest_thesis_ledger visual-walkthrough --output-dir visual-walkthrough
 ```
 
 ## Commands
@@ -276,6 +285,12 @@ Write a deterministic evidence path walkthrough receipt:
 python -m invest_thesis_ledger evidence-path-receipt --output evidence-path-receipt.md --json-output evidence-path-receipt.json
 ```
 
+Write a deterministic local visual screenshot guide:
+
+```bash
+python -m invest_thesis_ledger visual-walkthrough --output-dir visual-walkthrough
+```
+
 Create a deterministic starter ledger:
 
 ```bash
@@ -293,7 +308,7 @@ concise stderr and does not leave a newly written companion output behind.
 
 ## Ledger Format
 
-Ledgers are JSON objects. The v1.9.1 required fields are:
+Ledgers are JSON objects. The v1.9.2 required fields are:
 
 - `ledger_version`
 - `thesis_id`
@@ -330,7 +345,7 @@ ID.
 optional string `tags`; `exposure` combines these risk tags with position rules
 into a checklist.
 
-The formal v1.9.1 schema reference is in `docs/ledger-schema.md`.
+The formal v1.9.2 schema reference is in `docs/ledger-schema.md`.
 
 See:
 
@@ -359,6 +374,8 @@ Checked-in deterministic CLI output fixtures are available under
 - [decision review walkthrough JSON](examples/output/decision-review-walkthrough.json)
 - [evidence path receipt Markdown](examples/output/evidence-path-receipt.md)
 - [evidence path receipt JSON](examples/output/evidence-path-receipt.json)
+- [visual walkthrough guide](examples/output/visual-walkthrough/README.md)
+- [visual walkthrough JSON](examples/output/visual-walkthrough/visual-walkthrough.json)
 
 Additional single-command fixtures include brief, risk, history, calendar,
 evidence, broker matrix, exposure, decision memo, scenario plan, drift,
@@ -512,6 +529,16 @@ no-order/non-advice boundary. It is checked in as
 [examples/output/evidence-path-receipt.md](examples/output/evidence-path-receipt.md)
 with structured output at
 [examples/output/evidence-path-receipt.json](examples/output/evidence-path-receipt.json).
+
+`visual-walkthrough` writes a local directory containing a reviewer-facing
+README, structured JSON, and deterministic SVG screenshot guide assets for the
+static no-JS dashboard, Oklo decision review pack, and evidence path receipt.
+It records hashes for linked local artifacts and the SVG assets, uses only
+checked-in fixture labels and local paths, and keeps the same no-live-data/
+no-broker/no-account/no-order/non-advice boundary. It is checked in as
+[examples/output/visual-walkthrough/README.md](examples/output/visual-walkthrough/README.md)
+with structured output at
+[examples/output/visual-walkthrough/visual-walkthrough.json](examples/output/visual-walkthrough/visual-walkthrough.json).
 
 `scenario-plan` uses only existing ledger fields to derive base, bull, and bear
 cases from assumption confidence, risk severity/probability, open catalyst

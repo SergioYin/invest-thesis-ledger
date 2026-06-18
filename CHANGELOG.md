@@ -4,6 +4,12 @@
 
 - No changes yet.
 
+## 1.9.2 - 2026-06-19
+
+- Added `visual-walkthrough` to write a deterministic local SVG screenshot guide for the no-JS dashboard, Oklo decision review pack, and evidence path receipt route.
+- Added checked-in visual walkthrough README, JSON, and SVG assets with SHA-256 hashes, portable-path/secret-term checks, and explicit no-live-data/no-broker/no-account/no-order/non-advice boundaries.
+- Updated package/schema version, README, schema docs, integration links, tests, selfcheck, and checked-in fixtures for v1.9.2.
+
 ## 1.9.1 - 2026-06-18
 
 - Added `evidence-path-receipt` checked-in Markdown and JSON outputs that connect fixture ledgers, quickstart receipt, decision review walkthrough, review artifacts, no-JS dashboard artifacts, SHA-256 hashes, fixture match status, public hygiene checks, and explicit no-live-data/no-broker/no-account/no-order/non-advice boundaries.

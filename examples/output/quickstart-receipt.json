@@ -37,7 +37,7 @@
       "bytes": 1518,
       "kind": "dashboard",
       "path": "examples/output/html-dashboard/index.html",
-      "sha256": "b9708579e3d17711fe1d0b0ea1f0c5474547e1defd41684dfd611e42c0cbb4d9"
+      "sha256": "208168a583d53779dc377ec1923d590499c9483d361f28312d1d3ad7857b1ce2"
     },
     {
       "bytes": 5569,
@@ -49,7 +49,7 @@
       "bytes": 346,
       "kind": "dashboard",
       "path": "examples/output/html-dashboard/manifest.json",
-      "sha256": "484ed13f6e5c53205d3257fde7187a9a9e96742f366190385752b804badee4e1"
+      "sha256": "57c96b37a40bacc016aad1d4e73b7986e2f388bb9bfdd330f7d12a9b33728ed6"
     },
     {
       "bytes": 5849,
@@ -135,7 +135,7 @@
   ],
   "receipt": {
     "deterministic": true,
-    "tool_version": "1.9.1",
+    "tool_version": "1.9.2",
     "workflow": "cold-reviewer quickstart receipt",
     "zero_dependencies": true
   }

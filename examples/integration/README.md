@@ -58,6 +58,19 @@ Checked-in equivalents are
 and
 [examples/output/evidence-path-receipt.json](../output/evidence-path-receipt.json).
 
+Render the local visual screenshot guide when a reviewer needs a deterministic
+SVG route through the dashboard, decision review pack, and evidence path
+receipt:
+
+```bash
+python -m invest_thesis_ledger visual-walkthrough --output-dir /tmp/visual-walkthrough
+```
+
+The checked-in equivalent is
+[examples/output/visual-walkthrough/README.md](../output/visual-walkthrough/README.md)
+with structured output at
+[examples/output/visual-walkthrough/visual-walkthrough.json](../output/visual-walkthrough/visual-walkthrough.json).
+
 For a public multi-ledger demo bundle:
 
 ```bash
@@ -126,6 +139,8 @@ The checked-in review packet examples generated from ordinary ledger fields are:
 - [Decision review walkthrough JSON](../output/decision-review-walkthrough.json)
 - [Evidence path receipt Markdown](../output/evidence-path-receipt.md)
 - [Evidence path receipt JSON](../output/evidence-path-receipt.json)
+- [Visual walkthrough guide](../output/visual-walkthrough/README.md)
+- [Visual walkthrough JSON](../output/visual-walkthrough/visual-walkthrough.json)
 - [Demo bundle index with per-ledger packets](../output/demo-bundle/index.md)
 - [Portable archive README with per-ledger packets](../output/archive/README.md)
 

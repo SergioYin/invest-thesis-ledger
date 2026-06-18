@@ -51,7 +51,11 @@ from .render import (
     to_json,
     watchlist_payload,
 )
-from .review_walkthrough import decision_review_walkthrough_payload, render_decision_review_walkthrough
+from .review_walkthrough import (
+    decision_review_walkthrough_payload,
+    render_decision_review_walkthrough,
+    visual_walkthrough_files,
+)
 from .schema import load_ledger, validate_ledger, validation_summary
 
 
@@ -252,6 +256,19 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_output_args(evidence_path)
     evidence_path.set_defaults(func=_cmd_evidence_path_receipt)
+
+    visual_walkthrough = subparsers.add_parser(
+        "visual-walkthrough",
+        help="write a deterministic visual screenshot guide from demo fixtures",
+        description="write a deterministic visual screenshot guide from demo fixtures.",
+    )
+    visual_walkthrough.add_argument(
+        "--output-dir",
+        required=True,
+        metavar="DIR",
+        help="write visual walkthrough guide and SVG assets to DIR",
+    )
+    visual_walkthrough.set_defaults(func=_cmd_visual_walkthrough)
 
     init_template = subparsers.add_parser("init-template", help="create a deterministic starter ledger")
     init_template.add_argument("--asset", required=True, metavar="TICKER", help="asset ticker or symbol")
@@ -699,6 +716,30 @@ def _cmd_evidence_path_receipt(args: argparse.Namespace) -> int:
     if status:
         return status
     sys.stdout.write(f"wrote: {args.output}, {args.json_output}\n")
+    return 0
+
+
+def _cmd_visual_walkthrough(args: argparse.Namespace) -> int:
+    output_dir = Path(args.output_dir)
+    if output_dir.exists() and (not output_dir.is_dir() or output_dir.is_symlink()):
+        sys.stderr.write(f"error: output dir is not a directory: {output_dir}\n")
+        return 2
+    if _is_unsafe_output_dir(output_dir):
+        sys.stderr.write(f"error: refusing to replace current working directory or ancestor: {output_dir}\n")
+        return 2
+    try:
+        files = visual_walkthrough_files()
+    except OSError as exc:
+        sys.stderr.write(f"error: cannot build visual walkthrough: {exc}\n")
+        return 2
+    except ValueError as exc:
+        sys.stderr.write(f"error: cannot build visual walkthrough: {exc}\n")
+        return 1
+
+    status = _write_output_dir(output_dir, lambda: _write_demo_bundle_dir(output_dir, files))
+    if status:
+        return status
+    sys.stdout.write(f"wrote: {output_dir}\n")
     return 0
 
 

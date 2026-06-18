@@ -3,7 +3,7 @@
 > This is a research organization tool, not investment advice.
 
 - Workflow: bounded decision review walkthrough
-- Tool version: 1.9.1
+- Tool version: 1.9.2
 - Deterministic: yes
 - Zero dependencies: yes
 - Fixture source: checked-in demo ledgers

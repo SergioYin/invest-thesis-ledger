@@ -241,6 +241,11 @@ class CliTests(unittest.TestCase):
         evidence_path = self.run_cli("evidence-path-receipt", "--help")
         self.assertEqual(evidence_path.returncode, 0, evidence_path.stderr)
         self.assertIn("evidence path walkthrough receipt", evidence_path.stdout)
+
+        visual_walkthrough = self.run_cli("visual-walkthrough", "--help")
+        self.assertEqual(visual_walkthrough.returncode, 0, visual_walkthrough.stderr)
+        self.assertIn("visual screenshot guide", visual_walkthrough.stdout)
+        self.assertIn("write visual walkthrough guide and SVG assets to DIR", visual_walkthrough.stdout)
         self.assertIn("write Markdown output to PATH", evidence_path.stdout)
         self.assertIn("write JSON output to PATH", evidence_path.stdout)
 
@@ -1126,6 +1131,41 @@ class CliTests(unittest.TestCase):
             self.assertTrue(by_path["examples/output/quickstart-receipt.md"]["matches_checked_in"])
             self.assertTrue(by_path["examples/output/decision-review-walkthrough.md"]["matches_checked_in"])
             self.assertTrue(by_path["examples/output/html-dashboard/index.html"]["matches_checked_in"])
+
+    def test_visual_walkthrough_writes_local_svg_screenshot_guide(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            output_dir = Path(temp) / "visual-walkthrough"
+            result = self.run_cli("visual-walkthrough", "--output-dir", str(output_dir))
+            self.assertEqual(result.returncode, 0, result.stderr)
+
+            readme = (output_dir / "README.md").read_text(encoding="utf-8")
+            self.assertIn("# Visual Walkthrough Screenshot Guide", readme)
+            self.assertIn("examples/output/html-dashboard/index.html", readme)
+            self.assertIn("examples/output/oklo-ai-power-decision-review-pack.md", readme)
+            self.assertIn("examples/output/evidence-path-receipt.md", readme)
+            self.assertIn("dashboard-route.svg", readme)
+            self.assertIn("No live market data: yes", readme)
+            self.assertIn("No broker connection: yes", readme)
+            self.assertIn("Not investment advice: yes", readme)
+            self.assertNotRegex(readme, r"/home/|/Users/|[A-Za-z]:\\")
+            self.assertNotRegex(readme.lower(), r"\b(secret|password|api[_ -]?key|private key)\b")
+            self.assertNotRegex(readme.lower(), r"\b(buy|sell|hold) recommendation\b")
+
+            payload = json.loads((output_dir / "visual-walkthrough.json").read_text(encoding="utf-8"))
+            self.assertEqual(payload["walkthrough"]["visual_format"], "local SVG screenshot guide")
+            self.assertEqual(payload["hygiene_checks"]["portable_paths"], {"status": "pass", "issues": []})
+            self.assertEqual(
+                [step["step"] for step in payload["route"]],
+                ["dashboard_review", "decision_review_pack", "evidence_path_receipt"],
+            )
+            by_asset = {item["path"]: item for item in payload["visual_assets"]}
+            self.assertEqual(
+                by_asset["dashboard-route.svg"]["sha256"],
+                hashlib.sha256((output_dir / "dashboard-route.svg").read_bytes()).hexdigest(),
+            )
+            svg = (output_dir / "evidence-path-route.svg").read_text(encoding="utf-8")
+            self.assertIn("<svg", svg)
+            self.assertIn("No live data, no broker connection, not investment advice.", svg)
 
     def test_scenario_plan_writes_base_bull_bear_payload(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -2457,7 +2497,7 @@ class CliTests(unittest.TestCase):
             self.assertIn("# Watchlist", (output_dir / "watchlist.md").read_text())
             self.assertIn("# Weekly Action Plan", (output_dir / "action-plan.md").read_text())
             manifest = json.loads((output_dir / "manifest.json").read_text())
-            self.assertEqual(manifest["tool_version"], "1.9.1")
+            self.assertEqual(manifest["tool_version"], "1.9.2")
             self.assertEqual(manifest["ledger_ids"], ["oklo-ai-power", "leveraged-etf-discipline"])
             self.assertEqual(manifest["generated_files"], expected_files)
             index_links = [
@@ -2607,11 +2647,11 @@ class CliTests(unittest.TestCase):
             self.assertEqual(sorted(path.name for path in output_dir.iterdir()), sorted(expected_files))
             manifest = json.loads((output_dir / "manifest.json").read_text())
             self.assertEqual(manifest["archive_format"], "portable-research-archive")
-            self.assertEqual(manifest["tool_version"], "1.9.1")
+            self.assertEqual(manifest["tool_version"], "1.9.2")
             self.assertEqual(manifest["ledger_ids"], ["oklo-ai-power", "leveraged-etf-discipline"])
             self.assertEqual(manifest["generated_files"], expected_files)
             summary = json.loads((output_dir / "archive-summary.json").read_text())
-            self.assertEqual(summary["tool_version"], "1.9.1")
+            self.assertEqual(summary["tool_version"], "1.9.2")
             self.assertEqual(summary["ledger_ids"], manifest["ledger_ids"])
             self.assertEqual(summary["archive"]["ledger_count"], 2)
             self.assertEqual(summary["archive"]["file_count"], len(expected_files))
@@ -3099,7 +3139,7 @@ class CliTests(unittest.TestCase):
             self.assertNotIn("<script", (output_dir / "index.html").read_text().lower())
             self.assertNotIn("@import", (output_dir / "style.css").read_text().lower())
             manifest = json.loads((output_dir / "manifest.json").read_text())
-            self.assertEqual(manifest["tool_version"], "1.9.1")
+            self.assertEqual(manifest["tool_version"], "1.9.2")
             self.assertEqual(manifest["ledger_ids"], ["oklo-ai-power", "leveraged-etf-discipline"])
             self.assertEqual(manifest["generated_files"], expected_files)
             self.assertNotIn("timestamp", manifest)
@@ -3295,7 +3335,7 @@ class CliTests(unittest.TestCase):
             self.assertEqual(second.returncode, 0, second.stderr)
             self.assertEqual(output_a.read_text(), output_b.read_text())
             payload = json.loads(output_a.read_text())
-            self.assertEqual(payload["ledger_version"], "1.9.1")
+            self.assertEqual(payload["ledger_version"], "1.9.2")
             self.assertEqual(payload["thesis_id"], "msft-thesis")
             self.assertEqual(payload["sources"][0]["id"], "S1")
             self.assertEqual(payload["assumptions"][0]["source_ids"], ["S1"])
@@ -3583,6 +3623,17 @@ class CliTests(unittest.TestCase):
                     ],
                     ["decision-review-walkthrough.md", "decision-review-walkthrough.json"],
                 ),
+                (
+                    "evidence-path-receipt",
+                    [
+                        "evidence-path-receipt",
+                        "--output",
+                        str(temp_dir / "evidence-path-receipt.md"),
+                        "--json-output",
+                        str(temp_dir / "evidence-path-receipt.json"),
+                    ],
+                    ["evidence-path-receipt.md", "evidence-path-receipt.json"],
+                ),
             ]
             for label, args, filenames in commands:
                 result = self.run_cli(*args)
@@ -3655,6 +3706,11 @@ class CliTests(unittest.TestCase):
             self.assert_output_tree_matches(generated_dashboard, OUTPUT / "html-dashboard")
             self.assertEqual(generated_diff_md.read_text(), (OUTPUT / "archive-diff.md").read_text())
             self.assertEqual(generated_diff_json.read_text(), (OUTPUT / "archive-diff.json").read_text())
+
+            generated_visual = temp_dir / "visual-walkthrough"
+            result = self.run_cli("visual-walkthrough", "--output-dir", str(generated_visual))
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assert_output_tree_matches(generated_visual, OUTPUT / "visual-walkthrough")
 
     def test_invalid_unknown_source_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

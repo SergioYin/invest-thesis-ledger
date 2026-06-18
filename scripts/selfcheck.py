@@ -60,6 +60,11 @@ FIXTURE_OUTPUTS = [
     "decision-review-walkthrough.json",
     "evidence-path-receipt.md",
     "evidence-path-receipt.json",
+    "visual-walkthrough/README.md",
+    "visual-walkthrough/visual-walkthrough.json",
+    "visual-walkthrough/dashboard-route.svg",
+    "visual-walkthrough/decision-review-pack-route.svg",
+    "visual-walkthrough/evidence-path-route.svg",
     "demo-bundle/index.md",
     "demo-bundle/oklo-ai-power-brief.md",
     "demo-bundle/oklo-ai-power-risk.md",
@@ -394,6 +399,16 @@ def main() -> int:
                 str(temp_dir / "evidence-path-receipt.md"),
                 "--json-output",
                 str(temp_dir / "evidence-path-receipt.json"),
+            ]
+        )
+        _run(
+            [
+                sys.executable,
+                "-m",
+                "invest_thesis_ledger",
+                "visual-walkthrough",
+                "--output-dir",
+                str(temp_dir / "visual-walkthrough"),
             ]
         )
         _run(
