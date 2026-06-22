@@ -4,6 +4,12 @@
 
 - No changes yet.
 
+## 1.9.3 - 2026-06-23
+
+- Added `package-readiness-receipt` to emit deterministic Markdown and JSON package publish landing receipts from local/static checked-in files.
+- The receipt records package name/version, public CLI entry points, core docs/demo artifact bytes and SHA-256 hashes, verification commands, release readiness notes, public hygiene checks, and explicit local-only/no-live-data/no-broker/no-order/no-personalized-advice/no-private-data boundaries.
+- Updated package/schema version, README, schema docs, tests, selfcheck, and checked-in fixtures for v1.9.3.
+
 ## 1.9.2 - 2026-06-19
 
 - Added `visual-walkthrough` to write a deterministic local SVG screenshot guide for the no-JS dashboard, Oklo decision review pack, and evidence path receipt route.

@@ -71,6 +71,19 @@ The checked-in equivalent is
 with structured output at
 [examples/output/visual-walkthrough/visual-walkthrough.json](../output/visual-walkthrough/visual-walkthrough.json).
 
+Render the package readiness receipt when a reviewer needs local package
+metadata, public CLI entry points, checked-in artifact hashes, verification
+commands, and finance safety boundaries before publish or landing-page review:
+
+```bash
+python -m invest_thesis_ledger package-readiness-receipt --output /tmp/package-readiness-receipt.md --json-output /tmp/package-readiness-receipt.json
+```
+
+Checked-in equivalents are
+[examples/output/package-readiness-receipt.md](../output/package-readiness-receipt.md)
+and
+[examples/output/package-readiness-receipt.json](../output/package-readiness-receipt.json).
+
 For a public multi-ledger demo bundle:
 
 ```bash

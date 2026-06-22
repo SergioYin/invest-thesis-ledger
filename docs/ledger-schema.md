@@ -1,7 +1,7 @@
-# Ledger Schema v1.9.2
+# Ledger Schema v1.9.3
 
 This document defines the JSON ledger format accepted by `invest-thesis-ledger`
-v1.9.2. Ledgers are research organization records only and are not investment
+v1.9.3. Ledgers are research organization records only and are not investment
 advice.
 
 ## Document Shape
@@ -15,7 +15,7 @@ without breaking the renderer.
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `ledger_version` | string | Schema version. v1.9.2 ledgers should use `"1.9.2"`. v0.1.0 through v1.9.1 remain accepted for compatibility; other values validate with a warning. |
+| `ledger_version` | string | Schema version. v1.9.3 ledgers should use `"1.9.3"`. v0.1.0 through v1.9.2 remain accepted for compatibility; other values validate with a warning. |
 | `thesis_id` | string | Stable machine-readable ledger identifier. |
 | `title` | string | Human-readable thesis title. |
 | `asset` | object | Asset metadata. |
@@ -183,7 +183,7 @@ source, and duplicate source references within one item are invalid.
 
 ## Determinism
 
-For the same input file or ordered input file list, v1.9.2 CLI outputs are
+For the same input file or ordered input file list, v1.9.3 CLI outputs are
 deterministic:
 
 - JSON outputs are serialized with sorted keys and two-space indentation.
@@ -219,6 +219,11 @@ deterministic:
   IDs without timestamps or wall-clock data.
 - HTML dashboard pages escape all HTML with the Python standard library and do
   not include external CSS, JavaScript, images, or fonts.
+- Package readiness receipts list package metadata, public CLI entry points,
+  checked-in public artifact bytes and SHA-256 hashes, verification commands,
+  release readiness notes, public hygiene checks, and finance safety
+  boundaries without timestamps, wall-clock data, absolute paths, live data,
+  broker connections, orders, private data, or personalized investment advice.
 - Evidence stale-source warnings are measured against ledger `updated`, not the
   current wall-clock date.
 - Source reference lists preserve the ledger order inside each item.
@@ -231,7 +236,7 @@ deterministic:
 - Paired Markdown/JSON report commands stage both output files before final
   commit and clean up or restore companions on write failure.
 
-## v1.9.2 Reports
+## v1.9.3 Reports
 
 `compare <old.json> <new.json> --output drift.md --json-output drift.json`
 loads and validates both ledgers, then compares:
@@ -312,6 +317,8 @@ Checked-in generated examples:
 - [decision review pack JSON](../examples/output/oklo-ai-power-decision-review-pack.json)
 - [decision review walkthrough Markdown](../examples/output/decision-review-walkthrough.md)
 - [decision review walkthrough JSON](../examples/output/decision-review-walkthrough.json)
+- [package readiness receipt Markdown](../examples/output/package-readiness-receipt.md)
+- [package readiness receipt JSON](../examples/output/package-readiness-receipt.json)
 - [visual walkthrough guide](../examples/output/visual-walkthrough/README.md)
 - [visual walkthrough JSON](../examples/output/visual-walkthrough/visual-walkthrough.json)
 - [demo bundle index](../examples/output/demo-bundle/index.md)
@@ -332,6 +339,15 @@ evidence path receipt route. The directory contains `README.md`,
 checked-in fixture labels and local artifact paths; it does not fetch live
 market data, connect to broker/account systems, place orders, execute trades,
 or provide investment advice.
+
+`package-readiness-receipt --output package-readiness-receipt.md --json-output package-readiness-receipt.json`
+reads local/static checked-in package files and public demo artifacts, then
+emits deterministic package publish landing evidence. The Markdown and JSON
+include package name/version, public console script entry points, core docs and
+demo artifact bytes/SHA-256 hashes, verification commands, release readiness
+notes, hygiene checks, and explicit finance safety boundaries. It does not
+fetch live data, connect to broker systems, place orders, inspect private data,
+or provide personalized investment advice or recommendations.
 
 `scenario-plan <ledger.json> --output scenario-plan.md --json-output scenario-plan.json`
 loads and validates one ledger, then renders deterministic base, bull, and bear
@@ -358,7 +374,7 @@ Evidence gaps are ordered by review priority: low-confidence assumptions, stale
 sources, unused sources, then unsupported evidence items.
 
 `init-template --asset TICKER --name NAME --type TYPE --output ledger.json`
-writes a deterministic starter ledger with v1.9.2 fields, fixed placeholder
+writes a deterministic starter ledger with v1.9.3 fields, fixed placeholder
 dates, one source-backed assumption, one risk, one review, and a thesis ID
 derived from the ticker.
 

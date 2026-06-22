@@ -1,0 +1,141 @@
+{
+  "finance_safety_boundaries": {
+    "local_static_source_files_only": true,
+    "no_broker": true,
+    "no_live_data": true,
+    "no_orders": true,
+    "no_personalized_investment_advice_or_recommendations": true,
+    "no_private_data": true,
+    "text": "This package readiness receipt inspects local/static checked-in source files and public demo artifacts only. It does not fetch live data, connect to brokers, place orders, produce personalized investment advice or recommendations, or read private data."
+  },
+  "hygiene_checks": {
+    "portable_paths": {
+      "issues": [],
+      "status": "pass"
+    },
+    "public_fixture_hygiene": {
+      "issues": [],
+      "status": "pass"
+    },
+    "secret_terms": {
+      "issues": [],
+      "status": "pass"
+    }
+  },
+  "package": {
+    "name": "invest-thesis-ledger",
+    "requires_python": ">=3.9",
+    "version": "1.9.3"
+  },
+  "public_artifacts": [
+    {
+      "bytes": 25686,
+      "kind": "docs",
+      "path": "README.md",
+      "sha256": "8c25d95f8b163bdbc4306023d69b9e991da1e5b4134282e1afb10c422efe836b"
+    },
+    {
+      "bytes": 16364,
+      "kind": "docs",
+      "path": "CHANGELOG.md",
+      "sha256": "9ee52c3e582eed94c76dcbaa0bd453e1e436e0c68063e880bbdc2d2544303e87"
+    },
+    {
+      "bytes": 29010,
+      "kind": "docs",
+      "path": "docs/ledger-schema.md",
+      "sha256": "b8627bd4bb70c9dbef6e29d8dec52390a76c99cc22d7af190e6e62d6f54fc078"
+    },
+    {
+      "bytes": 920,
+      "kind": "package-metadata",
+      "path": "pyproject.toml",
+      "sha256": "3491f0659b321750839bfde83df22c24128536e99a532cf1e3356223bd60b3dd"
+    },
+    {
+      "bytes": 5035,
+      "kind": "fixture-input",
+      "path": "examples/oklo-ai-power.json",
+      "sha256": "e275acdb478565eb9c5a91d8b1fe7309f308d6b112fadab25c26596308da2cb6"
+    },
+    {
+      "bytes": 3926,
+      "kind": "fixture-input",
+      "path": "examples/leveraged-etf-discipline.json",
+      "sha256": "b538a1256b9c824eb18b9b1f954008472faa88f7116bbe54c2831c499a37a9af"
+    },
+    {
+      "bytes": 4595,
+      "kind": "demo-output",
+      "path": "examples/output/oklo-ai-power-decision-review-pack.md",
+      "sha256": "d5b46e7440c9cdffc147c38856abdfcc7c51a5d439938780165cb48583c2044b"
+    },
+    {
+      "bytes": 9644,
+      "kind": "demo-output",
+      "path": "examples/output/oklo-ai-power-decision-review-pack.json",
+      "sha256": "f149c8c448277707ac701bdbc491ba00b50327612f7ce683232079c470cdc5be"
+    },
+    {
+      "bytes": 3880,
+      "kind": "demo-output",
+      "path": "examples/output/quickstart-receipt.md",
+      "sha256": "3c39b79ffc30c74631f0939aa2b723e7df78e2504b980d50b16f1522a9572d95"
+    },
+    {
+      "bytes": 5091,
+      "kind": "demo-output",
+      "path": "examples/output/quickstart-receipt.json",
+      "sha256": "fbc42b0811b5dac44d5e28536c5fa83e8cd08289c0194b66d76c49c0aaca9e0f"
+    },
+    {
+      "bytes": 5265,
+      "kind": "demo-output",
+      "path": "examples/output/evidence-path-receipt.md",
+      "sha256": "e55f7c8c6740eef18c2afca38b1ab120090436b45b6e138f20e9e8ff4e9f6e7b"
+    },
+    {
+      "bytes": 9553,
+      "kind": "demo-output",
+      "path": "examples/output/evidence-path-receipt.json",
+      "sha256": "7830629279eb9666335832f258b0c1f14f0fc56da12f198b8b1ccfe35bf1a844"
+    },
+    {
+      "bytes": 3409,
+      "kind": "demo-output",
+      "path": "examples/output/visual-walkthrough/README.md",
+      "sha256": "31048d5fbd9f08f50775bdb330c4f760fecf08f400da99f5ceae0ce56bae4a4d"
+    },
+    {
+      "bytes": 4080,
+      "kind": "demo-output",
+      "path": "examples/output/visual-walkthrough/visual-walkthrough.json",
+      "sha256": "6b5fee76dc1247c38ec6d9e5a972c22a4c5b4fc735ae8b07b2f46ce235fd4b60"
+    }
+  ],
+  "public_cli_entry_points": [
+    {
+      "name": "invest-thesis-ledger",
+      "target": "invest_thesis_ledger.cli:main"
+    }
+  ],
+  "receipt": {
+    "deterministic": true,
+    "tool_version": "1.9.3",
+    "workflow": "package publish landing readiness receipt",
+    "zero_dependencies": true
+  },
+  "release_readiness_notes": [
+    "Package metadata name and version are present in pyproject.toml.",
+    "Console script entry points are public and deterministic.",
+    "README, schema docs, changelog, and demo receipt artifacts are checked in.",
+    "Examples are local fixtures and generated static artifacts only.",
+    "No timestamp, wall-clock, live market data, broker, order, private path, or credential material is included."
+  ],
+  "verification_commands": [
+    "python -m invest_thesis_ledger --version",
+    "python -m invest_thesis_ledger package-readiness-receipt --output examples/output/package-readiness-receipt.md --json-output examples/output/package-readiness-receipt.json",
+    "python scripts/selfcheck.py",
+    "python -m unittest discover -s tests"
+  ]
+}

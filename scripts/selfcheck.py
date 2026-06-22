@@ -60,6 +60,8 @@ FIXTURE_OUTPUTS = [
     "decision-review-walkthrough.json",
     "evidence-path-receipt.md",
     "evidence-path-receipt.json",
+    "package-readiness-receipt.md",
+    "package-readiness-receipt.json",
     "visual-walkthrough/README.md",
     "visual-walkthrough/visual-walkthrough.json",
     "visual-walkthrough/dashboard-route.svg",
@@ -399,6 +401,18 @@ def main() -> int:
                 str(temp_dir / "evidence-path-receipt.md"),
                 "--json-output",
                 str(temp_dir / "evidence-path-receipt.json"),
+            ]
+        )
+        _run(
+            [
+                sys.executable,
+                "-m",
+                "invest_thesis_ledger",
+                "package-readiness-receipt",
+                "--output",
+                str(temp_dir / "package-readiness-receipt.md"),
+                "--json-output",
+                str(temp_dir / "package-readiness-receipt.json"),
             ]
         )
         _run(

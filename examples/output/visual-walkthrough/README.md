@@ -3,7 +3,7 @@
 > This is a research organization tool, not investment advice.
 
 - Workflow: bounded visual walkthrough screenshot guide
-- Tool version: 1.9.2
+- Tool version: 1.9.3
 - Deterministic: yes
 - Zero dependencies: yes
 - Fixture source: checked-in demo ledgers
@@ -41,10 +41,10 @@
 
 | Path | Bytes | SHA-256 |
 | --- | ---: | --- |
-| `examples/output/html-dashboard/index.html` | 1518 | `208168a583d53779dc377ec1923d590499c9483d361f28312d1d3ad7857b1ce2` |
+| `examples/output/html-dashboard/index.html` | 1518 | `9e72bf48eece5b7bba3bd87015ba17ead2bc4e0b2c61dcac7f3e1f41a61bdf3b` |
 | `examples/output/oklo-ai-power-decision-review-pack.md` | 4595 | `d5b46e7440c9cdffc147c38856abdfcc7c51a5d439938780165cb48583c2044b` |
-| `examples/output/evidence-path-receipt.md` | 5265 | `44dad31cc9792f8fef5eb08281130e9741921d87ca38da962d4743b7781682a4` |
-| `examples/output/evidence-path-receipt.json` | 9553 | `a665fa568382f4103e9faa239ff8053d970245e7e2cbc5a494e9b15a6eb94365` |
+| `examples/output/evidence-path-receipt.md` | 5265 | `e55f7c8c6740eef18c2afca38b1ab120090436b45b6e138f20e9e8ff4e9f6e7b` |
+| `examples/output/evidence-path-receipt.json` | 9553 | `7830629279eb9666335832f258b0c1f14f0fc56da12f198b8b1ccfe35bf1a844` |
 
 ## Visual Assets
 

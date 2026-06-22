@@ -94,7 +94,7 @@
   "walkthrough": {
     "deterministic": true,
     "fixture_source": "checked-in demo ledgers",
-    "tool_version": "1.9.2",
+    "tool_version": "1.9.3",
     "workflow": "bounded decision review walkthrough",
     "zero_dependencies": true
   }

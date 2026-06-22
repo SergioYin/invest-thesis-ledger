@@ -66,19 +66,19 @@
   "generated_artifacts": [
     {
       "bytes": 3661,
-      "checked_in_sha256": "948aabaf35aaf033ae097d45bbd41236c72f944c419b2dc502d224e8b932492f",
+      "checked_in_sha256": "5d6f47b21bb97154db9a78b1e3394ff485d28a7d58abcd5ef1a1376145a30595",
       "kind": "walkthrough",
       "matches_checked_in": true,
       "path": "examples/output/decision-review-walkthrough.json",
-      "sha256": "948aabaf35aaf033ae097d45bbd41236c72f944c419b2dc502d224e8b932492f"
+      "sha256": "5d6f47b21bb97154db9a78b1e3394ff485d28a7d58abcd5ef1a1376145a30595"
     },
     {
       "bytes": 2917,
-      "checked_in_sha256": "0b6267349f21b2a0b7d23f9c8f5f090c6b712724425dddcc13dc1a289e352c28",
+      "checked_in_sha256": "f3353da1449797e37a9107f62eceaa117ff8e56a8a6f05093eda91898259e96b",
       "kind": "walkthrough",
       "matches_checked_in": true,
       "path": "examples/output/decision-review-walkthrough.md",
-      "sha256": "0b6267349f21b2a0b7d23f9c8f5f090c6b712724425dddcc13dc1a289e352c28"
+      "sha256": "f3353da1449797e37a9107f62eceaa117ff8e56a8a6f05093eda91898259e96b"
     },
     {
       "bytes": 6807,
@@ -98,11 +98,11 @@
     },
     {
       "bytes": 1518,
-      "checked_in_sha256": "208168a583d53779dc377ec1923d590499c9483d361f28312d1d3ad7857b1ce2",
+      "checked_in_sha256": "9e72bf48eece5b7bba3bd87015ba17ead2bc4e0b2c61dcac7f3e1f41a61bdf3b",
       "kind": "dashboard",
       "matches_checked_in": true,
       "path": "examples/output/html-dashboard/index.html",
-      "sha256": "208168a583d53779dc377ec1923d590499c9483d361f28312d1d3ad7857b1ce2"
+      "sha256": "9e72bf48eece5b7bba3bd87015ba17ead2bc4e0b2c61dcac7f3e1f41a61bdf3b"
     },
     {
       "bytes": 5569,
@@ -114,11 +114,11 @@
     },
     {
       "bytes": 346,
-      "checked_in_sha256": "57c96b37a40bacc016aad1d4e73b7986e2f388bb9bfdd330f7d12a9b33728ed6",
+      "checked_in_sha256": "0eb2b65f94d30dd3b51d2625586ef04dcebc0b7a4a9dc7f3c9820ab237af4522",
       "kind": "dashboard",
       "matches_checked_in": true,
       "path": "examples/output/html-dashboard/manifest.json",
-      "sha256": "57c96b37a40bacc016aad1d4e73b7986e2f388bb9bfdd330f7d12a9b33728ed6"
+      "sha256": "0eb2b65f94d30dd3b51d2625586ef04dcebc0b7a4a9dc7f3c9820ab237af4522"
     },
     {
       "bytes": 5849,
@@ -186,19 +186,19 @@
     },
     {
       "bytes": 5091,
-      "checked_in_sha256": "58f3b872958886ab6809c76b8c241f2e47da8de6e9a3b1a998a58baf71393c26",
+      "checked_in_sha256": "fbc42b0811b5dac44d5e28536c5fa83e8cd08289c0194b66d76c49c0aaca9e0f",
       "kind": "receipt",
       "matches_checked_in": true,
       "path": "examples/output/quickstart-receipt.json",
-      "sha256": "58f3b872958886ab6809c76b8c241f2e47da8de6e9a3b1a998a58baf71393c26"
+      "sha256": "fbc42b0811b5dac44d5e28536c5fa83e8cd08289c0194b66d76c49c0aaca9e0f"
     },
     {
       "bytes": 3880,
-      "checked_in_sha256": "34223d9563f894ff764aa6aea539a87373c60e6d7b524d85106380a4accd3455",
+      "checked_in_sha256": "3c39b79ffc30c74631f0939aa2b723e7df78e2504b980d50b16f1522a9572d95",
       "kind": "receipt",
       "matches_checked_in": true,
       "path": "examples/output/quickstart-receipt.md",
-      "sha256": "34223d9563f894ff764aa6aea539a87373c60e6d7b524d85106380a4accd3455"
+      "sha256": "3c39b79ffc30c74631f0939aa2b723e7df78e2504b980d50b16f1522a9572d95"
     },
     {
       "bytes": 2819,
@@ -248,7 +248,7 @@
   "receipt": {
     "deterministic": true,
     "fixture_source": "checked-in demo ledgers",
-    "tool_version": "1.9.2",
+    "tool_version": "1.9.3",
     "workflow": "bounded evidence path walkthrough receipt",
     "zero_dependencies": true
   }

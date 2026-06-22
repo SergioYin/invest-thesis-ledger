@@ -257,6 +257,14 @@ def build_parser() -> argparse.ArgumentParser:
     _add_output_args(evidence_path)
     evidence_path.set_defaults(func=_cmd_evidence_path_receipt)
 
+    package_readiness = subparsers.add_parser(
+        "package-readiness-receipt",
+        help="write a deterministic package publish readiness receipt",
+        description="write a deterministic package publish readiness receipt.",
+    )
+    _add_output_args(package_readiness)
+    package_readiness.set_defaults(func=_cmd_package_readiness_receipt)
+
     visual_walkthrough = subparsers.add_parser(
         "visual-walkthrough",
         help="write a deterministic visual screenshot guide from demo fixtures",
@@ -719,6 +727,27 @@ def _cmd_evidence_path_receipt(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_package_readiness_receipt(args: argparse.Namespace) -> int:
+    try:
+        payload = _package_readiness_receipt_payload()
+    except OSError as exc:
+        sys.stderr.write(f"error: cannot build package readiness receipt: {exc}\n")
+        return 2
+    except ValueError as exc:
+        sys.stderr.write(f"error: cannot build package readiness receipt: {exc}\n")
+        return 1
+    status = _write_text_outputs(
+        (
+            (args.output, _render_package_readiness_receipt(payload)),
+            (args.json_output, to_json(payload)),
+        )
+    )
+    if status:
+        return status
+    sys.stdout.write(f"wrote: {args.output}, {args.json_output}\n")
+    return 0
+
+
 def _cmd_visual_walkthrough(args: argparse.Namespace) -> int:
     output_dir = Path(args.output_dir)
     if output_dir.exists() and (not output_dir.is_dir() or output_dir.is_symlink()):
@@ -987,6 +1016,168 @@ def _evidence_path_receipt_payload() -> dict:
         },
         "boundaries": boundaries,
     }
+
+
+def _package_readiness_receipt_payload() -> dict:
+    root = Path(__file__).resolve().parents[1]
+    pyproject_path = root / "pyproject.toml"
+    pyproject_text = pyproject_path.read_text(encoding="utf-8")
+    package_name = _extract_pyproject_string(pyproject_text, "name")
+    package_version = _extract_pyproject_string(pyproject_text, "version")
+    if package_version != __version__:
+        raise ValueError(f"pyproject version {package_version} does not match package version {__version__}")
+
+    entry_points = _pyproject_entry_points(pyproject_text)
+    public_artifacts = _package_readiness_artifacts(root)
+    boundaries = {
+        "local_static_source_files_only": True,
+        "no_live_data": True,
+        "no_broker": True,
+        "no_orders": True,
+        "no_personalized_investment_advice_or_recommendations": True,
+        "no_private_data": True,
+        "text": (
+            "This package readiness receipt inspects local/static checked-in source files and public demo "
+            "artifacts only. It does not fetch live data, connect to brokers, place orders, produce "
+            "personalized investment advice or recommendations, or read private data."
+        ),
+    }
+    verification_commands = [
+        "python -m invest_thesis_ledger --version",
+        "python -m invest_thesis_ledger package-readiness-receipt "
+        "--output examples/output/package-readiness-receipt.md "
+        "--json-output examples/output/package-readiness-receipt.json",
+        "python scripts/selfcheck.py",
+        "python -m unittest discover -s tests",
+    ]
+    static_text = _package_readiness_static_text(
+        package_name,
+        package_version,
+        entry_points,
+        public_artifacts,
+        verification_commands,
+        boundaries,
+    )
+    hygiene_issues = public_fixture_hygiene_issues(root)
+    release_notes = [
+        "Package metadata name and version are present in pyproject.toml.",
+        "Console script entry points are public and deterministic.",
+        "README, schema docs, changelog, and demo receipt artifacts are checked in.",
+        "Examples are local fixtures and generated static artifacts only.",
+        "No timestamp, wall-clock, live market data, broker, order, private path, or credential material is included.",
+    ]
+    return {
+        "receipt": {
+            "workflow": "package publish landing readiness receipt",
+            "tool_version": __version__,
+            "deterministic": True,
+            "zero_dependencies": True,
+        },
+        "package": {
+            "name": package_name,
+            "version": package_version,
+            "requires_python": _extract_pyproject_string(pyproject_text, "requires-python"),
+        },
+        "public_cli_entry_points": entry_points,
+        "public_artifacts": public_artifacts,
+        "verification_commands": verification_commands,
+        "release_readiness_notes": release_notes,
+        "hygiene_checks": {
+            "public_fixture_hygiene": _check_result(not hygiene_issues, hygiene_issues),
+            "portable_paths": _check_result(not _has_private_path(static_text), []),
+            "secret_terms": _check_result(not _has_secret_term(static_text), []),
+        },
+        "finance_safety_boundaries": boundaries,
+    }
+
+
+def _package_readiness_artifacts(root: Path) -> list[dict]:
+    artifact_paths = [
+        "README.md",
+        "CHANGELOG.md",
+        "docs/ledger-schema.md",
+        "pyproject.toml",
+        "examples/oklo-ai-power.json",
+        "examples/leveraged-etf-discipline.json",
+        "examples/output/oklo-ai-power-decision-review-pack.md",
+        "examples/output/oklo-ai-power-decision-review-pack.json",
+        "examples/output/quickstart-receipt.md",
+        "examples/output/quickstart-receipt.json",
+        "examples/output/evidence-path-receipt.md",
+        "examples/output/evidence-path-receipt.json",
+        "examples/output/visual-walkthrough/README.md",
+        "examples/output/visual-walkthrough/visual-walkthrough.json",
+    ]
+    artifacts = []
+    for relative_path in artifact_paths:
+        path = root / relative_path
+        if path.is_symlink() or not path.is_file():
+            raise ValueError(f"missing public package artifact: {relative_path}")
+        data = path.read_bytes()
+        artifacts.append(
+            {
+                "path": relative_path,
+                "kind": _package_artifact_kind(relative_path),
+                "bytes": len(data),
+                "sha256": hashlib.sha256(data).hexdigest(),
+            }
+        )
+    return artifacts
+
+
+def _package_artifact_kind(path: str) -> str:
+    if path.startswith("docs/") or path in {"README.md", "CHANGELOG.md"}:
+        return "docs"
+    if path == "pyproject.toml":
+        return "package-metadata"
+    if path.startswith("examples/output/"):
+        return "demo-output"
+    return "fixture-input"
+
+
+def _extract_pyproject_string(text: str, key: str) -> str:
+    match = re.search(rf'^{re.escape(key)} = "([^"]+)"', text, flags=re.MULTILINE)
+    if match is None:
+        raise ValueError(f"pyproject.toml missing {key}")
+    return match.group(1)
+
+
+def _pyproject_entry_points(text: str) -> list[dict]:
+    in_scripts = False
+    entry_points = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped == "[project.scripts]":
+            in_scripts = True
+            continue
+        if in_scripts and stripped.startswith("["):
+            break
+        if not in_scripts or not stripped or stripped.startswith("#"):
+            continue
+        match = re.match(r'([A-Za-z0-9_.-]+)\s*=\s*"([^"]+)"$', stripped)
+        if match:
+            entry_points.append({"name": match.group(1), "target": match.group(2)})
+    if not entry_points:
+        raise ValueError("pyproject.toml missing project.scripts entry points")
+    return sorted(entry_points, key=lambda item: item["name"])
+
+
+def _package_readiness_static_text(
+    package_name: str,
+    package_version: str,
+    entry_points: Sequence[Mapping[str, object]],
+    artifacts: Sequence[Mapping[str, object]],
+    commands: Sequence[str],
+    boundaries: Mapping[str, object],
+) -> str:
+    fields = [package_name, package_version]
+    for entry_point in entry_points:
+        fields.extend(str(entry_point[key]) for key in ("name", "target"))
+    for artifact in artifacts:
+        fields.extend(str(artifact[key]) for key in ("path", "sha256"))
+    fields.extend(commands)
+    fields.append(str(boundaries["text"]))
+    return "\n".join(fields)
 
 
 def _evidence_path_artifacts(
@@ -1303,6 +1494,70 @@ def _render_evidence_path_receipt(payload: Mapping[str, object]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _render_package_readiness_receipt(payload: Mapping[str, object]) -> str:
+    receipt = payload["receipt"]
+    package = payload["package"]
+    boundaries = payload["finance_safety_boundaries"]
+    assert isinstance(receipt, Mapping)
+    assert isinstance(package, Mapping)
+    assert isinstance(boundaries, Mapping)
+    lines = [
+        "# Package Readiness Receipt",
+        "",
+        "> This is a research organization tool, not investment advice.",
+        "",
+        f"- Workflow: {_receipt_inline(receipt['workflow'])}",
+        f"- Tool version: {_receipt_inline(receipt['tool_version'])}",
+        f"- Deterministic: {_receipt_bool(receipt['deterministic'])}",
+        f"- Zero dependencies: {_receipt_bool(receipt['zero_dependencies'])}",
+        "",
+        "## Package Metadata",
+        "",
+        f"- Name: {_receipt_inline(package['name'])}",
+        f"- Version: {_receipt_inline(package['version'])}",
+        f"- Requires Python: {_receipt_inline(package['requires_python'])}",
+        "",
+        "## Public CLI Entry Points",
+        "",
+    ]
+    for entry_point in payload["public_cli_entry_points"]:
+        lines.append(f"- `{entry_point['name']}` -> `{entry_point['target']}`")
+    lines.extend(["", "## Public Artifact Evidence", ""])
+    lines.extend(["| Path | Kind | Bytes | SHA-256 |", "| --- | --- | ---: | --- |"])
+    for item in payload["public_artifacts"]:
+        lines.append(
+            f"| `{item['path']}` | {_receipt_inline(item['kind'])} | {item['bytes']} | `{item['sha256']}` |"
+        )
+    lines.extend(["", "## Verification Commands", ""])
+    for command in payload["verification_commands"]:
+        lines.append(f"- `{command}`")
+    lines.extend(["", "## Release and Landing Readiness Notes", ""])
+    for note in payload["release_readiness_notes"]:
+        lines.append(f"- {_receipt_inline(note)}")
+    lines.extend(["", "## Hygiene Checks", ""])
+    for name, result in payload["hygiene_checks"].items():
+        lines.append(f"- {_receipt_inline(name)}: {_receipt_inline(result['status'])}")
+        for issue in result["issues"]:
+            lines.append(f"  - {_receipt_inline(issue)}")
+    lines.extend(
+        [
+            "",
+            "## Finance Safety Boundaries",
+            "",
+            f"- Local/static source files only: {_receipt_bool(boundaries['local_static_source_files_only'])}",
+            f"- No live data: {_receipt_bool(boundaries['no_live_data'])}",
+            f"- No broker: {_receipt_bool(boundaries['no_broker'])}",
+            f"- No orders: {_receipt_bool(boundaries['no_orders'])}",
+            "- No personalized investment advice/recommendations: "
+            f"{_receipt_bool(boundaries['no_personalized_investment_advice_or_recommendations'])}",
+            f"- No private data: {_receipt_bool(boundaries['no_private_data'])}",
+            "",
+            _receipt_inline(boundaries["text"]),
+        ]
+    )
+    return "\n".join(lines) + "\n"
+
+
 def _receipt_bool(value: object) -> str:
     return "yes" if value is True else "no"
 
@@ -1362,12 +1617,26 @@ def _write_rendered_outputs(ledger: dict, outputs: Sequence[tuple[str, Callable[
 
 def _write_text_outputs(outputs: Sequence[tuple[str, str]]) -> int:
     if len(outputs) > 1:
+        duplicate = _duplicate_output_path(outputs)
+        if duplicate is not None:
+            sys.stderr.write(f"error: duplicate output path: {duplicate}\n")
+            return 2
         return _write_paired_text_outputs(outputs)
     for output_path, text in outputs:
         status = _write_output(output_path, lambda output_path=output_path, text=text: _write_text(output_path, text))
         if status:
             return status
     return 0
+
+
+def _duplicate_output_path(outputs: Sequence[tuple[str, str]]) -> Optional[str]:
+    seen: set[Path] = set()
+    for output_path, _ in outputs:
+        normalized = Path(output_path).expanduser().resolve(strict=False)
+        if normalized in seen:
+            return output_path
+        seen.add(normalized)
+    return None
 
 
 def _write_paired_text_outputs(outputs: Sequence[tuple[str, str]]) -> int:

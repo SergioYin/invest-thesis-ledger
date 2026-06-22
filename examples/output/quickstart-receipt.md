@@ -3,7 +3,7 @@
 > This is a research organization tool, not investment advice.
 
 - Workflow: cold-reviewer quickstart receipt
-- Tool version: 1.9.2
+- Tool version: 1.9.3
 - Deterministic: yes
 - Zero dependencies: yes
 
@@ -26,9 +26,9 @@
 | --- | --- | ---: | --- |
 | `examples/output/html-dashboard/action-plan.html` | dashboard | 6807 | `bc8693d4c6498785687731ee4d4dc95251ac2f4acb6babec0e991691544da8f3` |
 | `examples/output/html-dashboard/evidence-audit.html` | dashboard | 2820 | `768b6f9c2acd6960d3aebe02aeeafb5171c00d97db9f403a36181a0a85a91112` |
-| `examples/output/html-dashboard/index.html` | dashboard | 1518 | `208168a583d53779dc377ec1923d590499c9483d361f28312d1d3ad7857b1ce2` |
+| `examples/output/html-dashboard/index.html` | dashboard | 1518 | `9e72bf48eece5b7bba3bd87015ba17ead2bc4e0b2c61dcac7f3e1f41a61bdf3b` |
 | `examples/output/html-dashboard/leveraged-etf-discipline.html` | dashboard | 5569 | `1017429f90e6b3f6b4a536384f0b7b07cf5cc982dc533442f53e57c7d694dc3f` |
-| `examples/output/html-dashboard/manifest.json` | dashboard | 346 | `57c96b37a40bacc016aad1d4e73b7986e2f388bb9bfdd330f7d12a9b33728ed6` |
+| `examples/output/html-dashboard/manifest.json` | dashboard | 346 | `0eb2b65f94d30dd3b51d2625586ef04dcebc0b7a4a9dc7f3c9820ab237af4522` |
 | `examples/output/html-dashboard/oklo-ai-power.html` | dashboard | 5849 | `48ed09388ee7ddf657b8e6c350fc99a5ac59fa76ddc8f02cca2127569fdce981` |
 | `examples/output/html-dashboard/portfolio.html` | dashboard | 3494 | `5cc3a89b7bc828b8df61d9e749ab7ac4342552ee3b16514e043243bd8d119c9b` |
 | `examples/output/html-dashboard/style.css` | dashboard | 1505 | `9782f8bde5983d76c244fd01925accb96a45adeb6c2cbc86e14c5ddc2eb2e160` |

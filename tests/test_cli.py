@@ -241,13 +241,19 @@ class CliTests(unittest.TestCase):
         evidence_path = self.run_cli("evidence-path-receipt", "--help")
         self.assertEqual(evidence_path.returncode, 0, evidence_path.stderr)
         self.assertIn("evidence path walkthrough receipt", evidence_path.stdout)
+        self.assertIn("write Markdown output to PATH", evidence_path.stdout)
+        self.assertIn("write JSON output to PATH", evidence_path.stdout)
+
+        package_readiness = self.run_cli("package-readiness-receipt", "--help")
+        self.assertEqual(package_readiness.returncode, 0, package_readiness.stderr)
+        self.assertIn("package publish readiness receipt", package_readiness.stdout)
+        self.assertIn("write Markdown output to PATH", package_readiness.stdout)
+        self.assertIn("write JSON output to PATH", package_readiness.stdout)
 
         visual_walkthrough = self.run_cli("visual-walkthrough", "--help")
         self.assertEqual(visual_walkthrough.returncode, 0, visual_walkthrough.stderr)
         self.assertIn("visual screenshot guide", visual_walkthrough.stdout)
         self.assertIn("write visual walkthrough guide and SVG assets to DIR", visual_walkthrough.stdout)
-        self.assertIn("write Markdown output to PATH", evidence_path.stdout)
-        self.assertIn("write JSON output to PATH", evidence_path.stdout)
 
         archive = self.run_cli("archive", "--help")
         self.assertEqual(archive.returncode, 0, archive.stderr)
@@ -342,6 +348,7 @@ class CliTests(unittest.TestCase):
             ("quickstart-receipt", []),
             ("decision-review-walkthrough", []),
             ("evidence-path-receipt", []),
+            ("package-readiness-receipt", []),
         )
         for command, positional_args in commands:
             with self.subTest(command=command), tempfile.TemporaryDirectory() as temp:
@@ -366,6 +373,47 @@ class CliTests(unittest.TestCase):
                 self.assertNotIn("Traceback", stderr)
                 self.assertFalse(md_path.exists())
                 self.assertFalse(json_path.exists())
+
+    def test_paired_outputs_reject_duplicate_paths(self) -> None:
+        commands = (
+            ("risk", [str(EXAMPLE)]),
+            ("history", [str(EXAMPLE)]),
+            ("calendar", [str(EXAMPLE)]),
+            ("evidence", [str(EXAMPLE)]),
+            ("broker-matrix", [str(EXAMPLE)]),
+            ("exposure", [str(EXAMPLE)]),
+            ("decision-memo", [str(EXAMPLE)]),
+            ("decision-review-pack", [str(EXAMPLE)]),
+            ("scenario-plan", [str(EXAMPLE)]),
+            ("compare", [str(PRIOR_EXAMPLE), str(EXAMPLE)]),
+            ("portfolio", [str(EXAMPLE), str(ETF_EXAMPLE)]),
+            ("evidence-audit", [str(EXAMPLE), str(ETF_EXAMPLE)]),
+            ("review-queue", [str(EXAMPLE), str(ETF_EXAMPLE)]),
+            ("watchlist", [str(EXAMPLE), str(ETF_EXAMPLE)]),
+            ("action-plan", [str(EXAMPLE), str(ETF_EXAMPLE)]),
+            ("diff-archive", [str(ARCHIVE_FIXTURE), str(ARCHIVE_FIXTURE)]),
+            ("quickstart-receipt", []),
+            ("decision-review-walkthrough", []),
+            ("evidence-path-receipt", []),
+            ("package-readiness-receipt", []),
+        )
+        for command, positional_args in commands:
+            with self.subTest(command=command), tempfile.TemporaryDirectory() as temp:
+                output_path = Path(temp) / f"{command}.out"
+
+                status, stdout, stderr = self.run_cli_in_process(
+                    command,
+                    *positional_args,
+                    "--output",
+                    str(output_path),
+                    "--json-output",
+                    str(output_path),
+                )
+
+                self.assertEqual(status, 2)
+                self.assertEqual(stdout, "")
+                self.assertEqual(stderr, f"error: duplicate output path: {output_path}\n")
+                self.assertFalse(output_path.exists())
 
     def test_command_level_invalid_ledgers_do_not_write_outputs(self) -> None:
         commands = (
@@ -1031,6 +1079,55 @@ class CliTests(unittest.TestCase):
             self.assertEqual(
                 by_path["examples/output/html-dashboard/index.html"]["sha256"],
                 hashlib.sha256((OUTPUT / "html-dashboard" / "index.html").read_bytes()).hexdigest(),
+            )
+
+    def test_package_readiness_receipt_writes_local_package_evidence_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_dir = Path(temp)
+            md_path = temp_dir / "package-readiness-receipt.md"
+            json_path = temp_dir / "package-readiness-receipt.json"
+            result = self.run_cli(
+                "package-readiness-receipt",
+                "--output",
+                str(md_path),
+                "--json-output",
+                str(json_path),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            text = md_path.read_text(encoding="utf-8")
+            self.assertIn("# Package Readiness Receipt", text)
+            self.assertIn("invest-thesis-ledger", text)
+            self.assertIn("`invest-thesis-ledger` -> `invest_thesis_ledger.cli:main`", text)
+            self.assertIn("examples/output/quickstart-receipt.md", text)
+            self.assertIn("Local/static source files only: yes", text)
+            self.assertIn("No live data: yes", text)
+            self.assertIn("No broker: yes", text)
+            self.assertIn("No orders: yes", text)
+            self.assertIn("No personalized investment advice/recommendations: yes", text)
+            self.assertIn("No private data: yes", text)
+            self.assertNotRegex(text, r"/home/|/Users/|[A-Za-z]:\\")
+            self.assertNotRegex(text.lower(), r"\b(secret|password|api[_ -]?key|private key)\b")
+            self.assertNotRegex(text.lower(), r"\b(buy|sell|hold) recommendation\b")
+
+            payload = json.loads(json_path.read_text(encoding="utf-8"))
+            self.assertEqual(payload["package"]["name"], "invest-thesis-ledger")
+            self.assertEqual(payload["package"]["version"], __version__)
+            self.assertEqual(
+                payload["public_cli_entry_points"],
+                [{"name": "invest-thesis-ledger", "target": "invest_thesis_ledger.cli:main"}],
+            )
+            self.assertTrue(payload["finance_safety_boundaries"]["local_static_source_files_only"])
+            self.assertTrue(payload["finance_safety_boundaries"]["no_private_data"])
+            self.assertEqual(payload["hygiene_checks"]["portable_paths"], {"status": "pass", "issues": []})
+            self.assertEqual(payload["hygiene_checks"]["secret_terms"], {"status": "pass", "issues": []})
+            by_path = {item["path"]: item for item in payload["public_artifacts"]}
+            self.assertEqual(
+                by_path["README.md"]["sha256"],
+                hashlib.sha256((ROOT / "README.md").read_bytes()).hexdigest(),
+            )
+            self.assertEqual(
+                by_path["examples/output/quickstart-receipt.md"]["sha256"],
+                hashlib.sha256((OUTPUT / "quickstart-receipt.md").read_bytes()).hexdigest(),
             )
 
     def test_decision_review_walkthrough_writes_fixture_backed_evidence_artifact(self) -> None:
@@ -2497,7 +2594,7 @@ class CliTests(unittest.TestCase):
             self.assertIn("# Watchlist", (output_dir / "watchlist.md").read_text())
             self.assertIn("# Weekly Action Plan", (output_dir / "action-plan.md").read_text())
             manifest = json.loads((output_dir / "manifest.json").read_text())
-            self.assertEqual(manifest["tool_version"], "1.9.2")
+            self.assertEqual(manifest["tool_version"], "1.9.3")
             self.assertEqual(manifest["ledger_ids"], ["oklo-ai-power", "leveraged-etf-discipline"])
             self.assertEqual(manifest["generated_files"], expected_files)
             index_links = [
@@ -2647,11 +2744,11 @@ class CliTests(unittest.TestCase):
             self.assertEqual(sorted(path.name for path in output_dir.iterdir()), sorted(expected_files))
             manifest = json.loads((output_dir / "manifest.json").read_text())
             self.assertEqual(manifest["archive_format"], "portable-research-archive")
-            self.assertEqual(manifest["tool_version"], "1.9.2")
+            self.assertEqual(manifest["tool_version"], "1.9.3")
             self.assertEqual(manifest["ledger_ids"], ["oklo-ai-power", "leveraged-etf-discipline"])
             self.assertEqual(manifest["generated_files"], expected_files)
             summary = json.loads((output_dir / "archive-summary.json").read_text())
-            self.assertEqual(summary["tool_version"], "1.9.2")
+            self.assertEqual(summary["tool_version"], "1.9.3")
             self.assertEqual(summary["ledger_ids"], manifest["ledger_ids"])
             self.assertEqual(summary["archive"]["ledger_count"], 2)
             self.assertEqual(summary["archive"]["file_count"], len(expected_files))
@@ -3139,7 +3236,7 @@ class CliTests(unittest.TestCase):
             self.assertNotIn("<script", (output_dir / "index.html").read_text().lower())
             self.assertNotIn("@import", (output_dir / "style.css").read_text().lower())
             manifest = json.loads((output_dir / "manifest.json").read_text())
-            self.assertEqual(manifest["tool_version"], "1.9.2")
+            self.assertEqual(manifest["tool_version"], "1.9.3")
             self.assertEqual(manifest["ledger_ids"], ["oklo-ai-power", "leveraged-etf-discipline"])
             self.assertEqual(manifest["generated_files"], expected_files)
             self.assertNotIn("timestamp", manifest)
@@ -3335,7 +3432,7 @@ class CliTests(unittest.TestCase):
             self.assertEqual(second.returncode, 0, second.stderr)
             self.assertEqual(output_a.read_text(), output_b.read_text())
             payload = json.loads(output_a.read_text())
-            self.assertEqual(payload["ledger_version"], "1.9.2")
+            self.assertEqual(payload["ledger_version"], "1.9.3")
             self.assertEqual(payload["thesis_id"], "msft-thesis")
             self.assertEqual(payload["sources"][0]["id"], "S1")
             self.assertEqual(payload["assumptions"][0]["source_ids"], ["S1"])
@@ -3633,6 +3730,17 @@ class CliTests(unittest.TestCase):
                         str(temp_dir / "evidence-path-receipt.json"),
                     ],
                     ["evidence-path-receipt.md", "evidence-path-receipt.json"],
+                ),
+                (
+                    "package-readiness-receipt",
+                    [
+                        "package-readiness-receipt",
+                        "--output",
+                        str(temp_dir / "package-readiness-receipt.md"),
+                        "--json-output",
+                        str(temp_dir / "package-readiness-receipt.json"),
+                    ],
+                    ["package-readiness-receipt.md", "package-readiness-receipt.json"],
                 ),
             ]
             for label, args, filenames in commands:
